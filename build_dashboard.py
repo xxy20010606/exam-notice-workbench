@@ -36,25 +36,25 @@ TEMPLATE = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#22c55e">
+  <meta name="theme-color" content="#4ade80">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
   <title>公考/事考 工作台</title>
 <style>
   :root{
-    --bg:#f0fdf4; --card:#ffffff; --text:#1f3a2e; --muted:#7c9b8a;
-    --border:#d1fae5; --accent:#22c55e; --accent-soft:#dcfce7;
-    --gk:#fb7185; --sk:#60a5fa; --sy:#34d399;
+    --bg:#f3fcf6; --card:#ffffff; --text:#1f3a2e; --muted:#8bb3a1;
+    --border:#d6f3e2; --accent:#4ade80; --accent-soft:#e7faf0;
+    --gk:#fb7185; --sk:#60a5fa; --sy:#4ade80;
     --newbg:#fef9c3; --newtx:#a16207; --sidebg:#ffffff;
-    --shadow:0 6px 20px rgba(34,197,94,.12);
+    --shadow:0 6px 20px rgba(74,222,128,.14);
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-       background:var(--bg);color:var(--text);font-size:14px;position:relative}
-  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
-    background-image:radial-gradient(var(--border) 2.5px, transparent 2.5px);
-    background-size:28px 28px;opacity:.55}
+       background:var(--bg);color:var(--text);font-size:14px}
+  /* 散落的可爱叶子/花瓣背景装饰 */
+  .deco{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+  .deco span{position:absolute;opacity:.16;user-select:none}
   .app{display:flex;min-height:100vh}
   aside{width:235px;background:var(--sidebg);border-right:1px solid var(--border);padding:18px 10px;position:sticky;top:0;height:100vh;overflow:auto}
   .logo{font-size:17px;font-weight:700;margin-bottom:18px;padding:0 6px}
@@ -91,8 +91,8 @@ TEMPLATE = r"""<!DOCTYPE html>
   }
 
   /* countdown */
-  .cd-card{background:linear-gradient(135deg,#34d399,#16a34a);color:#fff;border-radius:22px;padding:22px;box-shadow:var(--shadow);position:relative;overflow:hidden}
-  .cd-card.fj{background:linear-gradient(135deg,#6ee7b7,#22c55e)}
+  .cd-card{background:linear-gradient(135deg,#86efac,#34d399);color:#1f3a2e;border-radius:22px;padding:22px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .cd-card.fj{background:linear-gradient(135deg,#bbf7d0,#4ade80)}
   .cd-card::after{content:"🌿";position:absolute;right:14px;top:6px;font-size:46px;opacity:.18;line-height:1}
   .cd-title{font-size:18px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
   .cd-year{font-size:12px;background:rgba(255,255,255,.18);padding:2px 8px;border-radius:999px}
@@ -123,7 +123,7 @@ TEMPLATE = r"""<!DOCTYPE html>
   .chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
   select,input{padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:13px}
   input{min-width:180px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 14px;margin-bottom:10px;display:flex;gap:10px;align-items:flex-start;box-shadow:0 2px 8px rgba(34,197,94,.06);transition:transform .15s ease}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 14px;margin-bottom:10px;display:flex;gap:10px;align-items:flex-start;box-shadow:0 2px 8px rgba(74,222,128,.08);transition:transform .15s ease}
   .card:hover{transform:translateY(-2px)}
   .card .body{flex:1;min-width:0}
   .card a{color:var(--text);text-decoration:none;font-weight:600;font-size:14px}
@@ -135,6 +135,22 @@ TEMPLATE = r"""<!DOCTYPE html>
 </style>
 </head>
 <body>
+<div class="deco" aria-hidden="true">
+  <span style="left:5%;top:10%;font-size:30px;transform:rotate(-15deg)">🌿</span>
+  <span style="left:83%;top:7%;font-size:26px;transform:rotate(22deg)">🍃</span>
+  <span style="left:14%;top:34%;font-size:34px;transform:rotate(12deg)">🌸</span>
+  <span style="left:71%;top:28%;font-size:28px;transform:rotate(-20deg)">🌼</span>
+  <span style="left:37%;top:13%;font-size:24px;transform:rotate(30deg)">🍀</span>
+  <span style="left:90%;top:46%;font-size:30px;transform:rotate(15deg)">💮</span>
+  <span style="left:24%;top:60%;font-size:28px;transform:rotate(-12deg)">🍃</span>
+  <span style="left:58%;top:54%;font-size:32px;transform:rotate(20deg)">🌿</span>
+  <span style="left:87%;top:70%;font-size:30px;transform:rotate(-25deg)">🌷</span>
+  <span style="left:9%;top:78%;font-size:32px;transform:rotate(18deg)">🌸</span>
+  <span style="left:46%;top:80%;font-size:26px;transform:rotate(-15deg)">🌼</span>
+  <span style="left:77%;top:88%;font-size:24px;transform:rotate(12deg)">🍀</span>
+  <span style="left:32%;top:90%;font-size:28px;transform:rotate(-8deg)">💮</span>
+  <span style="left:54%;top:34%;font-size:22px;transform:rotate(35deg)">🍃</span>
+</div>
 <div class="app">
   <aside>
     <div class="logo">🌿 公考工作台<small>公告聚合 · 倒计时</small></div>
