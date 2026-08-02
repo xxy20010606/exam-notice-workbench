@@ -291,10 +291,12 @@ TEMPLATE = TEMPLATE  # noqa
 
 def build():
     conn = sqlite3.connect(DB)
+    # 动态近 6 个月过滤（约 180 天），保留近期公告；空 date 的专题页始终保留
+    cutoff = (datetime.date.today() - datetime.timedelta(days=180)).strftime("%Y-%m-%d")
     rows = conn.execute(
         "SELECT source,category,region,title,url,date,first_seen,last_seen FROM notices "
         "WHERE date>=? OR date='' OR date IS NULL",
-        ("2026-07-01",)).fetchall()
+        (cutoff,)).fetchall()
     conn.close()
     today = datetime.date.today().strftime("%Y-%m-%d")
     notices = []

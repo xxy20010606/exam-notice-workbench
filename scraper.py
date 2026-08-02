@@ -219,7 +219,7 @@ def _work(s, limit_per_source=40):
 
 
 def run_all(limit_per_source=40, max_workers=8,
-            skip_fail_threshold=3, retry_after_hours=12):
+            skip_fail_threshold=10, retry_after_hours=12):
     """
     自适应跳过失败源：
     - 连续失败 ≥ skip_fail_threshold 次的源，本轮跳过 fetch（不耗超时）
