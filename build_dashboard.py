@@ -45,27 +45,63 @@ TEMPLATE = r"""<!DOCTYPE html>
   :root{
     --bg:#F5FFFA; --card:#ffffff; --text:#2d3a2a; --muted:#8a9a85;
     --border:#e8efe6; --accent:#9CAF88; --accent-soft:#eef3ea;
-    --gk:#C08552; --sk:#9CAF88; --sy:#002FA7; --klein:#002FA7;
+    --gk:#C08552; --sk:#9CAF88; --sy:#93A9C1; --klein:#002FA7;
     --newbg:#002FA7; --newtx:#ffffff; --sidebg:#ffffff;
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
        background:var(--bg);color:var(--text);font-size:14px}
-  /* 大片叶子背景装饰 + 极轻柔动态 */
+  /* 5片叶子缓缓飘落（从顶部到屏幕外，自转+横向漂移+淡入淡出） */
   .deco{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
-  .deco svg.leaf{position:absolute;will-change:transform}
-  .deco .leaf-a{transform-origin:30% 85%;animation:swayA 9s ease-in-out infinite alternate}
-  .deco .leaf-b{transform-origin:70% 85%;animation:swayB 11s ease-in-out infinite alternate}
-  @keyframes swayA{from{transform:rotate(-2.5deg)}to{transform:rotate(3deg)}}
-  @keyframes swayB{from{transform:rotate(-32deg)}to{transform:rotate(-25deg)}}
+  .deco svg.leaf{position:absolute;will-change:transform,opacity;top:-220px}
+  .deco .leaf-1{left:6%;width:210px;opacity:.12;animation:fall1 22s linear infinite}
+  .deco .leaf-2{left:28%;width:160px;opacity:.10;animation:fall2 28s linear infinite -8s}
+  .deco .leaf-3{left:50%;width:230px;opacity:.13;animation:fall3 26s linear infinite -3s}
+  .deco .leaf-4{left:72%;width:180px;opacity:.11;animation:fall4 31s linear infinite -16s}
+  .deco .leaf-5{left:89%;width:150px;opacity:.10;animation:fall5 24s linear infinite -11s}
+  @keyframes fall1{
+    0%  {transform:translate(0,-180px) rotate(0deg);opacity:0}
+    8%  {opacity:.12}
+    50% {transform:translate(60px,50vh) rotate(220deg);opacity:.12}
+    92% {opacity:.12}
+    100%{transform:translate(-30px,110vh) rotate(420deg);opacity:0}
+  }
+  @keyframes fall2{
+    0%  {transform:translate(0,-180px) rotate(0deg);opacity:0}
+    10% {opacity:.10}
+    50% {transform:translate(-50px,50vh) rotate(-200deg);opacity:.10}
+    90% {opacity:.10}
+    100%{transform:translate(40px,110vh) rotate(-380deg);opacity:0}
+  }
+  @keyframes fall3{
+    0%  {transform:translate(0,-180px) rotate(0deg);opacity:0}
+    7%  {opacity:.13}
+    50% {transform:translate(45px,50vh) rotate(260deg);opacity:.13}
+    93% {opacity:.13}
+    100%{transform:translate(-50px,110vh) rotate(500deg);opacity:0}
+  }
+  @keyframes fall4{
+    0%  {transform:translate(0,-180px) rotate(0deg);opacity:0}
+    9%  {opacity:.11}
+    50% {transform:translate(-40px,50vh) rotate(-240deg);opacity:.11}
+    91% {opacity:.11}
+    100%{transform:translate(50px,110vh) rotate(-460deg);opacity:0}
+  }
+  @keyframes fall5{
+    0%  {transform:translate(0,-180px) rotate(0deg);opacity:0}
+    10% {opacity:.10}
+    50% {transform:translate(55px,50vh) rotate(200deg);opacity:.10}
+    90% {opacity:.10}
+    100%{transform:translate(-25px,110vh) rotate(400deg);opacity:0}
+  }
   body::before{content:"";position:fixed;inset:-25%;z-index:-2;pointer-events:none;
     background:radial-gradient(38% 38% at 28% 30%, rgba(156,175,136,.07), transparent 70%),
-               radial-gradient(42% 42% at 72% 72%, rgba(0,47,167,.05), transparent 72%);
+               radial-gradient(42% 42% at 72% 72%, rgba(147,169,193,.06), transparent 72%);
     animation:drift 20s ease-in-out infinite alternate}
   @keyframes drift{from{transform:translate(0,0)}to{transform:translate(2.5%,2.5%)}}
   @media (prefers-reduced-motion:reduce){
-    .deco .leaf-a,.deco .leaf-b{animation:none}
-    body::before{animation:none}
+    .deco svg.leaf,body::before{animation:none}
+    .deco svg.leaf{opacity:0;top:auto}
   }
   .app{display:flex;min-height:100vh}
   aside{width:235px;background:var(--sidebg);border-right:1px solid var(--border);padding:18px 10px;position:sticky;top:0;height:100vh;overflow:auto}
@@ -152,13 +188,25 @@ TEMPLATE = r"""<!DOCTYPE html>
 </head>
 <body>
 <div class="deco" aria-hidden="true">
-  <svg class="leaf leaf-a" style="left:-8%;top:8%;width:280px;opacity:.12" viewBox="0 0 200 200">
+  <svg class="leaf leaf-1" viewBox="0 0 200 200">
     <path d="M 100 12 C 145 55 165 125 135 178 C 122 198 92 198 76 175 C 48 132 52 70 82 30 C 90 18 96 12 100 12 Z" fill="#9CAF88"/>
     <path d="M 102 28 C 112 80 110 140 96 178" stroke="#7d9070" stroke-width="2" fill="none" opacity=".4"/>
   </svg>
-  <svg class="leaf leaf-b" style="left:78%;top:65%;width:260px;opacity:.10" viewBox="0 0 200 200">
+  <svg class="leaf leaf-2" viewBox="0 0 200 200">
     <path d="M 32 55 C 80 28 158 42 178 100 C 188 128 168 148 138 148 C 78 148 30 120 22 88 C 18 72 22 60 32 55 Z" fill="#9CAF88"/>
     <path d="M 55 68 C 100 50 150 70 170 105" stroke="#7d9070" stroke-width="2" fill="none" opacity=".4"/>
+  </svg>
+  <svg class="leaf leaf-3" viewBox="0 0 200 200">
+    <path d="M 100 12 C 145 55 165 125 135 178 C 122 198 92 198 76 175 C 48 132 52 70 82 30 C 90 18 96 12 100 12 Z" fill="#9CAF88"/>
+    <path d="M 102 28 C 112 80 110 140 96 178" stroke="#7d9070" stroke-width="2" fill="none" opacity=".4"/>
+  </svg>
+  <svg class="leaf leaf-4" viewBox="0 0 200 200">
+    <path d="M 32 55 C 80 28 158 42 178 100 C 188 128 168 148 138 148 C 78 148 30 120 22 88 C 18 72 22 60 32 55 Z" fill="#9CAF88"/>
+    <path d="M 55 68 C 100 50 150 70 170 105" stroke="#7d9070" stroke-width="2" fill="none" opacity=".4"/>
+  </svg>
+  <svg class="leaf leaf-5" viewBox="0 0 200 200">
+    <path d="M 100 12 C 145 55 165 125 135 178 C 122 198 92 198 76 175 C 48 132 52 70 82 30 C 90 18 96 12 100 12 Z" fill="#9CAF88"/>
+    <path d="M 102 28 C 112 80 110 140 96 178" stroke="#7d9070" stroke-width="2" fill="none" opacity=".4"/>
   </svg>
 </div>
 <div class="app">

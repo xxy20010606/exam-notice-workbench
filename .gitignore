@@ -8,3 +8,11 @@ last_run.json
 
 # WorkBuddy 客户端内部数据
 .workbuddy/
+
+# Node 依赖（本地截图用，不入仓）
+node_modules/
+package.json
+package-lock.json
+
+# 临时预览截图
+preview/
