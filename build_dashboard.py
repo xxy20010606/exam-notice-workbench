@@ -31,63 +31,105 @@ def render_sidebar():
     )
 
 
-def _willow_veins():
-    """细叶子的主脉：1 条居中曲线（自然弯曲），仅 1 条更显薄。"""
+def _stem_path(t0, t1, p0y, p1y, sag=18):
+    """柳枝主茎：一条带自然下垂弧度的三次贝塞尔曲线（从 (t0,p0y) 到 (t1,p1y)）。"""
+    cx1 = t0 + (t1 - t0) * 0.30
+    cx2 = t0 + (t1 - t0) * 0.70
+    cy1 = p0y + (p1y - p0y) * 0.35 + sag
+    cy2 = p0y + (p1y - p0y) * 0.70 + sag
+    return f"M{t0} {p0y} C{cx1} {cy1} {cx2} {cy2} {t1} {p1y}"
+
+
+def _point_on_stem(t0, t1, p0y, p1y, sag, u):
+    """在主茎三次贝塞尔曲线上取 u∈[0,1] 处的点 + 切线方向（用于让叶片垂直于茎）。"""
+    cx1 = t0 + (t1 - t0) * 0.30
+    cx2 = t0 + (t1 - t0) * 0.70
+    cy1 = p0y + (p1y - p0y) * 0.35 + sag
+    cy2 = p0y + (p1y - p0y) * 0.70 + sag
+    omu = 1 - u
+    x = omu**3 * t0 + 3 * omu**2 * u * cx1 + 3 * omu * u**2 * cx2 + u**3 * t1
+    y = omu**3 * p0y + 3 * omu**2 * u * cy1 + 3 * omu * u**2 * cy2 + u**3 * p1y
+    # 切线
+    tx = 3 * omu**2 * (cx1 - t0) + 6 * omu * u * (cx2 - cx1) + 3 * u**2 * (t1 - cx2)
+    ty = 3 * omu**2 * (cy1 - p0y) + 6 * omu * u * (cy2 - cy1) + 3 * u**2 * (p1y - cy2)
+    import math
+    ang = math.degrees(math.atan2(ty, tx))
+    return x, y, ang
+
+
+def _blade(x, y, stem_ang, length, side, width=7):
+    """在 (x,y) 长出一片柳叶，朝向与主茎切线垂直，沿 side 方向（+1 下 / -1 上）下垂。
+    柳叶是细长三角尖头尖尾，加重力下垂 sag 让叶子更明显朝下弯。"""
+    import math
+    # 茎的垂直方向 = 茎角度 + 90°，再加重力下垂 25°（让柳叶明显斜向下垂）
+    deg = stem_ang + (90 if side > 0 else -90) + (25 * side)
+    rad = math.radians(deg)
+    # 柳叶 path 起点在 (0,0)，向 +y 方向长 length
+    d = (
+        f"M0 0 "
+        f"C {width} {length*0.22}, {width*0.5} {length*0.62}, 0 {length} "
+        f"C {-width*0.5} {length*0.62}, {-width} {length*0.22}, 0 0 Z"
+    )
     return (
-        '<path d="M40 16 C 38 80 42 160 40 224" stroke="var(--leaf-vein)" stroke-width="1" fill="none" opacity=".30"/>'
+        f'<g transform="translate({x:.1f} {y:.1f}) rotate({deg:.1f})">'
+        f'<path d="{d}" fill="url(#leafgrad)"/>'
+        f'<path d="M0 0 C 0 {length*0.35}, 0 {length*0.7}, 0 {length}" '
+        f'stroke="var(--leaf-vein)" stroke-width="0.6" fill="none" opacity=".20"/>'
+        f'</g>'
     )
 
 
-def willow_leaf_svg():
-    """细长柳叶/草叶：尖头尖尾，薄如纸。viewBox 80x240（竖向 1:3 比例）。"""
+def branch_svg(leaf_count=12, leaf_min=42, leaf_max=78, stem_sag=18, blur=False):
+    """一条完整柳枝：水平弧形主茎 + 两侧斜向下垂的柳叶。viewBox 420x180（横扁）。"""
+    # 主茎：从 (15, 105) 弧到 (405, 65)，弧度 sag
+    t0, t1, p0y, p1y = 15, 405, 105, 65
+    stem = _stem_path(t0, t1, p0y, p1y, stem_sag)
+    blades = []
+    import math
+    for i in range(leaf_count):
+        u = (i + 0.5) / leaf_count
+        # 叶片大小：中间大两端略小（不要极端，避免"中间突兀"）
+        size_factor = 0.55 + 0.45 * math.sin(u * math.pi)  # 0.55~1.0~0.55
+        length = leaf_min + (leaf_max - leaf_min) * size_factor
+        x, y, stem_ang = _point_on_stem(t0, t1, p0y, p1y, stem_sag, u)
+        side = 1 if i % 2 == 0 else -1
+        blades.append(_blade(x, y, stem_ang, length, side))
+    blur_attr = ' filter="url(#branchblur)"' if blur else ""
     return (
-        '<svg class="leaf" viewBox="0 0 80 240" preserveAspectRatio="xMidYMid meet">'
-        '<path d="M40 4 C 54 60 58 130 52 200 C 49 220 44 232 40 236 C 36 232 31 220 28 200 C 22 130 26 60 40 4 Z" fill="url(#leafgrad)"/>'
-        + _willow_veins() +
+        f'<svg class="branch" viewBox="0 0 420 180" preserveAspectRatio="xMidYMid meet"'
+        f' style="overflow:visible"{blur_attr}>'
+        f'<path d="{stem}" stroke="#7d9070" stroke-width="1.5" fill="none" opacity=".65"/>'
+        + "".join(blades) +
         '</svg>'
     )
 
 
-def willow_leaf_alt_svg():
-    """轻微弯的细长叶（不居中，略 S 形），与 willow_leaf 形态不同。"""
-    return (
-        '<svg class="leaf" viewBox="0 0 80 240" preserveAspectRatio="xMidYMid meet">'
-        '<path d="M44 4 C 62 64 56 138 48 210 C 45 226 40 234 36 234 C 30 230 24 218 24 198 C 24 132 32 60 44 4 Z" fill="url(#leafgrad2)"/>'
-        + '<path d="M44 18 C 42 90 40 170 36 222" stroke="var(--leaf-vein)" stroke-width="1" fill="none" opacity=".28"/>'
-        '</svg>'
-    )
-
-
-# 背景层（远景）：7 片小叶子，blur 1.5px，opacity 0.10
-_BG_LEAVES = [
-    (6,   90,  30,  0),
-    (22,  75,  34, -10),
-    (40, 100,  28,  -3),
-    (58,  82,  32, -14),
-    (74,  95,  26,  -7),
-    (88,  78,  30,  -1),
-    (15,  85,  28, -17),
+# 背景层（远景）：4 条小柳枝，blur 1.6px
+_BG_BRANCHES = [
+    (8,  180, 32,   0, 10, 56, 30, 20),   # left, width, fall_dur, fall_delay, leaf_count, leaf_max, leaf_min, sag
+    (38, 150, 38, -12, 8,  48, 26, 14),
+    (66, 190, 34,  -5, 11, 60, 32, 22),
+    (24, 165, 40, -19, 9,  52, 28, 16),
 ]
 
-# 前景层（近景）：3 片大叶子，无 blur，opacity 0.28
-_FG_LEAVES = [
-    (12,  180, 38,  -5),
-    (52,  200, 34, -12),
-    (82,  160, 42,  -2),
+# 前景层（近景）：2 条大柳枝，无 blur
+_FG_BRANCHES = [
+    (16, 320, 46,  -7, 14, 92, 50, 26),
+    (58, 300, 52, -22, 12, 88, 48, 22),
 ]
 
 
-def render_leaves_bg():
+def render_branches_bg():
     return "\n".join(
-        f'<div class="leaf-wrap blw-{i+1}">{willow_leaf_svg() if i % 2 == 0 else willow_leaf_alt_svg()}</div>'
-        for i, (left, w, dur, delay) in enumerate(_BG_LEAVES)
+        f'<div class="branch-wrap bbw-{i+1}">{branch_svg(c, lmax, lmin, sag, blur=True)}</div>'
+        for i, (left, w, dur, delay, c, lmax, lmin, sag) in enumerate(_BG_BRANCHES)
     )
 
 
-def render_leaves_fg():
+def render_branches_fg():
     return "\n".join(
-        f'<div class="leaf-wrap flw-{i+1}">{willow_leaf_svg() if i % 2 == 0 else willow_leaf_alt_svg()}</div>'
-        for i, (left, w, dur, delay) in enumerate(_FG_LEAVES)
+        f'<div class="branch-wrap fbw-{i+1}">{branch_svg(c, lmax, lmin, sag, blur=False)}</div>'
+        for i, (left, w, dur, delay, c, lmax, lmin, sag) in enumerate(_FG_BRANCHES)
     )
 
 
@@ -111,58 +153,84 @@ TEMPLATE = r"""<!DOCTYPE html>
   *{box-sizing:border-box}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
        background:var(--bg);color:var(--text);font-size:14px}
-  /* 细长柳叶/草叶飘落：背景层（远景小叶+模糊）+ 前景层（近景大叶+清晰） */
+  /* 柳枝飘过：主茎横向往返 + 柳叶在茎上斜向下垂，主茎本身有微摆 */
+  /* deco 在 .app 之下但在 body 背景之上（z-index 0/1），main 透明，card 等有白底的元素盖住柳枝 */
   .deco-bg,.deco-fg{position:fixed;inset:0;pointer-events:none;overflow:hidden;--leaf-vein:#6f8460}
-  .deco-bg{z-index:-2;filter:blur(1.5px)}
-  .deco-fg{z-index:-1}
-  .leaf-wrap{position:absolute;top:-300px;will-change:transform}
-  .leaf{display:block;width:100%;height:auto;will-change:transform;transform-origin:50% 4%}
-  /* 背景层 7 片小叶子，opacity 0.10（薄纱） */
-  .blw-1{left:6%;width:90px;animation:fb1 30s linear infinite}
-  .blw-2{left:22%;width:75px;animation:fb2 34s linear infinite -10s}
-  .blw-3{left:40%;width:100px;animation:fb3 28s linear infinite -3s}
-  .blw-4{left:58%;width:82px;animation:fb4 32s linear infinite -14s}
-  .blw-5{left:74%;width:95px;animation:fb5 36s linear infinite -7s}
-  .blw-6{left:88%;width:78px;animation:fb6 30s linear infinite -1s}
-  .blw-7{left:15%;width:85px;animation:fb7 33s linear infinite -17s}
-  .blw-1 .leaf{animation:flitterA 4.2s ease-in-out infinite}
-  .blw-2 .leaf{animation:flitterB 5.1s ease-in-out infinite -1s}
-  .blw-3 .leaf{animation:flitterC 3.8s ease-in-out infinite -2s}
-  .blw-4 .leaf{animation:flitterD 4.7s ease-in-out infinite -.5s}
-  .blw-5 .leaf{animation:flitterA 4.4s ease-in-out infinite -2.5s}
-  .blw-6 .leaf{animation:flitterB 5.3s ease-in-out infinite -1.8s}
-  .blw-7 .leaf{animation:flitterC 3.6s ease-in-out infinite -3.2s}
-  /* 前景层 3 片大叶子，opacity 0.28（薄纱但更清晰） */
-  .flw-1{left:12%;width:180px;animation:ff1 38s linear infinite -5s}
-  .flw-2{left:52%;width:200px;animation:ff2 42s linear infinite -12s}
-  .flw-3{left:82%;width:160px;animation:ff3 36s linear infinite -2s}
-  .flw-1 .leaf{animation:flitterD 5.6s ease-in-out infinite}
-  .flw-2 .leaf{animation:flitterA 4.9s ease-in-out infinite -1.5s}
-  .flw-3 .leaf{animation:flitterB 5.2s ease-in-out infinite -2.8s}
-  /* 背景层下落（横向漂移更小，像远处叶子） */
-  @keyframes fb1{0%{transform:translate(0,-300px);opacity:0}8%{opacity:.10}92%{opacity:.10}100%{transform:translate(35px,120vh);opacity:0}}
-  @keyframes fb2{0%{transform:translate(0,-300px);opacity:0}9%{opacity:.09}91%{opacity:.09}100%{transform:translate(-30px,120vh);opacity:0}}
-  @keyframes fb3{0%{transform:translate(0,-300px);opacity:0}7%{opacity:.11}93%{opacity:.11}100%{transform:translate(28px,120vh);opacity:0}}
-  @keyframes fb4{0%{transform:translate(0,-300px);opacity:0}9%{opacity:.10}91%{opacity:.10}100%{transform:translate(-32px,120vh);opacity:0}}
-  @keyframes fb5{0%{transform:translate(0,-300px);opacity:0}8%{opacity:.09}92%{opacity:.09}100%{transform:translate(38px,120vh);opacity:0}}
-  @keyframes fb6{0%{transform:translate(0,-300px);opacity:0}10%{opacity:.10}90%{opacity:.10}100%{transform:translate(-26px,120vh);opacity:0}}
-  @keyframes fb7{0%{transform:translate(0,-300px);opacity:0}8%{opacity:.09}92%{opacity:.09}100%{transform:translate(30px,120vh);opacity:0}}
-  /* 前景层下落（横向漂移略大，像近处叶子） */
-  @keyframes ff1{0%{transform:translate(0,-300px);opacity:0}7%{opacity:.28}93%{opacity:.28}100%{transform:translate(50px,120vh);opacity:0}}
-  @keyframes ff2{0%{transform:translate(0,-300px);opacity:0}6%{opacity:.30}94%{opacity:.30}100%{transform:translate(-55px,120vh);opacity:0}}
-  @keyframes ff3{0%{transform:translate(0,-300px);opacity:0}8%{opacity:.26}92%{opacity:.26}100%{transform:translate(45px,120vh);opacity:0}}
-  /* 钟摆翻转：绕叶尖轻微摆+翻面，幅度比之前大（细叶子更显摆动） */
-  @keyframes flitterA{0%,100%{transform:translateX(0) rotate(-15deg)}50%{transform:translateX(45px) rotate(22deg)}}
-  @keyframes flitterB{0%,100%{transform:translateX(0) rotate(13deg)}50%{transform:translateX(-42px) rotate(-20deg)}}
-  @keyframes flitterC{0%,100%{transform:translateX(0) rotate(-11deg)}50%{transform:translateX(50px) rotate(18deg)}}
-  @keyframes flitterD{0%,100%{transform:translateX(0) rotate(16deg)}50%{transform:translateX(-48px) rotate(-19deg)}}
+  .deco-bg{z-index:0}
+  .deco-fg{z-index:1}
+  .app{position:relative;z-index:2}
+  .branch-wrap{position:absolute;top:0;will-change:transform}
+  .branch{display:block;width:100%;height:auto;will-change:transform;transform-origin:50% 50%}
+  /* 背景层 4 条小柳枝（远景，模糊，在视野内来回飘） */
+  .bbw-1{left:5%;width:220px;animation:driftB1 26s ease-in-out infinite;       opacity:.34}
+  .bbw-2{left:55%;width:190px;animation:driftB2 32s ease-in-out infinite  -8s;opacity:.30}
+  .bbw-3{left:30%;width:240px;animation:driftB3 28s ease-in-out infinite -14s;opacity:.36}
+  .bbw-4{left:70%;width:200px;animation:driftB1 30s ease-in-out infinite -20s;opacity:.32}
+  .bbw-1 .branch{animation:swayStemA 7.2s ease-in-out infinite}
+  .bbw-2 .branch{animation:swayStemB 8.4s ease-in-out infinite -2s}
+  .bbw-3 .branch{animation:swayStemA 6.8s ease-in-out infinite -3.5s}
+  .bbw-4 .branch{animation:swayStemB 7.9s ease-in-out infinite -1.2s}
+  /* 前景层 2 条大柳枝（近景，清晰，在视野内来回飘） */
+  .fbw-1{left:15%;width:460px;animation:driftF1 38s ease-in-out infinite  -4s;opacity:.58}
+  .fbw-2{left:50%;width:430px;animation:driftF2 44s ease-in-out infinite -18s;opacity:.55}
+  .fbw-1 .branch{animation:swayStemC 8.8s ease-in-out infinite}
+  .fbw-2 .branch{animation:swayStemD 9.6s ease-in-out infinite -2.8s}
+  /* 视野内来回飘：横移 ±15vw + 上下漂移 + 轻微旋转，柳枝大部分时间在视野中央 */
+  @keyframes driftB1{
+    0%  {transform:translate(0,5vh) rotate(-3deg)}
+    50% {transform:translate(20vw,18vh) rotate(4deg)}
+    100%{transform:translate(0,5vh) rotate(-3deg)}
+  }
+  @keyframes driftB2{
+    0%  {transform:translate(0,8vh) rotate(2deg)}
+    50% {transform:translate(-18vw,22vh) rotate(-4deg)}
+    100%{transform:translate(0,8vh) rotate(2deg)}
+  }
+  @keyframes driftB3{
+    0%  {transform:translate(0,30vh) rotate(-2deg)}
+    50% {transform:translate(15vw,42vh) rotate(5deg)}
+    100%{transform:translate(0,30vh) rotate(-2deg)}
+  }
+  @keyframes driftF1{
+    0%  {transform:translate(0,8vh) rotate(-2deg);opacity:0}
+    10% {opacity:.58}
+    50% {transform:translate(12vw,24vh) rotate(3deg);opacity:.58}
+    90% {opacity:.58}
+    100%{transform:translate(0,8vh) rotate(-2deg);opacity:0}
+  }
+  @keyframes driftF2{
+    0%  {transform:translate(0,35vh) rotate(2deg);opacity:0}
+    10% {opacity:.55}
+    50% {transform:translate(-14vw,52vh) rotate(-3deg);opacity:.55}
+    90% {opacity:.55}
+    100%{transform:translate(0,35vh) rotate(2deg);opacity:0}
+  }
+  /* 主茎自身微摆：整体像被风带动的柳枝（细茎柔韧） */
+  @keyframes swayStemA{0%,100%{transform:rotate(-2.5deg) translateY(0)}50%{transform:rotate(2.5deg) translateY(-6px)}}
+  @keyframes swayStemB{0%,100%{transform:rotate(2deg) translateY(0)}50%{transform:rotate(-2deg) translateY(-7px)}}
+  @keyframes swayStemC{0%,100%{transform:rotate(-1.8deg) translateY(0)}50%{transform:rotate(1.8deg) translateY(-10px)}}
+  @keyframes swayStemD{0%,100%{transform:rotate(1.5deg) translateY(0)}50%{transform:rotate(-1.5deg) translateY(-9px)}}
+  /* 移动端：柳枝缩小、范围收窄（避免溢出小屏） */
+  @media (max-width:880px){
+    .bbw-1{left:0;width:160px}
+    .bbw-2{left:50%;width:140px}
+    .bbw-3{left:25%;width:170px}
+    .bbw-4{left:60%;width:150px}
+    .fbw-1{left:5%;width:300px;top:30vh}
+    .fbw-2{left:30%;width:280px;top:55vh}
+    @keyframes driftB1{0%{transform:translate(0,5vh) rotate(-3deg)}50%{transform:translate(15vw,15vh) rotate(4deg)}100%{transform:translate(0,5vh) rotate(-3deg)}}
+    @keyframes driftB2{0%{transform:translate(0,8vh) rotate(2deg)}50%{transform:translate(-12vw,18vh) rotate(-4deg)}100%{transform:translate(0,8vh) rotate(2deg)}}
+    @keyframes driftB3{0%{transform:translate(0,30vh) rotate(-2deg)}50%{transform:translate(10vw,38vh) rotate(5deg)}100%{transform:translate(0,30vh) rotate(-2deg)}}
+    @keyframes driftF1{0%{transform:translate(0,8vh) rotate(-2deg);opacity:0}10%{opacity:.58}50%{transform:translate(10vw,18vh) rotate(3deg);opacity:.58}90%{opacity:.58}100%{transform:translate(0,8vh) rotate(-2deg);opacity:0}}
+    @keyframes driftF2{0%{transform:translate(0,30vh) rotate(2deg);opacity:0}10%{opacity:.55}50%{transform:translate(-10vw,42vh) rotate(-3deg);opacity:.55}90%{opacity:.55}100%{transform:translate(0,30vh) rotate(2deg);opacity:0}}
+  }
   body::before{content:"";position:fixed;inset:-25%;z-index:-2;pointer-events:none;
     background:radial-gradient(38% 38% at 28% 30%, rgba(156,175,136,.07), transparent 70%),
                radial-gradient(42% 42% at 72% 72%, rgba(147,169,193,.06), transparent 72%);
     animation:drift 20s ease-in-out infinite alternate}
   @keyframes drift{from{transform:translate(0,0)}to{transform:translate(2.5%,2.5%)}}
   @media (prefers-reduced-motion:reduce){
-    .leaf-wrap,.leaf,body::before{animation:none}
+    .branch-wrap,.branch,body::before{animation:none}
     .deco-bg,.deco-fg{display:none}
   }
   .app{display:flex;min-height:100vh}
@@ -260,6 +328,9 @@ TEMPLATE = r"""<!DOCTYPE html>
     <stop offset="0.55" stop-color="#c2d0ac"/>
     <stop offset="1" stop-color="#a4b58e"/>
   </linearGradient>
+  <filter id="branchblur" x="-20%" y="-20%" width="140%" height="140%">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="1.6"/>
+  </filter>
 </defs></svg>
 <div class="deco-bg" aria-hidden="true">
   /*__LEAVES_BG__*/
@@ -443,8 +514,8 @@ def build():
             .replace("/*__DATA__*/", json.dumps(data, ensure_ascii=False))
             .replace("/*__EXAM__*/", json.dumps(exam, ensure_ascii=False))
             .replace("/*__SIDEBAR__*/", render_sidebar())
-            .replace("/*__LEAVES_BG__*/", render_leaves_bg())
-            .replace("/*__LEAVES_FG__*/", render_leaves_fg()))
+            .replace("/*__LEAVES_BG__*/", render_branches_bg())
+            .replace("/*__LEAVES_FG__*/", render_branches_fg()))
     with open(OUT, "w", encoding="utf-8") as f:
         f.write(html)
     return len(notices)
