@@ -234,10 +234,7 @@ function renderNotices(){
     if(q&&!n.title.includes(q)) return false;
     return true;
   });
-  list.sort((a,b)=>{
-    if((b.is_new?1:0)!==(a.is_new?1:0)) return (b.is_new?1:0)-(a.is_new?1:0);
-    return (b.date||"").localeCompare(a.date||"");
-  });
+  list.sort((a,b)=>(b.first_seen||"").localeCompare(a.first_seen||""));
   document.getElementById("list").innerHTML = list.map(n=>`
     <div class="card">
       <span class="tag ${catClass(n.category)}">${n.category||""}</span>
