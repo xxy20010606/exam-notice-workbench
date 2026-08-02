@@ -174,6 +174,12 @@ def init_db():
         title TEXT, url TEXT, date TEXT, first_seen TEXT, last_seen TEXT)""")
     conn.execute("""CREATE TABLE IF NOT EXISTS sources_status(
         name TEXT PRIMARY KEY, last_run TEXT, last_count INT, last_error TEXT)""")
+    # 兼容老库：渐进加列（fail_streak=连续失败次数；last_attempt_at=上次实际尝试时间）
+    cols = {r[1] for r in conn.execute("PRAGMA table_info(sources_status)").fetchall()}
+    if "fail_streak" not in cols:
+        conn.execute("ALTER TABLE sources_status ADD COLUMN fail_streak INT DEFAULT 0")
+    if "last_attempt_at" not in cols:
+        conn.execute("ALTER TABLE sources_status ADD COLUMN last_attempt_at TEXT")
     conn.commit()
     return conn
 
@@ -212,14 +218,58 @@ def _work(s, limit_per_source=40):
         return s, [], str(e)
 
 
-def run_all(limit_per_source=40, max_workers=8):
+def run_all(limit_per_source=40, max_workers=8,
+            skip_fail_threshold=3, retry_after_hours=12):
+    """
+    自适应跳过失败源：
+    - 连续失败 ≥ skip_fail_threshold 次的源，本轮跳过 fetch（不耗超时）
+    - 距 last_attempt_at ≥ retry_after_hours 小时后强制重试一次
+    - 重试成功 → fail_streak 归零；仍失败 → fail_streak+1，重新进入跳过窗口
+    目的：云端 IP 对部分中国 gov 站点系统性不可达，跳过这些源可省 1-2min。
+    """
     with open(SOURCES, encoding="utf-8") as f:
         sources = json.load(f)
     conn = init_db()
     report = {"run_at": now_iso(), "sources": [], "new": []}
 
-    http_sources = [s for s in sources if s.get("method", "http") != "browser"]
-    browser_sources = [s for s in sources if s.get("method", "http") == "browser"]
+    # 读取 sources_status 计算本轮要跳过的源
+    rows = conn.execute(
+        "SELECT name, fail_streak, last_attempt_at FROM sources_status"
+    ).fetchall()
+    fail_info = {r[0]: {"streak": r[1] or 0, "last_attempt_at": r[2] or ""} for r in rows}
+    now_dt = datetime.datetime.now()
+
+    def _should_skip(name):
+        st = fail_info.get(name)
+        if not st or st["streak"] < skip_fail_threshold:
+            return False, ""
+        last_str = st["last_attempt_at"]
+        if not last_str:
+            return False, ""
+        try:
+            last_dt = datetime.datetime.strptime(last_str, "%Y-%m-%d %H:%M:%S")
+            elapsed_h = (now_dt - last_dt).total_seconds() / 3600
+            if elapsed_h >= retry_after_hours:
+                return False, ""  # 超过重试窗口，本轮重试
+            return True, f"已连续失败 {st['streak']} 次，下次重试约 {retry_after_hours - elapsed_h:.1f}h 后"
+        except Exception:
+            return False, ""
+
+    active_sources, skipped_sources = [], []
+    for s in sources:
+        skip, reason = _should_skip(s["name"])
+        if skip:
+            skipped_sources.append((s, reason))
+            report["sources"].append({
+                "name": s["name"], "category": s.get("category"),
+                "region": s.get("region"), "count": 0, "new": 0,
+                "error": None, "skipped": True, "skip_reason": reason,
+            })
+        else:
+            active_sources.append(s)
+
+    http_sources = [s for s in active_sources if s.get("method", "http") != "browser"]
+    browser_sources = [s for s in active_sources if s.get("method", "http") == "browser"]
 
     # http 源并发抓取（每个线程只 fetch+parse，不写库，避免 SQLite 跨线程）
     results = {}
@@ -236,24 +286,37 @@ def run_all(limit_per_source=40, max_workers=8):
         results[s2["name"]] = (s2, items, err)
 
     # 主线程顺序写库（SQLite 线程安全）
-    for s in sources:
+    now_str = now_iso()
+    for s in active_sources:
         s2, items, err = results[s["name"]]
         if err:
-            conn.execute("INSERT OR REPLACE INTO sources_status(name,last_run,last_count,last_error) VALUES(?,?,?,?)",
-                         (s["name"], now_iso(), 0, err[:300]))
+            old = fail_info.get(s["name"], {}).get("streak", 0)
+            new_streak = old + 1
+            conn.execute("""INSERT OR REPLACE INTO sources_status
+                            (name,last_run,last_count,last_error,fail_streak,last_attempt_at)
+                            VALUES(?,?,?,?,?,?)""",
+                         (s["name"], now_str, 0, err[:300], new_streak, now_str))
             report["sources"].append({"name": s["name"], "category": s.get("category"),
                                        "region": s.get("region"), "count": 0, "new": 0,
                                        "error": err[:200]})
         else:
             new = store(conn, s, items)
-            conn.execute("INSERT OR REPLACE INTO sources_status(name,last_run,last_count,last_error) VALUES(?,?,?,?)",
-                         (s["name"], now_iso(), len(items), ""))
+            conn.execute("""INSERT OR REPLACE INTO sources_status
+                            (name,last_run,last_count,last_error,fail_streak,last_attempt_at)
+                            VALUES(?,?,?,?,?,?)""",
+                         (s["name"], now_str, len(items), "", 0, now_str))
             report["sources"].append({"name": s["name"], "category": s.get("category"),
                                        "region": s.get("region"), "count": len(items),
                                        "new": len(new), "error": None})
             for n in new:
                 report["new"].append({"source": s["name"], "category": s.get("category"),
                                        "region": s.get("region"), **n})
+
+    # 更新被跳过源的 last_run（让 UI 显示"上次跳过时间"）；fail_streak/last_attempt_at 不变
+    for s, _reason in skipped_sources:
+        conn.execute("""UPDATE sources_status SET last_run=? WHERE name=?""",
+                     (now_str, s["name"]))
+
     conn.commit()
     conn.close()
     return report
