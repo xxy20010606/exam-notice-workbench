@@ -36,34 +36,38 @@ TEMPLATE = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#2563eb">
+  <meta name="theme-color" content="#22c55e">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
   <title>公考/事考 工作台</title>
 <style>
   :root{
-    --bg:#f4f6fb; --card:#ffffff; --text:#1f2937; --muted:#6b7280;
-    --border:#e5e7eb; --accent:#2563eb; --accent-soft:#eef2ff;
-    --gk:#c0392b; --sk:#2563eb; --sy:#16a34a;
-    --newbg:#fef3c7; --newtx:#b45309; --sidebg:#ffffff;
+    --bg:#f0fdf4; --card:#ffffff; --text:#1f3a2e; --muted:#7c9b8a;
+    --border:#d1fae5; --accent:#22c55e; --accent-soft:#dcfce7;
+    --gk:#fb7185; --sk:#60a5fa; --sy:#34d399;
+    --newbg:#fef9c3; --newtx:#a16207; --sidebg:#ffffff;
+    --shadow:0 6px 20px rgba(34,197,94,.12);
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
-       background:var(--bg);color:var(--text);font-size:14px}
+       background:var(--bg);color:var(--text);font-size:14px;position:relative}
+  body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+    background-image:radial-gradient(var(--border) 2.5px, transparent 2.5px);
+    background-size:28px 28px;opacity:.55}
   .app{display:flex;min-height:100vh}
   aside{width:235px;background:var(--sidebg);border-right:1px solid var(--border);padding:18px 10px;position:sticky;top:0;height:100vh;overflow:auto}
   .logo{font-size:17px;font-weight:700;margin-bottom:18px;padding:0 6px}
   .logo small{display:block;color:var(--muted);font-weight:400;font-size:11px;margin-top:2px}
   nav .sec-title{font-size:11px;color:var(--muted);margin:16px 6px 6px;letter-spacing:.5px;font-weight:600}
-  nav a{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:8px;color:var(--text);text-decoration:none;margin-bottom:3px;cursor:pointer;font-size:13.5px;line-height:1.2}
+  nav a{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:14px;color:var(--text);text-decoration:none;margin-bottom:4px;cursor:pointer;font-size:13.5px;line-height:1.2;transition:background .15s}
   nav a.active{background:var(--accent);color:#fff;font-weight:600}
   nav a:not(.active):hover{background:var(--accent-soft)}
   nav a.parent{font-weight:600}
   nav .sub-nav{padding:2px 0 4px 14px;margin:0 6px 6px 14px;border-left:1px solid var(--border)}
   nav .sub-nav a{padding:7px 12px;font-size:13px}
   main{flex:1;padding:20px 28px;overflow:auto}
-  h1{font-size:20px;margin:0 0 14px}
+  h1{font-size:20px;margin:0 0 14px;font-weight:800}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 
   /* 手机端底部导航（窄屏显示，隐藏左侧栏） */
@@ -87,12 +91,13 @@ TEMPLATE = r"""<!DOCTYPE html>
   }
 
   /* countdown */
-  .cd-card{background:linear-gradient(135deg,#2563eb,#1e40af);color:#fff;border-radius:14px;padding:22px}
-  .cd-card.fj{background:linear-gradient(135deg,#0ea5e9,#0369a1)}
+  .cd-card{background:linear-gradient(135deg,#34d399,#16a34a);color:#fff;border-radius:22px;padding:22px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .cd-card.fj{background:linear-gradient(135deg,#6ee7b7,#22c55e)}
+  .cd-card::after{content:"🌿";position:absolute;right:14px;top:6px;font-size:46px;opacity:.18;line-height:1}
   .cd-title{font-size:18px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
   .cd-year{font-size:12px;background:rgba(255,255,255,.18);padding:2px 8px;border-radius:999px}
   .cd-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
-  .cd-cell{background:rgba(255,255,255,.12);border-radius:10px;padding:14px}
+  .cd-cell{background:rgba(255,255,255,.18);border-radius:14px;padding:14px}
   .cd-cell h4{margin:0 0 4px;font-size:12px;font-weight:500;opacity:.85}
   .cd-cell .date{font-size:13px;opacity:.95}
   .cd-cell .days{font-size:30px;font-weight:800;margin-top:4px}
@@ -111,14 +116,15 @@ TEMPLATE = r"""<!DOCTYPE html>
   .latest h2{font-size:15px;margin:0 0 10px}
   .latest .row{display:flex;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);font-size:13px}
   .latest .row:last-child{border-bottom:none}
-  .tag{font-size:11px;padding:1px 7px;border-radius:5px;color:#fff;white-space:nowrap}
+  .tag{font-size:11px;padding:2px 9px;border-radius:999px;color:#fff;white-space:nowrap;font-weight:600}
   .tag.国考{background:var(--gk)}.tag.省考{background:var(--sk)}.tag.事业编{background:var(--sy)}
   .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0 14px;position:sticky;top:0;background:var(--bg);padding:6px 0;z-index:5}
   .chip{padding:5px 13px;border:1px solid var(--border);border-radius:999px;background:#fff;cursor:pointer;font-size:13px}
   .chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
   select,input{padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:13px}
   input{min-width:180px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 14px;margin-bottom:10px;display:flex;gap:10px;align-items:flex-start;box-shadow:0 2px 8px rgba(34,197,94,.06);transition:transform .15s ease}
+  .card:hover{transform:translateY(-2px)}
   .card .body{flex:1;min-width:0}
   .card a{color:var(--text);text-decoration:none;font-weight:600;font-size:14px}
   .card a:hover{color:var(--accent);text-decoration:underline}
@@ -131,14 +137,14 @@ TEMPLATE = r"""<!DOCTYPE html>
 <body>
 <div class="app">
   <aside>
-    <div class="logo">公考工作台<small>公告聚合 · 倒计时</small></div>
+    <div class="logo">🌿 公考工作台<small>公告聚合 · 倒计时</small></div>
     <nav id="main-nav">
       /*__SIDEBAR__*/
     </nav>
   </aside>
   <main>
     <div id="view-home">
-      <h1>备考倒计时</h1>
+      <h1>🌱 备考倒计时</h1>
       <div class="sub">更新时间：<span id="gen"></span>　|　共 <span id="total"></span> 条公告，今日新增 <span id="newc"></span> 条</div>
       <div class="grid2" id="countdown-grid"></div>
       <div class="latest">
@@ -158,7 +164,7 @@ TEMPLATE = r"""<!DOCTYPE html>
         <input id="q" placeholder="搜索标题关键字…">
       </div>
       <div id="list"></div>
-      <div class="empty" id="empty" style="display:none">没有匹配的公告</div>
+      <div class="empty" id="empty" style="display:none">🍃 没有匹配的公告</div>
     </div>
   </main>
 </div>
@@ -219,7 +225,7 @@ function renderLatest(){
       <span class="tag ${catClass(n.category)}">${n.category||""}</span>
       <a href="${n.url}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;flex:1">${n.title}</a>
       <span class="sub">${n.region||""} · ${fmt(n.date)}</span>
-    </div>`).join("") || `<div class="empty">暂无公告</div>`;
+    </div>`).join("") || `<div class="empty">🍃 暂无公告</div>`;
 }
 
 function renderNotices(){
