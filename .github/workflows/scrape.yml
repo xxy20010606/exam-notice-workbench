@@ -32,16 +32,25 @@ jobs:
       - name: 安装依赖
         run: pip install -r requirements.txt
 
-      - name: 缓存 Playwright 浏览器
-        uses: actions/cache@v4
+      - name: 还原 Playwright 浏览器缓存（命中则跳过下载）
+        id: pwcache
+        uses: actions/cache/restore@v4
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-${{ hashFiles('requirements.txt') }}
           restore-keys: |
             ${{ runner.os }}-playwright-
 
-      - name: 安装 Playwright Chromium（缓存命中则秒过）
+      - name: 安装 Playwright Chromium（仅缓存未命中时执行）
+        if: steps.pwcache.outputs.cache-hit != 'true'
         run: python -m playwright install chromium
+
+      - name: 保存 Playwright 浏览器缓存（首次安装后才会有内容）
+        if: steps.pwcache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ steps.pwcache.outputs.cache-primary-key }}
 
       - name: 抓取并更新看板
         env:
