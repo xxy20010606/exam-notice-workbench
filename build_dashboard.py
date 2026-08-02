@@ -43,11 +43,10 @@ TEMPLATE = r"""<!DOCTYPE html>
   <title>公考/事考 工作台</title>
 <style>
   :root{
-    --bg:#f5f8f3; --card:#ffffff; --text:#2d3a2a; --muted:#8a9a85;
-    --border:#dbe5d5; --accent:#9CAF88; --accent-soft:#e8efe3;
-    --gk:#fb7185; --sk:#60a5fa; --sy:#9CAF88;
-    --newbg:#fef9c3; --newtx:#a16207; --sidebg:#ffffff;
-    --shadow:0 6px 20px rgba(156,175,136,.16);
+    --bg:#F5FFFA; --card:#ffffff; --text:#2d3a2a; --muted:#8a9a85;
+    --border:#e8efe6; --accent:#9CAF88; --accent-soft:#eef3ea;
+    --gk:#9CAF88; --sk:#9CAF88; --sy:#9CAF88; --klein:#002FA7;
+    --newbg:#002FA7; --newtx:#ffffff; --sidebg:#ffffff;
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
@@ -61,7 +60,8 @@ TEMPLATE = r"""<!DOCTYPE html>
   .logo small{display:block;color:var(--muted);font-weight:400;font-size:11px;margin-top:2px}
   nav .sec-title{font-size:11px;color:var(--muted);margin:16px 6px 6px;letter-spacing:.5px;font-weight:600}
   nav a{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:14px;color:var(--text);text-decoration:none;margin-bottom:4px;cursor:pointer;font-size:13.5px;line-height:1.2;transition:background .15s}
-  nav a.active{background:var(--accent);color:#fff;font-weight:600}
+  nav a.active{color:var(--klein);font-weight:700;background:transparent;position:relative}
+  nav a.active::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:3px;background:var(--klein);border-radius:0 3px 3px 0}
   nav a:not(.active):hover{background:var(--accent-soft)}
   nav a.parent{font-weight:600}
   nav .sub-nav{padding:2px 0 4px 14px;margin:0 6px 6px 14px;border-left:1px solid var(--border)}
@@ -83,7 +83,9 @@ TEMPLATE = r"""<!DOCTYPE html>
     .mobile-tab a{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;
       padding:14px 0;color:var(--muted);text-decoration:none;
       font-size:16px;font-weight:600;line-height:1.3;cursor:pointer}
-    .mobile-tab a.active{color:var(--accent)}
+    .mobile-tab a.active{color:var(--accent);position:relative}
+  .mobile-tab a.active::before{content:"";position:absolute;top:0;left:50%;transform:translateX(-50%);
+    width:28px;height:3px;background:var(--klein);border-radius:0 0 3px 3px}
     .mobile-tab a .ico{font-size:20px;line-height:1}
     .grid2{grid-template-columns:1fr}
     .bar{position:static}
@@ -93,8 +95,8 @@ TEMPLATE = r"""<!DOCTYPE html>
   }
 
   /* countdown */
-  .cd-card{background:linear-gradient(135deg,#c8d4b8,#9CAF88);color:#2d3a2a;border-radius:18px;padding:22px;box-shadow:var(--shadow);position:relative;overflow:hidden}
-  .cd-card.fj{background:linear-gradient(135deg,#d5dec8,#a8ba94)}
+  .cd-card{background:linear-gradient(135deg,#dbe5d2,#9CAF88);color:#2d3a2a;border-radius:18px;padding:24px;position:relative;overflow:hidden}
+  .cd-card.fj{background:linear-gradient(135deg,#dbe5d2,#9CAF88)}
   .cd-title{font-size:18px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
   .cd-year{font-size:12px;background:rgba(255,255,255,.18);padding:2px 8px;border-radius:999px}
   .cd-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
@@ -124,7 +126,7 @@ TEMPLATE = r"""<!DOCTYPE html>
   .chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
   select,input{padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:13px}
   input{min-width:180px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 14px;margin-bottom:10px;display:flex;gap:10px;align-items:flex-start;box-shadow:0 2px 8px rgba(156,175,136,.10)}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:11px 14px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start}
   .card .body{flex:1;min-width:0}
   .card a{color:var(--text);text-decoration:none;font-weight:600;font-size:14px}
   .card a:hover{color:var(--accent);text-decoration:underline}
@@ -136,25 +138,13 @@ TEMPLATE = r"""<!DOCTYPE html>
 </head>
 <body>
 <div class="deco" aria-hidden="true">
-  <svg class="leaf" style="left:-9%;top:6%;width:320px;opacity:.22" viewBox="0 0 200 200">
+  <svg class="leaf" style="left:-8%;top:8%;width:280px;opacity:.12" viewBox="0 0 200 200">
     <path d="M 100 12 C 145 55 165 125 135 178 C 122 198 92 198 76 175 C 48 132 52 70 82 30 C 90 18 96 12 100 12 Z" fill="#9CAF88"/>
-    <path d="M 102 28 C 112 80 110 140 96 178" stroke="#7d9070" stroke-width="2" fill="none" opacity=".55"/>
-    <path d="M 102 60 C 88 70 78 72 68 70 M 104 95 C 84 108 70 115 58 112 M 100 130 C 84 142 72 148 62 146" stroke="#7d9070" stroke-width="1.5" fill="none" opacity=".4"/>
+    <path d="M 102 28 C 112 80 110 140 96 178" stroke="#7d9070" stroke-width="2" fill="none" opacity=".4"/>
   </svg>
-  <svg class="leaf" style="left:74%;top:-7%;width:360px;opacity:.18;transform:rotate(35deg)" viewBox="0 0 200 200">
-    <path d="M 28 70 C 75 35 150 45 178 90 C 192 115 178 142 148 150 C 88 162 35 138 22 100 C 14 82 18 78 28 70 Z" fill="#a8ba94"/>
-    <path d="M 50 80 C 95 62 145 75 168 110" stroke="#7d9070" stroke-width="2" fill="none" opacity=".55"/>
-    <path d="M 70 78 C 92 70 112 66 128 64 M 90 95 C 112 88 132 88 145 92" stroke="#7d9070" stroke-width="1.5" fill="none" opacity=".4"/>
-  </svg>
-  <svg class="leaf" style="left:-12%;top:60%;width:340px;opacity:.16;transform:rotate(38deg)" viewBox="0 0 200 200">
-    <path d="M 100 14 C 138 65 158 145 122 180 C 108 192 80 188 70 168 C 42 122 50 60 78 25 C 86 16 94 14 100 14 Z" fill="#9CAF88"/>
-    <path d="M 102 30 C 116 90 118 145 102 178" stroke="#7d9070" stroke-width="2" fill="none" opacity=".5"/>
-    <path d="M 104 70 C 90 82 80 88 70 88 M 106 105 C 88 118 78 124 66 124" stroke="#7d9070" stroke-width="1.5" fill="none" opacity=".4"/>
-  </svg>
-  <svg class="leaf" style="left:76%;top:62%;width:300px;opacity:.20;transform:rotate(-30deg)" viewBox="0 0 200 200">
-    <path d="M 32 55 C 80 28 158 42 178 100 C 188 128 168 148 138 148 C 78 148 30 120 22 88 C 18 72 22 60 32 55 Z" fill="#a8ba94"/>
-    <path d="M 55 68 C 100 50 150 70 170 105" stroke="#7d9070" stroke-width="2" fill="none" opacity=".55"/>
-    <path d="M 75 62 C 100 55 122 54 138 56 M 92 85 C 115 78 138 80 152 86" stroke="#7d9070" stroke-width="1.5" fill="none" opacity=".4"/>
+  <svg class="leaf" style="left:78%;top:65%;width:260px;opacity:.10;transform:rotate(-30deg)" viewBox="0 0 200 200">
+    <path d="M 32 55 C 80 28 158 42 178 100 C 188 128 168 148 138 148 C 78 148 30 120 22 88 C 18 72 22 60 32 55 Z" fill="#9CAF88"/>
+    <path d="M 55 68 C 100 50 150 70 170 105" stroke="#7d9070" stroke-width="2" fill="none" opacity=".4"/>
   </svg>
 </div>
 <div class="app">
