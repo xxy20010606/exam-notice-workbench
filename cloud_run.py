@@ -18,7 +18,7 @@ from datetime import datetime
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
-import scraper, build_dashboard
+import scraper, build_dashboard, exam_sync
 
 SMTP_HOST = "smtp.163.com"
 SMTP_PORT = 465
@@ -49,6 +49,8 @@ def send_email(recipient, subject, body):
 
 def main():
     report = scraper.run_all()
+    # 若本次新增了国考/福建省考招录公告，自动从详情页校准倒计时日期
+    exam_sync.sync(report["new"])
     n = build_dashboard.build()
     report["dashboard_notices"] = n
     report["new_count"] = len(report["new"])
