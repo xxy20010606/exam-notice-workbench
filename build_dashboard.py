@@ -45,7 +45,7 @@ TEMPLATE = r"""<!DOCTYPE html>
   :root{
     --bg:#F5FFFA; --card:#ffffff; --text:#2d3a2a; --muted:#8a9a85;
     --border:#e8efe6; --accent:#9CAF88; --accent-soft:#eef3ea;
-    --gk:#9CAF88; --sk:#9CAF88; --sy:#9CAF88; --klein:#002FA7;
+    --gk:#002FA7; --sk:#9CAF88; --sy:#C08552; --klein:#002FA7;
     --newbg:#002FA7; --newtx:#ffffff; --sidebg:#ffffff;
   }
   *{box-sizing:border-box}
@@ -56,7 +56,8 @@ TEMPLATE = r"""<!DOCTYPE html>
   .deco svg.leaf{position:absolute}
   .app{display:flex;min-height:100vh}
   aside{width:235px;background:var(--sidebg);border-right:1px solid var(--border);padding:18px 10px;position:sticky;top:0;height:100vh;overflow:auto}
-  .logo{font-size:17px;font-weight:700;margin-bottom:18px;padding:0 6px}
+  .logo{font-size:17px;font-weight:700;margin-bottom:18px;padding:0 6px;display:flex;align-items:center}
+  .logo-dot{width:9px;height:9px;border-radius:50%;background:var(--klein);margin-right:8px;flex:none}
   .logo small{display:block;color:var(--muted);font-weight:400;font-size:11px;margin-top:2px}
   nav .sec-title{font-size:11px;color:var(--muted);margin:16px 6px 6px;letter-spacing:.5px;font-weight:600}
   nav a{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:14px;color:var(--text);text-decoration:none;margin-bottom:4px;cursor:pointer;font-size:13.5px;line-height:1.2;transition:background .15s}
@@ -149,7 +150,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 </div>
 <div class="app">
   <aside>
-    <div class="logo">🌿 公考工作台<small>公告聚合 · 倒计时</small></div>
+    <div class="logo"><span class="logo-dot"></span>公考工作台<small>公告聚合 · 倒计时</small></div>
     <nav id="main-nav">
       /*__SIDEBAR__*/
     </nav>
