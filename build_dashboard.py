@@ -214,7 +214,12 @@ function renderCountdown(){
 }
 
 function renderLatest(){
-  const list = [...DATA.notices].sort((a,b)=>(b.first_seen||"").localeCompare(a.first_seen||""));
+  const list = [...DATA.notices].sort((a,b)=>{
+    const ha=!!a.date, hb=!!b.date;
+    if(ha!==hb) return hb-ha;  // 有 date 的排前
+    if(ha) return b.date.localeCompare(a.date);
+    return (b.first_seen||"").localeCompare(a.first_seen||"");
+  });
   const top = list.slice(0,10);
   document.getElementById("latest-list").innerHTML = top.map(n=>`
     <div class="row">
@@ -234,7 +239,12 @@ function renderNotices(){
     if(q&&!n.title.includes(q)) return false;
     return true;
   });
-  list.sort((a,b)=>(b.first_seen||"").localeCompare(a.first_seen||""));
+  list.sort((a,b)=>{
+    const ha=!!a.date, hb=!!b.date;
+    if(ha!==hb) return hb-ha;
+    if(ha) return b.date.localeCompare(a.date);
+    return (b.first_seen||"").localeCompare(a.first_seen||"");
+  });
   document.getElementById("list").innerHTML = list.map(n=>`
     <div class="card">
       <span class="tag ${catClass(n.category)}">${n.category||""}</span>
@@ -282,7 +292,9 @@ TEMPLATE = TEMPLATE  # noqa
 def build():
     conn = sqlite3.connect(DB)
     rows = conn.execute(
-        "SELECT source,category,region,title,url,date,first_seen,last_seen FROM notices").fetchall()
+        "SELECT source,category,region,title,url,date,first_seen,last_seen FROM notices "
+        "WHERE date>=? OR date='' OR date IS NULL",
+        ("2026-07-01",)).fetchall()
     conn.close()
     today = datetime.date.today().strftime("%Y-%m-%d")
     notices = []
