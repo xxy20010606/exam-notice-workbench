@@ -36,18 +36,18 @@ TEMPLATE = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#4ade80">
+  <meta name="theme-color" content="#9CAF88">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
   <title>公考/事考 工作台</title>
 <style>
   :root{
-    --bg:#f3fcf6; --card:#ffffff; --text:#1f3a2e; --muted:#8bb3a1;
-    --border:#d6f3e2; --accent:#4ade80; --accent-soft:#e7faf0;
-    --gk:#fb7185; --sk:#60a5fa; --sy:#4ade80;
+    --bg:#f5f8f3; --card:#ffffff; --text:#2d3a2a; --muted:#8a9a85;
+    --border:#dbe5d5; --accent:#9CAF88; --accent-soft:#e8efe3;
+    --gk:#fb7185; --sk:#60a5fa; --sy:#9CAF88;
     --newbg:#fef9c3; --newtx:#a16207; --sidebg:#ffffff;
-    --shadow:0 6px 20px rgba(74,222,128,.14);
+    --shadow:0 6px 20px rgba(156,175,136,.16);
   }
   *{box-sizing:border-box}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
@@ -93,8 +93,8 @@ TEMPLATE = r"""<!DOCTYPE html>
   }
 
   /* countdown */
-  .cd-card{background:linear-gradient(135deg,#86efac,#34d399);color:#1f3a2e;border-radius:18px;padding:22px;box-shadow:var(--shadow);position:relative;overflow:hidden}
-  .cd-card.fj{background:linear-gradient(135deg,#bbf7d0,#4ade80)}
+  .cd-card{background:linear-gradient(135deg,#c8d4b8,#9CAF88);color:#2d3a2a;border-radius:18px;padding:22px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .cd-card.fj{background:linear-gradient(135deg,#d5dec8,#a8ba94)}
   .cd-title{font-size:18px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
   .cd-year{font-size:12px;background:rgba(255,255,255,.18);padding:2px 8px;border-radius:999px}
   .cd-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
@@ -124,7 +124,7 @@ TEMPLATE = r"""<!DOCTYPE html>
   .chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
   select,input{padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:13px}
   input{min-width:180px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 14px;margin-bottom:10px;display:flex;gap:10px;align-items:flex-start;box-shadow:0 2px 8px rgba(74,222,128,.08)}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 14px;margin-bottom:10px;display:flex;gap:10px;align-items:flex-start;box-shadow:0 2px 8px rgba(156,175,136,.10)}
   .card .body{flex:1;min-width:0}
   .card a{color:var(--text);text-decoration:none;font-weight:600;font-size:14px}
   .card a:hover{color:var(--accent);text-decoration:underline}
@@ -136,23 +136,25 @@ TEMPLATE = r"""<!DOCTYPE html>
 </head>
 <body>
 <div class="deco" aria-hidden="true">
-  <svg class="leaf" style="left:-8%;top:5%;width:300px;opacity:.22" viewBox="0 0 200 200">
-    <path d="M100 10 Q 175 65 100 190 Q 25 65 100 10 Z" fill="#86efac"/>
-    <path d="M100 22 L100 178" stroke="#4ade80" stroke-width="3" fill="none" opacity=".55"/>
-    <path d="M100 60 L65 55 M100 60 L135 55 M100 100 L55 92 M100 100 L145 92 M100 140 L70 145 M100 140 L130 145" stroke="#4ade80" stroke-width="2" fill="none" opacity=".4"/>
+  <svg class="leaf" style="left:-9%;top:6%;width:320px;opacity:.22" viewBox="0 0 200 200">
+    <path d="M 100 12 C 145 55 165 125 135 178 C 122 198 92 198 76 175 C 48 132 52 70 82 30 C 90 18 96 12 100 12 Z" fill="#9CAF88"/>
+    <path d="M 102 28 C 112 80 110 140 96 178" stroke="#7d9070" stroke-width="2" fill="none" opacity=".55"/>
+    <path d="M 102 60 C 88 70 78 72 68 70 M 104 95 C 84 108 70 115 58 112 M 100 130 C 84 142 72 148 62 146" stroke="#7d9070" stroke-width="1.5" fill="none" opacity=".4"/>
   </svg>
-  <svg class="leaf" style="left:78%;top:-6%;width:340px;opacity:.18;transform:rotate(28deg)" viewBox="0 0 200 200">
-    <path d="M100 10 Q 175 65 100 190 Q 25 65 100 10 Z" fill="#bbf7d0"/>
-    <path d="M100 22 L100 178" stroke="#34d399" stroke-width="3" fill="none" opacity=".55"/>
+  <svg class="leaf" style="left:74%;top:-7%;width:360px;opacity:.18;transform:rotate(35deg)" viewBox="0 0 200 200">
+    <path d="M 28 70 C 75 35 150 45 178 90 C 192 115 178 142 148 150 C 88 162 35 138 22 100 C 14 82 18 78 28 70 Z" fill="#a8ba94"/>
+    <path d="M 50 80 C 95 62 145 75 168 110" stroke="#7d9070" stroke-width="2" fill="none" opacity=".55"/>
+    <path d="M 70 78 C 92 70 112 66 128 64 M 90 95 C 112 88 132 88 145 92" stroke="#7d9070" stroke-width="1.5" fill="none" opacity=".4"/>
   </svg>
-  <svg class="leaf" style="left:-10%;top:62%;width:320px;opacity:.16;transform:rotate(40deg)" viewBox="0 0 200 200">
-    <path d="M100 10 Q 175 65 100 190 Q 25 65 100 10 Z" fill="#86efac"/>
-    <path d="M100 22 L100 178" stroke="#22c55e" stroke-width="3" fill="none" opacity=".5"/>
+  <svg class="leaf" style="left:-12%;top:60%;width:340px;opacity:.16;transform:rotate(38deg)" viewBox="0 0 200 200">
+    <path d="M 100 14 C 138 65 158 145 122 180 C 108 192 80 188 70 168 C 42 122 50 60 78 25 C 86 16 94 14 100 14 Z" fill="#9CAF88"/>
+    <path d="M 102 30 C 116 90 118 145 102 178" stroke="#7d9070" stroke-width="2" fill="none" opacity=".5"/>
+    <path d="M 104 70 C 90 82 80 88 70 88 M 106 105 C 88 118 78 124 66 124" stroke="#7d9070" stroke-width="1.5" fill="none" opacity=".4"/>
   </svg>
-  <svg class="leaf" style="left:80%;top:65%;width:280px;opacity:.2;transform:rotate(-32deg)" viewBox="0 0 200 200">
-    <path d="M100 10 Q 175 65 100 190 Q 25 65 100 10 Z" fill="#bbf7d0"/>
-    <path d="M100 22 L100 178" stroke="#4ade80" stroke-width="3" fill="none" opacity=".55"/>
-    <path d="M100 70 L60 62 M100 70 L140 62 M100 110 L55 102 M100 110 L145 102" stroke="#4ade80" stroke-width="2" fill="none" opacity=".4"/>
+  <svg class="leaf" style="left:76%;top:62%;width:300px;opacity:.20;transform:rotate(-30deg)" viewBox="0 0 200 200">
+    <path d="M 32 55 C 80 28 158 42 178 100 C 188 128 168 148 138 148 C 78 148 30 120 22 88 C 18 72 22 60 32 55 Z" fill="#a8ba94"/>
+    <path d="M 55 68 C 100 50 150 70 170 105" stroke="#7d9070" stroke-width="2" fill="none" opacity=".55"/>
+    <path d="M 75 62 C 100 55 122 54 138 56 M 92 85 C 115 78 138 80 152 86" stroke="#7d9070" stroke-width="1.5" fill="none" opacity=".4"/>
   </svg>
 </div>
 <div class="app">
