@@ -8,6 +8,7 @@
 import json, os, sqlite3, hashlib, re, time, datetime
 from urllib.parse import urljoin
 from bs4 import BeautifulSoup
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB = os.path.join(ROOT, "notices.db")
@@ -30,7 +31,7 @@ def now_iso():
 
 
 # ---------------- 抓取 ----------------
-def fetch_http(url, timeout=20, retries=2):
+def fetch_http(url, timeout=15, retries=2):
     import urllib.request, ssl, gzip
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
@@ -201,15 +202,49 @@ def store(conn, source, items):
 
 
 # ---------------- 主流程 ----------------
-def run_all(limit_per_source=40):
+def _work(s, limit_per_source=40):
+    """单源抓取+解析（线程安全：不碰 DB）。返回 (source, items, error)。"""
+    try:
+        html = fetch(s)
+        items = parse_source(s, html)[:limit_per_source]
+        return s, items, None
+    except Exception as e:
+        return s, [], str(e)
+
+
+def run_all(limit_per_source=40, max_workers=8):
     with open(SOURCES, encoding="utf-8") as f:
         sources = json.load(f)
     conn = init_db()
     report = {"run_at": now_iso(), "sources": [], "new": []}
+
+    http_sources = [s for s in sources if s.get("method", "http") != "browser"]
+    browser_sources = [s for s in sources if s.get("method", "http") == "browser"]
+
+    # http 源并发抓取（每个线程只 fetch+parse，不写库，避免 SQLite 跨线程）
+    results = {}
+    with ThreadPoolExecutor(max_workers=max_workers) as ex:
+        futures = {ex.submit(_work, s, limit_per_source): s["name"] for s in http_sources}
+        for fut in as_completed(futures):
+            name = futures[fut]
+            s, items, err = fut.result()
+            results[name] = (s, items, err)
+
+    # 浏览器源（反爬、共享单例 browser）顺序抓取，避免并发冲突
+    for s in browser_sources:
+        s2, items, err = _work(s, limit_per_source)
+        results[s2["name"]] = (s2, items, err)
+
+    # 主线程顺序写库（SQLite 线程安全）
     for s in sources:
-        try:
-            html = fetch(s)
-            items = parse_source(s, html)[:limit_per_source]
+        s2, items, err = results[s["name"]]
+        if err:
+            conn.execute("INSERT OR REPLACE INTO sources_status(name,last_run,last_count,last_error) VALUES(?,?,?,?)",
+                         (s["name"], now_iso(), 0, err[:300]))
+            report["sources"].append({"name": s["name"], "category": s.get("category"),
+                                       "region": s.get("region"), "count": 0, "new": 0,
+                                       "error": err[:200]})
+        else:
             new = store(conn, s, items)
             conn.execute("INSERT OR REPLACE INTO sources_status(name,last_run,last_count,last_error) VALUES(?,?,?,?)",
                          (s["name"], now_iso(), len(items), ""))
@@ -219,13 +254,6 @@ def run_all(limit_per_source=40):
             for n in new:
                 report["new"].append({"source": s["name"], "category": s.get("category"),
                                        "region": s.get("region"), **n})
-        except Exception as e:
-            err = str(e)
-            conn.execute("INSERT OR REPLACE INTO sources_status(name,last_run,last_count,last_error) VALUES(?,?,?,?)",
-                         (s["name"], now_iso(), 0, err[:300]))
-            report["sources"].append({"name": s["name"], "category": s.get("category"),
-                                       "region": s.get("region"), "count": 0, "new": 0,
-                                       "error": err[:200]})
     conn.commit()
     conn.close()
     return report
