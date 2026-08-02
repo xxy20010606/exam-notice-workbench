@@ -1,0 +1,6 @@
+{
+  "email": "xxy1037550012@163.com",
+  "notify_on": ["国考", "省考", "事业编"],
+  "min_new_to_notify": 1,
+  "note": "把 email 改成你的收件邮箱即可启用推送。国考/四川/山东等浏览器型源需本机先执行一次 'playwright install chromium'。"
+}

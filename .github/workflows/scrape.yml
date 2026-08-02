@@ -1,0 +1,57 @@
+name: 公考事考公告抓取
+
+on:
+  schedule:
+    # 每 6 小时跑一次（分钟取 17 避免整点拥堵）
+    - cron: '17 */6 * * *'
+  workflow_dispatch: {}      # 允许在 GitHub 上手动触发
+
+permissions:
+  contents: write            # 提交更新后的 notices.db / index.html
+  pages: write               # 发布看板到 GitHub Pages
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v4
+
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: 安装 Playwright Chromium（浏览器型源用）
+        run: python -m playwright install chromium
+
+      - name: 抓取并更新看板
+        env:
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          RECIPIENT: ${{ secrets.RECIPIENT }}
+          PAGES_URL: ${{ secrets.PAGES_URL }}
+        run: python cloud_run.py
+
+      - name: 提交更新
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: 定时更新公告 $(date +'%Y-%m-%d %H:%M')" || echo "无变更"
+          git push
+
+      - name: 上传 Pages 产物
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - name: 部署 Pages
+        uses: actions/deploy-pages@v4

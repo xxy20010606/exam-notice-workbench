@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+last_run.json
+
+# Playwright 浏览器缓存（巨大，绝不提交）
+.pw-browsers/
+
+# WorkBuddy 客户端内部数据
+.workbuddy/
