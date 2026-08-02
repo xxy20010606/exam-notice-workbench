@@ -22,12 +22,8 @@ def now_iso():
 
 def render_sidebar():
     return (
-        '<div class="sec-title">核心功能</div>\n'
-        '<a class="parent" data-view="home">📝 考试信息</a>\n'
-        '<div class="sub-nav">\n'
-        '  <a data-view="home" class="active">⌛ 倒计时</a>\n'
-        '  <a data-view="notices">📋 公告汇总</a>\n'
-        '</div>'
+        '<a data-view="home" class="active">⌛ 倒计时</a>\n'
+        '<a data-view="notices">📋 公告汇总</a>'
     )
 
 
@@ -55,18 +51,14 @@ TEMPLATE = r"""<!DOCTYPE html>
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
        background:var(--bg);color:var(--text);font-size:14px}
   .app{display:flex;min-height:100vh}
-  aside{width:235px;background:var(--sidebg);border-right:1px solid var(--border);padding:18px 10px;position:sticky;top:0;height:100vh;overflow:auto}
-  .logo{font-size:17px;font-weight:700;margin-bottom:18px;padding:0 6px;display:flex;align-items:center}
+  aside{width:215px;background:var(--sidebg);border-right:1px solid var(--border);padding:22px 14px;position:sticky;top:0;height:100vh;overflow:auto}
+  .logo{font-size:18px;font-weight:700;margin-bottom:22px;padding:0 4px;display:flex;align-items:center}
   .logo-dot{width:9px;height:9px;border-radius:50%;background:var(--klein);margin-right:8px;flex:none}
   .logo small{display:block;color:var(--muted);font-weight:400;font-size:11px;margin-top:2px}
-  nav .sec-title{font-size:11px;color:var(--muted);margin:16px 6px 6px;letter-spacing:.5px;font-weight:600}
-  nav a{display:flex;align-items:center;gap:8px;padding:9px 12px;border-radius:14px;color:var(--text);text-decoration:none;margin-bottom:4px;cursor:pointer;font-size:13.5px;line-height:1.2;transition:background .15s}
+  nav a{display:flex;align-items:center;gap:8px;padding:12px 14px;border-radius:14px;color:var(--text);text-decoration:none;margin-bottom:6px;cursor:pointer;font-size:15px;line-height:1.2;transition:background .15s}
   nav a.active{color:var(--klein);font-weight:700;background:transparent;position:relative}
   nav a.active::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:3px;background:var(--klein);border-radius:0 3px 3px 0}
   nav a:not(.active):hover{background:var(--accent-soft)}
-  nav a.parent{font-weight:600}
-  nav .sub-nav{padding:2px 0 4px 14px;margin:0 6px 6px 14px;border-left:1px solid var(--border)}
-  nav .sub-nav a{padding:7px 12px;font-size:13px}
   main{flex:1;padding:20px 28px;overflow:auto}
   h1{font-size:20px;margin:0 0 14px;font-weight:800}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
@@ -259,10 +251,7 @@ function renderNotices(){
 function switchView(v){
   document.getElementById("view-home").style.display = v==="home"?"":"none";
   document.getElementById("view-notices").style.display = v==="notices"?"":"none";
-  document.querySelectorAll("nav a[data-view]").forEach(a=>{
-    if(a.classList.contains("parent")) a.classList.toggle("active", v==="home");
-    else a.classList.toggle("active", a.dataset.view===v);
-  });
+  document.querySelectorAll("nav a[data-view]").forEach(a=>a.classList.toggle("active", a.dataset.view===v));
   document.querySelectorAll(".mobile-tab a[data-view]").forEach(a=>a.classList.toggle("active", a.dataset.view===v));
   if(v==="notices") renderNotices();
 }
