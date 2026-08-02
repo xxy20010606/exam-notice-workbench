@@ -1,0 +1,17 @@
+{
+  "name": "公考/事考 工作台",
+  "short_name": "公考工作台",
+  "description": "国考、省考、福建事业单位招考公告聚合与倒计时",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f6fb",
+  "theme_color": "#2563eb",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

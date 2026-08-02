@@ -35,8 +35,12 @@ TEMPLATE = r"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>公考/事考 工作台</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#2563eb">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icon.svg">
+  <title>公考/事考 工作台</title>
 <style>
   :root{
     --bg:#f4f6fb; --card:#ffffff; --text:#1f2937; --muted:#6b7280;
@@ -61,7 +65,26 @@ TEMPLATE = r"""<!DOCTYPE html>
   main{flex:1;padding:20px 28px;overflow:auto}
   h1{font-size:20px;margin:0 0 14px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-  @media(max-width:880px){.grid2{grid-template-columns:1fr}.app{flex-direction:column}aside{width:100%;height:auto;position:static;border-right:none;border-bottom:1px solid var(--border)}}
+
+  /* 手机端底部导航（窄屏显示，隐藏左侧栏） */
+  .mobile-tab{display:none}
+  @media(max-width:880px){
+    .app{flex-direction:column}
+    aside{display:none}
+    main{padding:16px 14px calc(76px + env(safe-area-inset-bottom))}
+    .mobile-tab{display:flex;position:fixed;bottom:0;left:0;right:0;
+      background:var(--card);border-top:1px solid var(--border);
+      box-shadow:0 -2px 10px rgba(0,0,0,.06);z-index:30;
+      padding-bottom:env(safe-area-inset-bottom)}
+    .mobile-tab a{flex:1;text-align:center;padding:9px 0;color:var(--muted);
+      text-decoration:none;font-size:12px;line-height:1.35;cursor:pointer}
+    .mobile-tab a.active{color:var(--accent);font-weight:700}
+    .grid2{grid-template-columns:1fr}
+    .bar{position:static}
+    h1{font-size:18px}
+    .cd-title{font-size:16px}
+    .card a{font-size:13.5px}
+  }
 
   /* countdown */
   .cd-card{background:linear-gradient(135deg,#2563eb,#1e40af);color:#fff;border-radius:14px;padding:22px}
@@ -139,6 +162,10 @@ TEMPLATE = r"""<!DOCTYPE html>
     </div>
   </main>
 </div>
+<nav class="mobile-tab">
+  <a data-view="home" class="active">⌛ 倒计时</a>
+  <a data-view="notices">📋 公告</a>
+</nav>
 <script>
 const DATA = /*__DATA__*/;
 const EXAM = /*__EXAM__*/;
@@ -227,6 +254,7 @@ function switchView(v){
     if(a.classList.contains("parent")) a.classList.toggle("active", v==="home");
     else a.classList.toggle("active", a.dataset.view===v);
   });
+  document.querySelectorAll(".mobile-tab a[data-view]").forEach(a=>a.classList.toggle("active", a.dataset.view===v));
   if(v==="notices") renderNotices();
 }
 
@@ -242,6 +270,7 @@ function init(){
     const o=document.createElement("option");o.value=r;o.textContent=r;sel.appendChild(o);
   });
   document.querySelectorAll("nav a[data-view]").forEach(a=>a.onclick=()=>switchView(a.dataset.view));
+  document.querySelectorAll(".mobile-tab a[data-view]").forEach(a=>a.onclick=()=>switchView(a.dataset.view));
   document.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{document.querySelectorAll(".chip").forEach(x=>x.classList.remove("active"));c.classList.add("active");renderNotices();});
   sel.onchange=renderNotices;
   document.getElementById("q").oninput=renderNotices;
