@@ -20,17 +20,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 检出仓库
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: 配置 Python
+      - name: 配置 Python（自动缓存 pip 依赖）
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
 
       - name: 安装依赖
         run: pip install -r requirements.txt
 
-      - name: 安装 Playwright Chromium（浏览器型源用）
+      - name: 缓存 Playwright 浏览器
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: 安装 Playwright Chromium（缓存命中则秒过）
         run: python -m playwright install chromium
 
       - name: 抓取并更新看板
@@ -49,9 +59,9 @@ jobs:
           git push
 
       - name: 上传 Pages 产物
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v4
         with:
           path: .
 
       - name: 部署 Pages
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
