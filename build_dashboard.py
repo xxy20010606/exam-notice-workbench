@@ -31,34 +31,64 @@ def render_sidebar():
     )
 
 
-def _leaf_veins():
-    """羽状叶脉：主脉 + 左右各 5 条侧脉，自然弯曲。"""
-    paths = ['<path d="M100 188 C 100 132 100 72 101 20" stroke="var(--leaf-vein)" stroke-width="2.4" fill="none" opacity=".5"/>']
-    left_y = [54, 82, 110, 138, 162]
-    left_x = [62, 56, 62, 74, 86]
-    right_x = [138, 144, 138, 126, 114]
-    for y, x in zip(left_y, left_x):
-        ty = y + (122 - y) * 0.2
-        paths.append(f'<path d="M100 {y} C {(100+x)//2} {y+3} {x} {ty-5} {x} {ty}" stroke="var(--leaf-vein)" stroke-width="1.2" fill="none" opacity=".4"/>')
-    for y, x in zip(left_y, right_x):
-        ty = y + (122 - y) * 0.2
-        paths.append(f'<path d="M100 {y} C {(100+x)//2} {y+3} {x} {ty-5} {x} {ty}" stroke="var(--leaf-vein)" stroke-width="1.2" fill="none" opacity=".4"/>')
-    return "".join(paths)
-
-
-def leaf_svg():
-    """一片真实阔叶：渐变叶身 + 羽状叶脉 + 叶柄。"""
+def _willow_veins():
+    """细叶子的主脉：1 条居中曲线（自然弯曲），仅 1 条更显薄。"""
     return (
-        '<svg class="leaf" viewBox="0 0 200 240" preserveAspectRatio="xMidYMid meet">'
-        '<path d="M100 16 C 138 48 152 122 124 178 C 116 197 84 197 76 178 C 48 122 62 48 100 16 Z" fill="url(#leafgrad)"/>'
-        + _leaf_veins() +
-        '<path d="M100 234 C 99 212 101 200 100 190" stroke="var(--leaf-vein)" stroke-width="3" fill="none"/>'
+        '<path d="M40 16 C 38 80 42 160 40 224" stroke="var(--leaf-vein)" stroke-width="1" fill="none" opacity=".30"/>'
+    )
+
+
+def willow_leaf_svg():
+    """细长柳叶/草叶：尖头尖尾，薄如纸。viewBox 80x240（竖向 1:3 比例）。"""
+    return (
+        '<svg class="leaf" viewBox="0 0 80 240" preserveAspectRatio="xMidYMid meet">'
+        '<path d="M40 4 C 54 60 58 130 52 200 C 49 220 44 232 40 236 C 36 232 31 220 28 200 C 22 130 26 60 40 4 Z" fill="url(#leafgrad)"/>'
+        + _willow_veins() +
         '</svg>'
     )
 
 
-def render_leaves():
-    return "\n".join(f'<div class="leaf-wrap lw-{i}">{leaf_svg()}</div>' for i in range(1, 6))
+def willow_leaf_alt_svg():
+    """轻微弯的细长叶（不居中，略 S 形），与 willow_leaf 形态不同。"""
+    return (
+        '<svg class="leaf" viewBox="0 0 80 240" preserveAspectRatio="xMidYMid meet">'
+        '<path d="M44 4 C 62 64 56 138 48 210 C 45 226 40 234 36 234 C 30 230 24 218 24 198 C 24 132 32 60 44 4 Z" fill="url(#leafgrad2)"/>'
+        + '<path d="M44 18 C 42 90 40 170 36 222" stroke="var(--leaf-vein)" stroke-width="1" fill="none" opacity=".28"/>'
+        '</svg>'
+    )
+
+
+# 背景层（远景）：7 片小叶子，blur 1.5px，opacity 0.10
+_BG_LEAVES = [
+    (6,   90,  30,  0),
+    (22,  75,  34, -10),
+    (40, 100,  28,  -3),
+    (58,  82,  32, -14),
+    (74,  95,  26,  -7),
+    (88,  78,  30,  -1),
+    (15,  85,  28, -17),
+]
+
+# 前景层（近景）：3 片大叶子，无 blur，opacity 0.28
+_FG_LEAVES = [
+    (12,  180, 38,  -5),
+    (52,  200, 34, -12),
+    (82,  160, 42,  -2),
+]
+
+
+def render_leaves_bg():
+    return "\n".join(
+        f'<div class="leaf-wrap blw-{i+1}">{willow_leaf_svg() if i % 2 == 0 else willow_leaf_alt_svg()}</div>'
+        for i, (left, w, dur, delay) in enumerate(_BG_LEAVES)
+    )
+
+
+def render_leaves_fg():
+    return "\n".join(
+        f'<div class="leaf-wrap flw-{i+1}">{willow_leaf_svg() if i % 2 == 0 else willow_leaf_alt_svg()}</div>'
+        for i, (left, w, dur, delay) in enumerate(_FG_LEAVES)
+    )
 
 
 TEMPLATE = r"""<!DOCTYPE html>
@@ -81,32 +111,51 @@ TEMPLATE = r"""<!DOCTYPE html>
   *{box-sizing:border-box}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
        background:var(--bg);color:var(--text);font-size:14px}
-  /* 真实阔叶缓缓飘落：外层只管下落，内层钟摆翻转，叠加成自然落叶 */
-  .deco{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden;--leaf-vein:#6f8460}
+  /* 细长柳叶/草叶飘落：背景层（远景小叶+模糊）+ 前景层（近景大叶+清晰） */
+  .deco-bg,.deco-fg{position:fixed;inset:0;pointer-events:none;overflow:hidden;--leaf-vein:#6f8460}
+  .deco-bg{z-index:-2;filter:blur(1.5px)}
+  .deco-fg{z-index:-1}
   .leaf-wrap{position:absolute;top:-300px;will-change:transform}
-  .leaf{display:block;width:100%;height:auto;will-change:transform;transform-origin:50% 6%}
-  .lw-1{left:4%;width:200px;animation:fall1 26s linear infinite}
-  .lw-2{left:26%;width:150px;animation:fall2 32s linear infinite -9s}
-  .lw-3{left:48%;width:235px;animation:fall3 28s linear infinite -4s}
-  .lw-4{left:70%;width:180px;animation:fall4 34s linear infinite -17s}
-  .lw-5{left:89%;width:160px;animation:fall5 24s linear infinite -12s}
-  .lw-1 .leaf{animation:flutterA 3.6s ease-in-out infinite}
-  .lw-2 .leaf{animation:flutterB 4.4s ease-in-out infinite -1s}
-  .lw-3 .leaf{animation:flutterC 3.1s ease-in-out infinite -2s}
-  .lw-4 .leaf{animation:flutterD 4.8s ease-in-out infinite -.5s}
-  .lw-5 .leaf{animation:flutterE 3.9s ease-in-out infinite -1.5s}
-  /* 下落：从屏幕上方到屏幕外，线性连续；opacity 淡入淡出避免突兀 */
-  @keyframes fall1{0%{transform:translate(0,-300px);opacity:0}8%{opacity:.14}92%{opacity:.14}100%{transform:translate(55px,120vh);opacity:0}}
-  @keyframes fall2{0%{transform:translate(0,-300px);opacity:0}9%{opacity:.12}91%{opacity:.12}100%{transform:translate(-45px,120vh);opacity:0}}
-  @keyframes fall3{0%{transform:translate(0,-300px);opacity:0}7%{opacity:.15}93%{opacity:.15}100%{transform:translate(40px,120vh);opacity:0}}
-  @keyframes fall4{0%{transform:translate(0,-300px);opacity:0}9%{opacity:.13}91%{opacity:.13}100%{transform:translate(-55px,120vh);opacity:0}}
-  @keyframes fall5{0%{transform:translate(0,-300px);opacity:0}10%{opacity:.12}90%{opacity:.12}100%{transform:translate(50px,120vh);opacity:0}}
-  /* 钟摆翻转：绕叶基轻微摆 + 翻面，叠加下落即飘落感 */
-  @keyframes flutterA{0%,100%{transform:translateX(0) rotate(-12deg)}50%{transform:translateX(38px) rotate(18deg)}}
-  @keyframes flutterB{0%,100%{transform:translateX(0) rotate(10deg)}50%{transform:translateX(-34px) rotate(-16deg)}}
-  @keyframes flutterC{0%,100%{transform:translateX(0) rotate(-9deg)}50%{transform:translateX(44px) rotate(15deg)}}
-  @keyframes flutterD{0%,100%{transform:translateX(0) rotate(13deg)}50%{transform:translateX(-40px) rotate(-14deg)}}
-  @keyframes flutterE{0%,100%{transform:translateX(0) rotate(-11deg)}50%{transform:translateX(36px) rotate(17deg)}}
+  .leaf{display:block;width:100%;height:auto;will-change:transform;transform-origin:50% 4%}
+  /* 背景层 7 片小叶子，opacity 0.10（薄纱） */
+  .blw-1{left:6%;width:90px;animation:fb1 30s linear infinite}
+  .blw-2{left:22%;width:75px;animation:fb2 34s linear infinite -10s}
+  .blw-3{left:40%;width:100px;animation:fb3 28s linear infinite -3s}
+  .blw-4{left:58%;width:82px;animation:fb4 32s linear infinite -14s}
+  .blw-5{left:74%;width:95px;animation:fb5 36s linear infinite -7s}
+  .blw-6{left:88%;width:78px;animation:fb6 30s linear infinite -1s}
+  .blw-7{left:15%;width:85px;animation:fb7 33s linear infinite -17s}
+  .blw-1 .leaf{animation:flitterA 4.2s ease-in-out infinite}
+  .blw-2 .leaf{animation:flitterB 5.1s ease-in-out infinite -1s}
+  .blw-3 .leaf{animation:flitterC 3.8s ease-in-out infinite -2s}
+  .blw-4 .leaf{animation:flitterD 4.7s ease-in-out infinite -.5s}
+  .blw-5 .leaf{animation:flitterA 4.4s ease-in-out infinite -2.5s}
+  .blw-6 .leaf{animation:flitterB 5.3s ease-in-out infinite -1.8s}
+  .blw-7 .leaf{animation:flitterC 3.6s ease-in-out infinite -3.2s}
+  /* 前景层 3 片大叶子，opacity 0.28（薄纱但更清晰） */
+  .flw-1{left:12%;width:180px;animation:ff1 38s linear infinite -5s}
+  .flw-2{left:52%;width:200px;animation:ff2 42s linear infinite -12s}
+  .flw-3{left:82%;width:160px;animation:ff3 36s linear infinite -2s}
+  .flw-1 .leaf{animation:flitterD 5.6s ease-in-out infinite}
+  .flw-2 .leaf{animation:flitterA 4.9s ease-in-out infinite -1.5s}
+  .flw-3 .leaf{animation:flitterB 5.2s ease-in-out infinite -2.8s}
+  /* 背景层下落（横向漂移更小，像远处叶子） */
+  @keyframes fb1{0%{transform:translate(0,-300px);opacity:0}8%{opacity:.10}92%{opacity:.10}100%{transform:translate(35px,120vh);opacity:0}}
+  @keyframes fb2{0%{transform:translate(0,-300px);opacity:0}9%{opacity:.09}91%{opacity:.09}100%{transform:translate(-30px,120vh);opacity:0}}
+  @keyframes fb3{0%{transform:translate(0,-300px);opacity:0}7%{opacity:.11}93%{opacity:.11}100%{transform:translate(28px,120vh);opacity:0}}
+  @keyframes fb4{0%{transform:translate(0,-300px);opacity:0}9%{opacity:.10}91%{opacity:.10}100%{transform:translate(-32px,120vh);opacity:0}}
+  @keyframes fb5{0%{transform:translate(0,-300px);opacity:0}8%{opacity:.09}92%{opacity:.09}100%{transform:translate(38px,120vh);opacity:0}}
+  @keyframes fb6{0%{transform:translate(0,-300px);opacity:0}10%{opacity:.10}90%{opacity:.10}100%{transform:translate(-26px,120vh);opacity:0}}
+  @keyframes fb7{0%{transform:translate(0,-300px);opacity:0}8%{opacity:.09}92%{opacity:.09}100%{transform:translate(30px,120vh);opacity:0}}
+  /* 前景层下落（横向漂移略大，像近处叶子） */
+  @keyframes ff1{0%{transform:translate(0,-300px);opacity:0}7%{opacity:.28}93%{opacity:.28}100%{transform:translate(50px,120vh);opacity:0}}
+  @keyframes ff2{0%{transform:translate(0,-300px);opacity:0}6%{opacity:.30}94%{opacity:.30}100%{transform:translate(-55px,120vh);opacity:0}}
+  @keyframes ff3{0%{transform:translate(0,-300px);opacity:0}8%{opacity:.26}92%{opacity:.26}100%{transform:translate(45px,120vh);opacity:0}}
+  /* 钟摆翻转：绕叶尖轻微摆+翻面，幅度比之前大（细叶子更显摆动） */
+  @keyframes flitterA{0%,100%{transform:translateX(0) rotate(-15deg)}50%{transform:translateX(45px) rotate(22deg)}}
+  @keyframes flitterB{0%,100%{transform:translateX(0) rotate(13deg)}50%{transform:translateX(-42px) rotate(-20deg)}}
+  @keyframes flitterC{0%,100%{transform:translateX(0) rotate(-11deg)}50%{transform:translateX(50px) rotate(18deg)}}
+  @keyframes flitterD{0%,100%{transform:translateX(0) rotate(16deg)}50%{transform:translateX(-48px) rotate(-19deg)}}
   body::before{content:"";position:fixed;inset:-25%;z-index:-2;pointer-events:none;
     background:radial-gradient(38% 38% at 28% 30%, rgba(156,175,136,.07), transparent 70%),
                radial-gradient(42% 42% at 72% 72%, rgba(147,169,193,.06), transparent 72%);
@@ -114,7 +163,7 @@ TEMPLATE = r"""<!DOCTYPE html>
   @keyframes drift{from{transform:translate(0,0)}to{transform:translate(2.5%,2.5%)}}
   @media (prefers-reduced-motion:reduce){
     .leaf-wrap,.leaf,body::before{animation:none}
-    .leaf-wrap{opacity:0}
+    .deco-bg,.deco-fg{display:none}
   }
   .app{display:flex;min-height:100vh}
   aside{width:235px;background:var(--sidebg);border-right:1px solid var(--border);padding:18px 10px;position:sticky;top:0;height:100vh;overflow:auto}
@@ -201,14 +250,22 @@ TEMPLATE = r"""<!DOCTYPE html>
 </head>
 <body>
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
-  <linearGradient id="leafgrad" x1="0" y1="0" x2="0.3" y2="1">
-    <stop offset="0" stop-color="#c4d2b6"/>
-    <stop offset="0.55" stop-color="#a3b88f"/>
-    <stop offset="1" stop-color="#8aa078"/>
+  <linearGradient id="leafgrad" x1="0" y1="0" x2="0.4" y2="1">
+    <stop offset="0" stop-color="#dde6d2"/>
+    <stop offset="0.5" stop-color="#bccba6"/>
+    <stop offset="1" stop-color="#9eb088"/>
+  </linearGradient>
+  <linearGradient id="leafgrad2" x1="0" y1="0" x2="0.5" y2="1">
+    <stop offset="0" stop-color="#e3ead9"/>
+    <stop offset="0.55" stop-color="#c2d0ac"/>
+    <stop offset="1" stop-color="#a4b58e"/>
   </linearGradient>
 </defs></svg>
-<div class="deco" aria-hidden="true">
-  /*__LEAVES__*/
+<div class="deco-bg" aria-hidden="true">
+  /*__LEAVES_BG__*/
+</div>
+<div class="deco-fg" aria-hidden="true">
+  /*__LEAVES_FG__*/
 </div>
 <div class="app">
   <aside>
@@ -386,7 +443,8 @@ def build():
             .replace("/*__DATA__*/", json.dumps(data, ensure_ascii=False))
             .replace("/*__EXAM__*/", json.dumps(exam, ensure_ascii=False))
             .replace("/*__SIDEBAR__*/", render_sidebar())
-            .replace("/*__LEAVES__*/", render_leaves()))
+            .replace("/*__LEAVES_BG__*/", render_leaves_bg())
+            .replace("/*__LEAVES_FG__*/", render_leaves_fg()))
     with open(OUT, "w", encoding="utf-8") as f:
         f.write(html)
     return len(notices)
