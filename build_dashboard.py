@@ -52,9 +52,10 @@ TEMPLATE = r"""<!DOCTYPE html>
        background:var(--bg);color:var(--text);font-size:14px}
   .app{display:flex;min-height:100vh}
   aside{width:215px;background:var(--sidebg);border-right:1px solid var(--border);padding:22px 14px;position:sticky;top:0;height:100vh;overflow:auto}
-  .logo{font-size:18px;font-weight:700;margin-bottom:22px;padding:0 4px;display:flex;align-items:center}
+  .logo{font-size:18px;font-weight:700;margin-bottom:22px;padding:0 4px;display:flex;flex-direction:column;align-items:flex-start;gap:4px;line-height:1.2}
+  .logo-mark{display:flex;align-items:center;white-space:nowrap}
   .logo-dot{width:9px;height:9px;border-radius:50%;background:var(--klein);margin-right:8px;flex:none}
-  .logo small{display:block;color:var(--muted);font-weight:400;font-size:11px;margin-top:2px}
+  .logo small{color:var(--muted);font-weight:400;font-size:11px;white-space:nowrap}
   nav a{display:flex;align-items:center;gap:8px;padding:12px 14px;border-radius:14px;color:var(--text);text-decoration:none;margin-bottom:6px;cursor:pointer;font-size:15px;line-height:1.2;transition:background .15s}
   nav a.active{color:var(--klein);font-weight:700;background:transparent;position:relative}
   nav a.active::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:3px;background:var(--klein);border-radius:0 3px 3px 0}
@@ -132,7 +133,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 <body>
 <div class="app">
   <aside>
-    <div class="logo"><span class="logo-dot"></span>公考工作台<small>公告聚合 · 倒计时</small></div>
+    <div class="logo"><span class="logo-mark"><span class="logo-dot"></span>公考工作台</span><small>公告聚合 · 倒计时</small></div>
     <nav id="main-nav">
       /*__SIDEBAR__*/
     </nav>
