@@ -52,9 +52,9 @@ TEMPLATE = r"""<!DOCTYPE html>
   *{box-sizing:border-box}
   body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
        background:var(--bg);color:var(--text);font-size:14px}
-  /* 散落的可爱叶子/花瓣背景装饰 */
+  /* 大片叶子背景装饰 */
   .deco{position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
-  .deco span{position:absolute;opacity:.16;user-select:none}
+  .deco svg.leaf{position:absolute}
   .app{display:flex;min-height:100vh}
   aside{width:235px;background:var(--sidebg);border-right:1px solid var(--border);padding:18px 10px;position:sticky;top:0;height:100vh;overflow:auto}
   .logo{font-size:17px;font-weight:700;margin-bottom:18px;padding:0 6px}
@@ -80,9 +80,11 @@ TEMPLATE = r"""<!DOCTYPE html>
       background:var(--card);border-top:1px solid var(--border);
       box-shadow:0 -2px 10px rgba(0,0,0,.06);z-index:30;
       padding-bottom:env(safe-area-inset-bottom)}
-    .mobile-tab a{flex:1;text-align:center;padding:9px 0;color:var(--muted);
-      text-decoration:none;font-size:12px;line-height:1.35;cursor:pointer}
-    .mobile-tab a.active{color:var(--accent);font-weight:700}
+    .mobile-tab a{flex:1;display:flex;align-items:center;justify-content:center;gap:6px;
+      padding:14px 0;color:var(--muted);text-decoration:none;
+      font-size:16px;font-weight:600;line-height:1.3;cursor:pointer}
+    .mobile-tab a.active{color:var(--accent)}
+    .mobile-tab a .ico{font-size:20px;line-height:1}
     .grid2{grid-template-columns:1fr}
     .bar{position:static}
     h1{font-size:18px}
@@ -91,9 +93,8 @@ TEMPLATE = r"""<!DOCTYPE html>
   }
 
   /* countdown */
-  .cd-card{background:linear-gradient(135deg,#86efac,#34d399);color:#1f3a2e;border-radius:22px;padding:22px;box-shadow:var(--shadow);position:relative;overflow:hidden}
+  .cd-card{background:linear-gradient(135deg,#86efac,#34d399);color:#1f3a2e;border-radius:18px;padding:22px;box-shadow:var(--shadow);position:relative;overflow:hidden}
   .cd-card.fj{background:linear-gradient(135deg,#bbf7d0,#4ade80)}
-  .cd-card::after{content:"🌿";position:absolute;right:14px;top:6px;font-size:46px;opacity:.18;line-height:1}
   .cd-title{font-size:18px;font-weight:700;display:flex;justify-content:space-between;align-items:center}
   .cd-year{font-size:12px;background:rgba(255,255,255,.18);padding:2px 8px;border-radius:999px}
   .cd-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
@@ -123,8 +124,7 @@ TEMPLATE = r"""<!DOCTYPE html>
   .chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
   select,input{padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:13px}
   input{min-width:180px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 14px;margin-bottom:10px;display:flex;gap:10px;align-items:flex-start;box-shadow:0 2px 8px rgba(74,222,128,.08);transition:transform .15s ease}
-  .card:hover{transform:translateY(-2px)}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:12px 14px;margin-bottom:10px;display:flex;gap:10px;align-items:flex-start;box-shadow:0 2px 8px rgba(74,222,128,.08)}
   .card .body{flex:1;min-width:0}
   .card a{color:var(--text);text-decoration:none;font-weight:600;font-size:14px}
   .card a:hover{color:var(--accent);text-decoration:underline}
@@ -136,20 +136,24 @@ TEMPLATE = r"""<!DOCTYPE html>
 </head>
 <body>
 <div class="deco" aria-hidden="true">
-  <span style="left:5%;top:10%;font-size:30px;transform:rotate(-15deg)">🌿</span>
-  <span style="left:83%;top:7%;font-size:26px;transform:rotate(22deg)">🍃</span>
-  <span style="left:14%;top:34%;font-size:34px;transform:rotate(12deg)">🌸</span>
-  <span style="left:71%;top:28%;font-size:28px;transform:rotate(-20deg)">🌼</span>
-  <span style="left:37%;top:13%;font-size:24px;transform:rotate(30deg)">🍀</span>
-  <span style="left:90%;top:46%;font-size:30px;transform:rotate(15deg)">💮</span>
-  <span style="left:24%;top:60%;font-size:28px;transform:rotate(-12deg)">🍃</span>
-  <span style="left:58%;top:54%;font-size:32px;transform:rotate(20deg)">🌿</span>
-  <span style="left:87%;top:70%;font-size:30px;transform:rotate(-25deg)">🌷</span>
-  <span style="left:9%;top:78%;font-size:32px;transform:rotate(18deg)">🌸</span>
-  <span style="left:46%;top:80%;font-size:26px;transform:rotate(-15deg)">🌼</span>
-  <span style="left:77%;top:88%;font-size:24px;transform:rotate(12deg)">🍀</span>
-  <span style="left:32%;top:90%;font-size:28px;transform:rotate(-8deg)">💮</span>
-  <span style="left:54%;top:34%;font-size:22px;transform:rotate(35deg)">🍃</span>
+  <svg class="leaf" style="left:-8%;top:5%;width:300px;opacity:.22" viewBox="0 0 200 200">
+    <path d="M100 10 Q 175 65 100 190 Q 25 65 100 10 Z" fill="#86efac"/>
+    <path d="M100 22 L100 178" stroke="#4ade80" stroke-width="3" fill="none" opacity=".55"/>
+    <path d="M100 60 L65 55 M100 60 L135 55 M100 100 L55 92 M100 100 L145 92 M100 140 L70 145 M100 140 L130 145" stroke="#4ade80" stroke-width="2" fill="none" opacity=".4"/>
+  </svg>
+  <svg class="leaf" style="left:78%;top:-6%;width:340px;opacity:.18;transform:rotate(28deg)" viewBox="0 0 200 200">
+    <path d="M100 10 Q 175 65 100 190 Q 25 65 100 10 Z" fill="#bbf7d0"/>
+    <path d="M100 22 L100 178" stroke="#34d399" stroke-width="3" fill="none" opacity=".55"/>
+  </svg>
+  <svg class="leaf" style="left:-10%;top:62%;width:320px;opacity:.16;transform:rotate(40deg)" viewBox="0 0 200 200">
+    <path d="M100 10 Q 175 65 100 190 Q 25 65 100 10 Z" fill="#86efac"/>
+    <path d="M100 22 L100 178" stroke="#22c55e" stroke-width="3" fill="none" opacity=".5"/>
+  </svg>
+  <svg class="leaf" style="left:80%;top:65%;width:280px;opacity:.2;transform:rotate(-32deg)" viewBox="0 0 200 200">
+    <path d="M100 10 Q 175 65 100 190 Q 25 65 100 10 Z" fill="#bbf7d0"/>
+    <path d="M100 22 L100 178" stroke="#4ade80" stroke-width="3" fill="none" opacity=".55"/>
+    <path d="M100 70 L60 62 M100 70 L140 62 M100 110 L55 102 M100 110 L145 102" stroke="#4ade80" stroke-width="2" fill="none" opacity=".4"/>
+  </svg>
 </div>
 <div class="app">
   <aside>
@@ -185,8 +189,8 @@ TEMPLATE = r"""<!DOCTYPE html>
   </main>
 </div>
 <nav class="mobile-tab">
-  <a data-view="home" class="active">⌛ 倒计时</a>
-  <a data-view="notices">📋 公告</a>
+  <a data-view="home" class="active"><span class="ico">⌛</span><span class="txt">倒计时</span></a>
+  <a data-view="notices"><span class="ico">📋</span><span class="txt">公告</span></a>
 </nav>
 <script>
 const DATA = /*__DATA__*/;
