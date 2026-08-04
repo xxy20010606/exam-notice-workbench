@@ -188,6 +188,49 @@ def parse_source(source, html):
     inc = re.compile(source["title_include"]) if source.get("title_include") else None
     exc_src = re.compile(source["title_exclude"]) if source.get("title_exclude") else None
     exc_glob = re.compile(GLOBAL_EXCLUDE)
+
+    # 表格行模式：Vue / Ant-Design 等 SPA 列表，条目为 <tr> 且不含 <a> 链接
+    if source.get("row_table"):
+        node = soup
+        if source.get("container"):
+            c = soup.select_one(source["container"])
+            if c:
+                node = c
+        items, seen = [], set()
+        t_idx = int(source.get("row_title_idx", 0))
+        d_idx = int(source.get("row_date_idx", 1))
+        for tr in node.select(source.get("row_selector", "tr")):
+            tds = tr.find_all("td")
+            if len(tds) <= max(t_idx, d_idx if d_idx >= 0 else -1):
+                continue
+            title = tds[t_idx].get_text(" ", strip=True)
+            if not title:
+                continue
+            if inc and not inc.search(title):
+                continue
+            # row_table 模式只套用该源的 include/exclude，不套 GLOBAL_EXCLUDE：
+            # 结构化列表标题已精确，全局排除（如“下载”）会误杀“面试通知单下载入口”等
+            if exc_src and exc_src.search(title):
+                continue
+            date = tds[d_idx].get_text(" ", strip=True) if (d_idx >= 0 and len(tds) > d_idx) else ""
+            if source.get("row_url_template") and tr.get("data-row-key"):
+                try:
+                    url = source["row_url_template"].format(tr.get("data-row-key"))
+                except Exception:
+                    url = source.get("base") or source["url"]
+            else:
+                url = source.get("base") or source["url"]
+            # row_table 行内多为同一源 URL，store() 以 url_id(url) 作主键去重会丢行；
+            # 用「标题+日期」造唯一 fragment 作为主键，保证每行独立入库
+            url = url.split("#")[0] + "#" + hashlib.md5((title + "|" + date).encode("utf-8")).hexdigest()[:12]
+            # 去重键用 标题+日期（行内 url 多为同一源 URL，不能用 url 去重）
+            uid = title + "|" + date
+            if uid in seen:
+                continue
+            seen.add(uid)
+            items.append({"title": title[:200], "url": url, "date": extract_date(date, url)})
+        return items
+
     items, seen = [], set()
     o_re = re.compile(source["onclick_regex"]) if source.get("onclick_regex") else None
     o_tpl = source.get("onclick_url_template")

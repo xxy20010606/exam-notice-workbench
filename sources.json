@@ -127,10 +127,15 @@
     "url": "https://www.hebpta.com.cn/notice?id=303",
     "method": "browser",
     "column_link_regex": null,
-    "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告|公务员录用.{0,10}联考",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
+    "title_include": "公务员录用|公开遴选公务员|省考|考试录用|公务员招录|公务员招考|录用公务员|省直机关公开遴选|招录计划",
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
     "container": null,
-    "browser_wait": 10000
+    "browser_wait": 10000,
+    "browser_wait_until": "networkidle",
+    "row_table": true,
+    "row_selector": "tr.ant-table-row",
+    "row_title_idx": 0,
+    "row_date_idx": 1
   },
   {
     "name": "山西-省考",
@@ -188,19 +193,6 @@
     "container": null,
     "onclick_regex": "queryDetail\\(\\s*'(\\d+)'\\s*,\\s*'(\\d+)'\\s*\\)",
     "onclick_url_template": "https://www.hljsgwy.org.cn/tyzpwb/website/queryDetail.htm?mkxh={0}&tzid={1}"
-  },
-  {
-    "name": "上海-省考",
-    "category": "省考",
-    "region": "上海",
-    "url": "https://bm.shacs.gov.cn/zlxt",
-    "method": "browser",
-    "column_link_regex": null,
-    "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
-    "container": null,
-    "browser_wait": 10000,
-    "browser_wait_until": "networkidle"
   },
   {
     "name": "江苏-省考",
