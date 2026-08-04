@@ -31,11 +31,17 @@ def now_iso():
 
 
 # ---------------- 抓取 ----------------
-def fetch_http(url, timeout=15, retries=2):
+def fetch_http(url, timeout=15, retries=2, encoding=None):
     import urllib.request, ssl, gzip
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
+    # 兼容老旧 TLS 重新协商（部分 gov 站如江西人事考试网使用旧协议）
+    if hasattr(ssl, "OP_LEGACY_SERVER_CONNECT"):
+        try:
+            ctx.options |= ssl.OP_LEGACY_SERVER_CONNECT
+        except Exception:
+            pass
     last = None
     for _ in range(retries + 1):
         try:
@@ -49,8 +55,10 @@ def fetch_http(url, timeout=15, retries=2):
                 raw = r.read()
                 if r.headers.get("Content-Encoding") == "gzip":
                     raw = gzip.decompress(raw)
-                m = re.search(r"charset=([\w-]+)", r.headers.get("Content-Type", ""))
-                cs = (m.group(1).lower() if m else "utf-8")
+                cs = encoding if encoding else None
+                if not cs:
+                    m = re.search(r"charset=([\w-]+)", r.headers.get("Content-Type", ""))
+                    cs = (m.group(1).lower() if m else "utf-8")
                 return raw.decode(cs, errors="ignore")
         except Exception as e:
             last = e
@@ -70,39 +78,45 @@ def _get_browser():
     return _browser
 
 
-def fetch_browser(url, timeout=30000, wait=3000):
+def fetch_browser(url, timeout=30000, wait=3000, wait_until="domcontentloaded"):
     browser = _get_browser()
-    page = browser.new_page(user_agent=DEFAULT_UA)
+    ctx = browser.new_context(user_agent=DEFAULT_UA, ignore_https_errors=True)
+    page = ctx.new_page()
     try:
-        page.goto(url, timeout=timeout, wait_until="domcontentloaded")
+        page.goto(url, timeout=timeout, wait_until=wait_until)
         page.wait_for_timeout(wait)
         html = page.content()
         # 国考等反爬：JS 设 cookie 后 location 跳转，若仍是挑战页则重载再等
         if "EO_Bot" in html or "tads" in html:
-            page.reload(wait_until="domcontentloaded")
+            page.reload(wait_until=wait_until)
             page.wait_for_timeout(wait + 1500)
             html = page.content()
         return html
     finally:
         page.close()
+        ctx.close()
 
 
-def _raw_fetch(url, method):
+def _raw_fetch(url, method, encoding=None, browser_wait=3000, browser_wait_until="domcontentloaded"):
     if method == "browser":
         try:
-            return fetch_browser(url)
+            return fetch_browser(url, wait=browser_wait, wait_until=browser_wait_until)
         except Exception as e:
             msg = str(e)
             if "playwright" in msg.lower() or "no module" in msg.lower():
                 raise RuntimeError("Playwright 未安装，无法抓取浏览器型源（" + url + "）")
             raise
-    return fetch_http(url)
+    return fetch_http(url, encoding=encoding)
 
 
 def fetch(source):
     """抓取入口：支持先抓首页、再自动跟进“公务员/省考专栏”仅一层。"""
     method = source.get("method", "http")
-    html = _raw_fetch(source["url"], method)
+    encoding = source.get("encoding")
+    browser_wait = source.get("browser_wait", 3000)
+    browser_wait_until = source.get("browser_wait_until", "domcontentloaded")
+    html = _raw_fetch(source["url"], method, encoding=encoding,
+                      browser_wait=browser_wait, browser_wait_until=browser_wait_until)
     clr = source.get("column_link_regex")
     if clr:
         soup = BeautifulSoup(html, "html.parser")
@@ -113,11 +127,41 @@ def fetch(source):
             if t and pat.search(t) and href and not href.startswith(("#", "javascript:")):
                 col_url = urljoin(source["url"], href)
                 try:
-                    col = _raw_fetch(col_url, method)
+                    col = _raw_fetch(col_url, method, encoding=encoding, browser_wait=browser_wait)
                     html = html + "\n" + col   # 合并首页与专栏，避免错过任一处公告
                 except Exception:
                     pass
                 break
+    # 分页跟进（如西藏通知公告 index_2.html / index_3.html ...）
+    fp = source.get("follow_pages")
+    if fp:
+        fpat = re.compile(fp)
+        visited = {source["url"].rstrip("/")}
+        max_pages = source.get("max_pages", 5)
+        soup = BeautifulSoup(html, "html.parser")
+        for a in soup.find_all("a", href=True):
+            href = a["href"].strip()
+            if fpat.search(href):
+                purl = urljoin(source["url"], href).rstrip("/")
+                if purl in visited:
+                    continue
+                visited.add(purl)
+                if len(visited) > max_pages + 1:
+                    break
+                try:
+                    ph = _raw_fetch(purl, method, encoding=encoding,
+                                   browser_wait=browser_wait, browser_wait_until=browser_wait_until)
+                    html = html + "\n" + ph
+                except Exception:
+                    pass
+    # 显式多页（page_urls）：用于分页靠 JS、首页无静态分页链接的站点（如西藏）
+    for purl in source.get("page_urls", []):
+        try:
+            ph = _raw_fetch(purl, method, encoding=encoding,
+                           browser_wait=browser_wait, browser_wait_until=browser_wait_until)
+            html = html + "\n" + ph
+        except Exception:
+            pass
     return html
 
 
@@ -145,6 +189,8 @@ def parse_source(source, html):
     exc_src = re.compile(source["title_exclude"]) if source.get("title_exclude") else None
     exc_glob = re.compile(GLOBAL_EXCLUDE)
     items, seen = [], set()
+    o_re = re.compile(source["onclick_regex"]) if source.get("onclick_regex") else None
+    o_tpl = source.get("onclick_url_template")
     for a in scope.find_all("a", href=True):
         title = (a.get("title") or a.get_text(strip=True) or "")
         if not title:
@@ -153,10 +199,19 @@ def parse_source(source, html):
             continue
         if (exc_src and exc_src.search(title)) or exc_glob.search(title):
             continue
-        href = a["href"].strip()
-        if not href or href.startswith(("javascript:", "#", "mailto:", "tel:")):
+        href = (a.get("href") or "").strip()
+        # 处理 onclick 拼接的真实链接（如黑龙江公务员考试网 queryDetail('mkxh','tzid')）
+        if (not href or href.startswith(("#", "javascript:", "mailto:", "tel:"))) and o_re and o_tpl:
+            onclick = a.get("onclick") or ""
+            m = o_re.search(onclick)
+            if m:
+                try:
+                    href = o_tpl.format(*m.groups())
+                except Exception:
+                    href = ""
+        if not href or href.startswith(("javascript:", "mailto:", "tel:")):
             continue
-        absurl = urljoin(base, href).split("?")[0].split("#")[0]
+        absurl = urljoin(base, href).split("#")[0]
         if absurl in seen:
             continue
         seen.add(absurl)

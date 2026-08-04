@@ -102,31 +102,35 @@
     "name": "北京-省考",
     "category": "省考",
     "region": "北京",
-    "url": "https://rsj.beijing.gov.cn/bm/ztzl/gwy/",
+    "url": "https://www.beijing.gov.cn/gongkai/rsxx/gwyzk/",
     "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
+    "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
+    "container": null
   },
   {
     "name": "天津-省考",
     "category": "省考",
     "region": "天津",
-    "url": "http://hrss.tj.gov.cn/jsdw/rsksw/",
+    "url": "https://www.tj.gov.cn/zwgk/zfxxgkzl/fdzdgknr/zkly/zk/",
     "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
-    "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "column_link_regex": null,
+    "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告|公开招考公务员",
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
+    "container": null
   },
   {
     "name": "河北-省考",
     "category": "省考",
     "region": "河北",
-    "url": "http://www.hebpta.com.cn/",
-    "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
-    "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "url": "https://www.hebpta.com.cn/notice?id=303",
+    "method": "browser",
+    "column_link_regex": null,
+    "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告|公务员录用.{0,10}联考",
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
+    "container": null,
+    "browser_wait": 10000
   },
   {
     "name": "山西-省考",
@@ -142,51 +146,61 @@
     "name": "内蒙古-省考",
     "category": "省考",
     "region": "内蒙古",
-    "url": "http://www.impta.com.cn/",
+    "url": "http://www.impta.com.cn/more.asp?ttt=33",
     "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
+    "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
+    "container": null,
+    "encoding": "gb2312"
   },
   {
     "name": "辽宁-省考",
     "category": "省考",
     "region": "辽宁",
-    "url": "http://www.lnrsks.com/",
+    "url": "https://www.lnrsks.com/html/gwy_zhaokaogonggao/",
     "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
+    "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
+    "container": null
   },
   {
     "name": "吉林-省考",
     "category": "省考",
     "region": "吉林",
-    "url": "http://www.jlzkb.com/",
-    "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
+    "url": "https://www.jlgwyks.cn/column/1",
+    "method": "browser",
+    "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
+    "container": null
   },
   {
     "name": "黑龙江-省考",
     "category": "省考",
     "region": "黑龙江",
-    "url": "http://www.hljrsks.org.cn/",
-    "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
+    "url": "https://www.hljsgwy.org.cn/tyzpwb/website/queryMore.htm?mkxh=2",
+    "method": "browser",
+    "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
+    "container": null,
+    "onclick_regex": "queryDetail\\(\\s*'(\\d+)'\\s*,\\s*'(\\d+)'\\s*\\)",
+    "onclick_url_template": "https://www.hljsgwy.org.cn/tyzpwb/website/queryDetail.htm?mkxh={0}&tzid={1}"
   },
   {
     "name": "上海-省考",
     "category": "省考",
     "region": "上海",
-    "url": "https://www.shacs.gov.cn/",
-    "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
+    "url": "https://bm.shacs.gov.cn/zlxt",
+    "method": "browser",
+    "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
+    "container": null,
+    "browser_wait": 10000,
+    "browser_wait_until": "networkidle"
   },
   {
     "name": "江苏-省考",
@@ -232,31 +246,36 @@
     "name": "江西-省考",
     "category": "省考",
     "region": "江西",
-    "url": "http://www.jxpta.com/",
-    "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
+    "url": "https://www.jxpta.com/jxsrskszx/lpylks/index.html",
+    "method": "browser",
+    "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
+    "container": null,
+    "browser_wait_until": "networkidle",
+    "browser_wait": 8000
   },
   {
     "name": "山东-省考",
     "category": "省考",
     "region": "山东",
-    "url": "http://www.dtdjzx.gov.cn/",
+    "url": "https://www.dtdjzx.gov.cn/web/dtdjzx/lygwyzkgg.html",
     "method": "browser",
-    "column_link_regex": "公务员|gwy|省考|招录",
+    "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
+    "container": null
   },
   {
     "name": "河南-省考",
     "category": "省考",
     "region": "河南",
-    "url": "http://www.hnrsks.com/",
+    "url": "https://www.henan.gov.cn/zwgk/zfxxgk/fdzdgknr/gwyzl/?itemscode=150",
     "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
+    "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
+    "container": null
   },
   {
     "name": "湖北-省考",
@@ -272,21 +291,23 @@
     "name": "湖南-省考",
     "category": "省考",
     "region": "湖南",
-    "url": "http://www.hunanpea.com/",
+    "url": "https://www.hxw.gov.cn/topic/267/category/622.html",
     "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
+    "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
+    "container": null
   },
   {
     "name": "广东-省考",
     "category": "省考",
     "region": "广东",
-    "url": "https://ggfw.hrss.gd.gov.cn/gwyks",
+    "url": "https://www.gdzz.gov.cn/tzgg/",
     "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
+    "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
+    "container": null
   },
   {
     "name": "广西-省考",
@@ -312,11 +333,12 @@
     "name": "重庆-省考",
     "category": "省考",
     "region": "重庆",
-    "url": "http://rlsbj.cq.gov.cn/",
+    "url": "https://rlsbj.cq.gov.cn/ywzl/rsks/gwyks/",
     "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
+    "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
+    "container": null
   },
   {
     "name": "四川-省考",
@@ -332,61 +354,73 @@
     "name": "贵州-省考",
     "category": "省考",
     "region": "贵州",
-    "url": "https://pta.guizhou.gov.cn/",
+    "url": "https://gzzzb.gov.cn/gbgz/gwyzh/",
     "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
-    "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "column_link_regex": null,
+    "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告|招录公务员",
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
+    "container": null
   },
   {
     "name": "云南-省考",
     "category": "省考",
     "region": "云南",
-    "url": "http://hrss.yn.gov.cn/",
+    "url": "https://ylxf.1237125.cn/TopicWeb/ynskslygwy/index.html",
     "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
+    "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考|招考简章|考试大纲|承诺书|登记表|推荐表|缴费|面试|裁减|拟录用|公示",
+    "container": null
   },
   {
     "name": "西藏-省考",
     "category": "省考",
     "region": "西藏",
-    "url": "http://hrss.xizang.gov.cn/",
-    "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
-    "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "url": "https://hrss.xizang.gov.cn/xwzx/tzgg/",
+    "method": "browser",
+    "column_link_regex": null,
+    "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告|考录公务员|招录公务员",
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考|公示|拟录用|面试|体能",
+    "container": null,
+    "follow_pages": "index_\\d+\\.html",
+    "max_pages": 4,
+    "page_urls": [
+      "https://hrss.xizang.gov.cn/xwzx/tzgg/index_2.html",
+      "https://hrss.xizang.gov.cn/xwzx/tzgg/index_3.html"
+    ]
   },
   {
     "name": "陕西-省考",
     "category": "省考",
     "region": "陕西",
-    "url": "http://www.sxrsks.cn/",
+    "url": "https://www.shaanxi.gov.cn/xw/ztzl/zxzt/zkzl/",
     "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
+    "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
+    "container": null
   },
   {
     "name": "甘肃-省考",
     "category": "省考",
     "region": "甘肃",
-    "url": "http://rst.gansu.gov.cn/",
-    "method": "browser",
-    "column_link_regex": "公务员|gwy|省考|招录",
-    "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "url": "https://ks.rst.gansu.gov.cn/ncms/wzlb.shtml?mkbh=gwysydwks",
+    "method": "http",
+    "column_link_regex": null,
+    "title_include": "考试录用(机关)?公务员|公务员招录|公务员招考|录用公务员公告",
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|中央国家机关|国考",
+    "container": null
   },
   {
     "name": "青海-省考",
     "category": "省考",
     "region": "青海",
-    "url": "http://www.qhpta.com/",
+    "url": "https://www.qhpta.com/ncms/gwyks.shtml",
     "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
+    "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
+    "container": null
   },
   {
     "name": "宁夏-省考",
