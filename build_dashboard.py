@@ -111,7 +111,7 @@ TEMPLATE = r"""<!DOCTYPE html>
   /* lists */
   .latest{margin-top:22px}
   .latest h2{font-size:15px;margin:0 0 10px}
-  .latest .row{display:flex;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);font-size:13px}
+  .latest .row{display:flex;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);font-size:13px;align-items:center}
   .latest .row:last-child{border-bottom:none}
   .tag{font-size:11px;padding:2px 9px;border-radius:999px;color:#fff;white-space:nowrap;font-weight:600}
   .tag.国考{background:var(--gk)}.tag.省考{background:var(--sk)}.tag.事业编{background:var(--sy)}
@@ -120,7 +120,7 @@ TEMPLATE = r"""<!DOCTYPE html>
   .chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
   select,input{padding:6px 10px;border:1px solid var(--border);border-radius:8px;background:#fff;font-size:13px}
   input{min-width:180px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:11px 14px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:11px 14px;margin-bottom:8px;display:flex;gap:10px;align-items:center}
   .card .body{flex:1;min-width:0}
   .card a{color:var(--text);text-decoration:none;font-weight:600;font-size:14px}
   .card a:hover{color:var(--accent);text-decoration:underline}
@@ -280,6 +280,11 @@ function init(){
   document.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{document.querySelectorAll(".chip").forEach(x=>x.classList.remove("active"));c.classList.add("active");renderNotices();});
   sel.onchange=renderNotices;
   document.getElementById("q").oninput=renderNotices;
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./service-worker.js').then(reg => {
+      console.log('[PWA] SW 已注册:', reg.scope);
+    }).catch(err => { console.warn('[PWA] SW 注册失败:', err); });
+  }
 }
 init();
 </script>
