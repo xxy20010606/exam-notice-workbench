@@ -1,6 +1,17 @@
 name: 公考事考公告抓取
 
 on:
+  push:
+    branches: [main]
+    # 只监听源码变更，排除 CI 自己生成的 notices.db/index.html/DATA.generated，避免无限循环
+    paths:
+      - 'sources.json'
+      - 'scraper.py'
+      - 'cloud_run.py'
+      - 'build_dashboard*.py'
+      - 'service-worker.js'
+      - 'requirements.txt'
+      - '.github/workflows/scrape.yml'
   schedule:
     # 每 6 小时跑一次（分钟取 17 避免整点拥堵）
     - cron: '17 */6 * * *'
