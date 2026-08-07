@@ -335,16 +335,26 @@ def _work(s, limit_per_source=40):
 
 
 def run_all(limit_per_source=40, max_workers=8,
-            skip_fail_threshold=10, retry_after_hours=12):
+            skip_fail_threshold=10, retry_after_hours=12,
+            only_region=None, exclude_region=None):
     """
     自适应跳过失败源：
     - 连续失败 ≥ skip_fail_threshold 次的源，本轮跳过 fetch（不耗超时）
     - 距 last_attempt_at ≥ retry_after_hours 小时后强制重试一次
     - 重试成功 → fail_streak 归零；仍失败 → fail_streak+1，重新进入跳过窗口
     目的：云端 IP 对部分中国 gov 站点系统性不可达，跳过这些源可省 1-2min。
+
+    区域过滤（混合架构用）：
+    - only_region:   只抓取 region 包含该关键字的源（自托管 Runner 只跑浙江）
+    - exclude_region: 跳过 region 包含该关键字的源（云端只跑非浙江）
     """
     with open(SOURCES, encoding="utf-8") as f:
         sources = json.load(f)
+    # 混合架构：云端跑非浙江、自托管只跑浙江，互不污染 fail_streak
+    if only_region:
+        sources = [s for s in sources if only_region in (s.get("region", "") or "")]
+    if exclude_region:
+        sources = [s for s in sources if exclude_region not in (s.get("region", "") or "")]
     conn = init_db()
     report = {"run_at": now_iso(), "sources": [], "new": []}
 
@@ -439,4 +449,9 @@ def run_all(limit_per_source=40, max_workers=8,
 
 
 if __name__ == "__main__":
-    print(json.dumps(run_all(), ensure_ascii=False, indent=2))
+    import argparse
+    ap = argparse.ArgumentParser(description="公考事考公告抓取")
+    ap.add_argument("--only-region", help="只抓取 region 包含该关键字的源（如 浙江）")
+    ap.add_argument("--exclude-region", help="跳过 region 包含该关键字的源（如 浙江）")
+    args = ap.parse_args()
+    print(json.dumps(run_all(only_region=args.only_region, exclude_region=args.exclude_region), ensure_ascii=False, indent=2))

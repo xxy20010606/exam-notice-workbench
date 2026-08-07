@@ -22,13 +22,16 @@ permissions:
   pages: write               # 发布看板到 GitHub Pages
   id-token: write
 
-concurrency:
-  group: pages
-  cancel-in-progress: false
+# 注意：不在这里设置全局 concurrency，改用每个 job 各自的并发组，
+# 这样自托管 Runner（浙江）排队/离线不会阻塞云端（非浙江）的定时更新。
 
 jobs:
-  build:
+  # ---------- 云端：抓取除浙江外的所有源（关机也自动更新） ----------
+  scrape-cloud:
     runs-on: ubuntu-latest
+    concurrency:
+      group: cloud-scrape
+      cancel-in-progress: true   # 新一次云端抓取开始就取消上一次，避免重叠写库
     steps:
       - name: 检出仓库
         uses: actions/checkout@v5
@@ -63,19 +66,70 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ steps.pwcache.outputs.cache-primary-key }}
 
-      - name: 抓取并更新看板
+      - name: 抓取并更新看板（排除浙江）
         env:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           RECIPIENT: ${{ secrets.RECIPIENT }}
           PAGES_URL: ${{ secrets.PAGES_URL }}
-        run: python cloud_run.py
+        run: python cloud_run.py --exclude-region 浙江
 
       - name: 提交更新
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "chore: 定时更新公告 $(date +'%Y-%m-%d %H:%M')" || echo "无变更"
+          git commit -m "chore: 定时更新公告(云端) $(date +'%Y-%m-%d %H:%M')" || echo "无变更"
+          git push
+
+      - name: 上传 Pages 产物
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+
+      - name: 部署 Pages
+        uses: actions/deploy-pages@v5
+
+  # ---------- 自托管 Runner：只抓取浙江源（电脑开机才更新） ----------
+  scrape-zhejiang:
+    runs-on: self-hosted
+    timeout-minutes: 60        # 电脑关机时最多等 60 分钟就放弃，不阻塞流水线
+    continue-on-error: true    # 离线/抓取失败也不让整个 run 变红，云端数据照常发布
+    concurrency:
+      group: zhejiang-self-hosted
+      cancel-in-progress: true  # 只保留最新一次浙江抓取，避免关机多天后堆积重复任务
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v5
+
+      - name: 同步云端最新数据（含非浙江公告，避免覆盖）
+        run: |
+          git fetch origin main
+          git reset --hard origin/main
+
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: 安装 Playwright Chromium
+        run: python -m playwright install chromium
+
+      - name: 抓取浙江并更新看板
+        env:
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          RECIPIENT: ${{ secrets.RECIPIENT }}
+          PAGES_URL: ${{ secrets.PAGES_URL }}
+        run: python cloud_run.py --only-region 浙江
+
+      - name: 提交更新
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "chore: 定时更新公告(浙江) $(date +'%Y-%m-%d %H:%M')" || echo "无变更"
           git push
 
       - name: 上传 Pages 产物

@@ -48,7 +48,12 @@ def send_email(recipient, subject, body):
 
 
 def main():
-    report = scraper.run_all()
+    import argparse
+    ap = argparse.ArgumentParser(description="云端编排入口")
+    ap.add_argument("--only-region", help="只抓取 region 包含该关键字的源（如 浙江）")
+    ap.add_argument("--exclude-region", help="跳过 region 包含该关键字的源（如 浙江）")
+    args = ap.parse_args()
+    report = scraper.run_all(only_region=args.only_region, exclude_region=args.exclude_region)
     # 若本次新增了国考/福建省考招录公告，自动从详情页校准倒计时日期
     exam_sync.sync(report["new"])
     n = build_dashboard.build()
