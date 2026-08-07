@@ -79,7 +79,7 @@ def _get_browser():
             "--no-sandbox",
             "--disable-blink-features=AutomationControlled",
             "--no-proxy-server",
-            "--disable-features=NetworkService",
+            "--disable-ipv6",
             "--ignore-certificate-errors",
         ])
     return _browser
