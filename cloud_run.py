@@ -67,6 +67,14 @@ def main():
         "new": report["new"],
     }, ensure_ascii=False, indent=2))
 
+    # 把本次新增数量写入 .new_count，供 CI 判断是否提交
+    # （无新数据时不提交/不推送，从根本上避免 Runner 自循环）
+    try:
+        with open(os.path.join(ROOT, ".new_count"), "w", encoding="utf-8") as _f:
+            _f.write(str(len(report["new"])))
+    except Exception as _e:
+        print(f"[warn] 写入 .new_count 失败: {_e}")
+
     new = report["new"]
     recipient = os.environ.get("RECIPIENT", SENDER).strip() or SENDER
     if new:

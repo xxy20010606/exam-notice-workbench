@@ -17,6 +17,9 @@ package-lock.json
 # 临时预览截图
 preview/
 
+# CI 临时标记文件（记录本次新增公告数量，不入库）
+.new_count
+
 # GitHub Runner 二进制文件（巨大，绝不提交）
 bin/
 externals/

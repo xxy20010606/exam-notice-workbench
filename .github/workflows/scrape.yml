@@ -82,10 +82,15 @@ jobs:
 
       - name: 提交更新
         run: |
+          NEW_COUNT=$(cat .new_count 2>/dev/null || echo 0)
+          if [ "$NEW_COUNT" -le 0 ]; then
+            echo "[跳过] 本次无新增公告，不提交不推送（避免自循环）"
+            exit 0
+          fi
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "chore: 定时更新公告(云端) $(date +'%Y-%m-%d %H:%M')" || echo "无变更"
+          git commit -m "chore: 定时更新公告(云端) $(date +'%Y-%m-%d %H:%M')"
           git push
 
       - name: 上传 Pages 产物
@@ -188,11 +193,16 @@ jobs:
       - name: 提交更新（含重试）
         working-directory: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench-new
         run: |
+          $newCount = 0
+          if (Test-Path .new_count) { $newCount = [int](Get-Content .new_count -Raw) }
+          if ($newCount -le 0) {
+            Write-Host "[跳过] 本次无新增浙江公告，不提交不推送（避免自循环）"
+            exit 0
+          }
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           git commit -m "chore: update zhejiang data"
-          if ($LASTEXITCODE -ne 0) { Write-Host "no changes" }
           $retry = 0
           while ($retry -lt 5) {
             try {
