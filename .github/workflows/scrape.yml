@@ -138,9 +138,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          $date = Get-Date -Format 'yyyy-MM-dd HH:mm'
-          git commit -m "chore: 定时更新公告(浙江) $date" || echo "无变更"
-          # 重试push最多3次（自托管网络可能不稳定）
+          git commit -m "chore: update zhejiang data" || echo "no changes"
+          # retry push up to 3 times
           $retry = 0
           while ($retry -lt 3) {
             try {
