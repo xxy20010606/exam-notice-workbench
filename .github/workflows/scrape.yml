@@ -120,7 +120,7 @@ jobs:
           }
 
       - name: 同步云端最新数据（含重试）
-        working-directory: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench
+        working-directory: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench-new
         run: |
           $retry = 0
           while ($retry -lt 5) {
@@ -146,14 +146,14 @@ jobs:
           python-version: '3.11'
 
       - name: 安装依赖
-        working-directory: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench
+        working-directory: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench-new
         run: pip install -r requirements.txt
 
       - name: 安装 Playwright Chromium
         run: python -m playwright install chromium
 
       - name: 抓取浙江并更新看板
-        working-directory: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench
+        working-directory: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench-new
         env:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           RECIPIENT: ${{ secrets.RECIPIENT }}
@@ -161,7 +161,7 @@ jobs:
         run: python cloud_run.py --only-region 浙江
 
       - name: 提交更新（含重试）
-        working-directory: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench
+        working-directory: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench-new
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
