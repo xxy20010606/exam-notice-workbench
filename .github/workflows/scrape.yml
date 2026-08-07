@@ -90,30 +90,53 @@ jobs:
         uses: actions/deploy-pages@v5
 
   # ---------- 自托管 Runner：只抓取浙江源（电脑开机才更新） ----------
+  # 关键设计：使用本地仓库路径，不依赖GitHub网络做检出
+  # 只有git fetch和git push需要联网（带重试），抓取本身完全离线可用
   scrape-zhejiang:
     runs-on: self-hosted
-    timeout-minutes: 60        # 电脑关机时最多等 60 分钟就放弃，不阻塞流水线
-    continue-on-error: true    # 离线/抓取失败也不让整个 run 变红，云端数据照常发布
+    timeout-minutes: 60
+    continue-on-error: true
     concurrency:
       group: zhejiang-self-hosted
-      cancel-in-progress: true  # 只保留最新一次浙江抓取，避免关机多天后堆积重复任务
+      cancel-in-progress: true
+    env:
+      # 本地仓库路径（Runner和用户在同一台机器上）
+      LOCAL_REPO: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench
     steps:
-      - name: 配置git超时（自托管网络可能不稳定）
+      - name: 配置git超时
         run: |
           git config --global http.lowSpeedLimit 500
           git config --global http.lowSpeedTime 120
           git config --global http.postBuffer 524288000
 
-      - name: 检出仓库
-        uses: actions/checkout@v5
-        with:
-          clean: false
-          fetch-depth: 1
-
-      - name: 同步云端最新数据（含非浙江公告，避免覆盖）
+      - name: 使用本地仓库（无需从GitHub克隆）
         run: |
-          git fetch origin main
-          git reset --hard origin/main
+          Write-Host "Using local repo: $env:LOCAL_REPO"
+          if (!(Test-Path $env:LOCAL_REPO)) {
+            Write-Error "Local repo not found at $env:LOCAL_REPO"
+            exit 1
+          }
+
+      - name: 同步云端最新数据（含重试）
+        working-directory: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench
+        run: |
+          $retry = 0
+          while ($retry -lt 5) {
+            try {
+              git fetch origin main
+              git reset --hard origin/main
+              Write-Host "Sync succeeded"
+              break
+            } catch {
+              $retry++
+              if ($retry -ge 5) {
+                Write-Host "Sync failed after $retry attempts, using local state"
+                break
+              }
+              Write-Host "Fetch failed attempt $retry, retrying in 15s..."
+              Start-Sleep -Seconds 15
+            }
+          }
 
       - name: 配置 Python
         uses: actions/setup-python@v5
@@ -121,12 +144,14 @@ jobs:
           python-version: '3.11'
 
       - name: 安装依赖
+        working-directory: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench
         run: pip install -r requirements.txt
 
       - name: 安装 Playwright Chromium
         run: python -m playwright install chromium
 
       - name: 抓取浙江并更新看板
+        working-directory: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench
         env:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           RECIPIENT: ${{ secrets.RECIPIENT }}
@@ -134,6 +159,7 @@ jobs:
         run: python cloud_run.py --only-region 浙江
 
       - name: 提交更新（含重试）
+        working-directory: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -141,16 +167,19 @@ jobs:
           git commit -m "chore: update zhejiang data"
           if ($LASTEXITCODE -ne 0) { Write-Host "no changes" }
           $retry = 0
-          while ($retry -lt 3) {
+          while ($retry -lt 5) {
             try {
               git push
               Write-Host "Push succeeded"
               break
             } catch {
               $retry++
-              if ($retry -ge 3) { throw }
-              Write-Host "Push failed attempt $retry retrying..."
-              Start-Sleep -Seconds 10
+              if ($retry -ge 5) {
+                Write-Host "Push failed after $retry attempts"
+                break
+              }
+              Write-Host "Push failed attempt $retry retrying in 15s..."
+              Start-Sleep -Seconds 15
             }
           }
 
