@@ -102,6 +102,7 @@ jobs:
         uses: actions/checkout@v5
 
       - name: 同步云端最新数据（含非浙江公告，避免覆盖）
+        shell: bash
         run: |
           git fetch origin main
           git reset --hard origin/main
@@ -112,12 +113,15 @@ jobs:
           python-version: '3.11'
 
       - name: 安装依赖
+        shell: bash
         run: pip install -r requirements.txt
 
       - name: 安装 Playwright Chromium
+        shell: bash
         run: python -m playwright install chromium
 
       - name: 抓取浙江并更新看板
+        shell: bash
         env:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           RECIPIENT: ${{ secrets.RECIPIENT }}
@@ -125,6 +129,7 @@ jobs:
         run: python cloud_run.py --only-region 浙江
 
       - name: 提交更新
+        shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
