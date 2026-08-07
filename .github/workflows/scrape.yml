@@ -97,11 +97,6 @@ jobs:
     concurrency:
       group: zhejiang-self-hosted
       cancel-in-progress: true  # 只保留最新一次浙江抓取，避免关机多天后堆积重复任务
-    env:
-      # Windows 自托管 Runner 连 GitHub 需要代理（按需修改为你的代理地址）
-      # 如果你的网络能直连 GitHub，下面两行可以删掉
-      HTTP_PROXY: http://127.0.0.1:7890
-      HTTPS_PROXY: http://127.0.0.1:7890
     steps:
       - name: 检出仓库
         uses: actions/checkout@v5
