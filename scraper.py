@@ -31,7 +31,7 @@ def now_iso():
 
 
 # ---------------- 抓取 ----------------
-def fetch_http(url, timeout=15, retries=2, encoding=None):
+def fetch_http(url, timeout=30, retries=2, encoding=None):
     import urllib.request, ssl, gzip
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
@@ -79,7 +79,7 @@ def _get_browser():
     return _browser
 
 
-def fetch_browser(url, timeout=30000, wait=3000, wait_until="domcontentloaded"):
+def fetch_browser(url, timeout=90000, wait=3000, wait_until="domcontentloaded"):
     browser = _get_browser()
     ctx = browser.new_context(user_agent=DEFAULT_UA, ignore_https_errors=True)
     page = ctx.new_page()
@@ -112,16 +112,16 @@ def fetch_browser(url, timeout=30000, wait=3000, wait_until="domcontentloaded"):
         ctx.close()
 
 
-def _raw_fetch(url, method, encoding=None, browser_wait=3000, browser_wait_until="domcontentloaded"):
+def _raw_fetch(url, method, encoding=None, browser_wait=3000, browser_wait_until="domcontentloaded", browser_timeout=90000, http_timeout=15):
     if method == "browser":
         try:
-            return fetch_browser(url, wait=browser_wait, wait_until=browser_wait_until)
+            return fetch_browser(url, timeout=browser_timeout, wait=browser_wait, wait_until=browser_wait_until)
         except Exception as e:
             msg = str(e)
             if "playwright" in msg.lower() or "no module" in msg.lower():
                 raise RuntimeError("Playwright 未安装，无法抓取浏览器型源（" + url + "）")
             raise
-    return fetch_http(url, encoding=encoding)
+    return fetch_http(url, encoding=encoding, timeout=http_timeout)
 
 
 def fetch(source):
@@ -130,8 +130,11 @@ def fetch(source):
     encoding = source.get("encoding")
     browser_wait = source.get("browser_wait", 3000)
     browser_wait_until = source.get("browser_wait_until", "domcontentloaded")
+    browser_timeout = source.get("browser_timeout", 90000)
+    http_timeout = source.get("http_timeout", 15)
     html = _raw_fetch(source["url"], method, encoding=encoding,
-                      browser_wait=browser_wait, browser_wait_until=browser_wait_until)
+                      browser_wait=browser_wait, browser_wait_until=browser_wait_until,
+                      browser_timeout=browser_timeout, http_timeout=http_timeout)
     clr = source.get("column_link_regex")
     if clr:
         soup = BeautifulSoup(html, "html.parser")

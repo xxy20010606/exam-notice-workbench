@@ -212,7 +212,8 @@
     "method": "http",
     "column_link_regex": "公务员|gwy|省考|招录",
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
+    "http_timeout": 30
   },
   {
     "name": "安徽-省考",
@@ -464,7 +465,8 @@
     "title_include": "招聘|招考|招录|引进|遴选|选调|公告|公示|简章|通知|方案",
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
     "browser_wait": 20000,
-    "browser_wait_until": "domcontentloaded"
+    "browser_wait_until": "domcontentloaded",
+    "browser_timeout": 90000
   },
   {
     "name": "浙江杭州-事业单位",
@@ -475,7 +477,8 @@
     "title_include": "招聘|招考|招录|引进|遴选|选调|公告|公示|简章|通知|方案",
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
     "browser_wait": 20000,
-    "browser_wait_until": "domcontentloaded"
+    "browser_wait_until": "domcontentloaded",
+    "browser_timeout": 90000
   },
   {
     "name": "浙江温州-事业单位",
@@ -486,7 +489,8 @@
     "title_include": "招聘|招考|招录|引进|遴选|选调|公告|公示|简章|通知|方案",
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
     "browser_wait": 20000,
-    "browser_wait_until": "domcontentloaded"
+    "browser_wait_until": "domcontentloaded",
+    "browser_timeout": 90000
   },
   {
     "name": "浙江湖州-事业单位",
@@ -497,7 +501,8 @@
     "title_include": "招聘|招考|招录|引进|遴选|选调|公告|公示|简章|通知|方案",
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
     "browser_wait": 20000,
-    "browser_wait_until": "domcontentloaded"
+    "browser_wait_until": "domcontentloaded",
+    "browser_timeout": 90000
   },
   {
     "name": "浙江绍兴-事业单位",
@@ -508,7 +513,8 @@
     "title_include": "招聘|招考|招录|引进|遴选|选调|公告|公示|简章|通知|方案",
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
     "browser_wait": 20000,
-    "browser_wait_until": "domcontentloaded"
+    "browser_wait_until": "domcontentloaded",
+    "browser_timeout": 90000
   },
   {
     "name": "浙江台州-事业单位",
@@ -519,7 +525,8 @@
     "title_include": "招聘|招考|招录|引进|遴选|选调|公告|公示|简章|通知|方案",
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
     "browser_wait": 20000,
-    "browser_wait_until": "domcontentloaded"
+    "browser_wait_until": "domcontentloaded",
+    "browser_timeout": 90000
   },
   {
     "name": "浙江宁波-事业单位",
@@ -530,7 +537,8 @@
     "title_include": "招聘|招考|招录|引进|遴选|选调|公告|公示|简章|通知|方案",
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
     "browser_wait": 20000,
-    "browser_wait_until": "domcontentloaded"
+    "browser_wait_until": "domcontentloaded",
+    "browser_timeout": 90000
   },
   {
     "name": "浙江嘉兴-事业单位",
@@ -541,7 +549,8 @@
     "title_include": "招聘|招考|招录|引进|遴选|选调|公告|公示|简章|通知|方案",
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
     "browser_wait": 20000,
-    "browser_wait_until": "domcontentloaded"
+    "browser_wait_until": "domcontentloaded",
+    "browser_timeout": 90000
   },
   {
     "name": "浙江金华-事业单位",
@@ -552,7 +561,8 @@
     "title_include": "招聘|招考|招录|引进|遴选|选调|公告|公示|简章|通知|方案",
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
     "browser_wait": 20000,
-    "browser_wait_until": "domcontentloaded"
+    "browser_wait_until": "domcontentloaded",
+    "browser_timeout": 90000
   },
   {
     "name": "浙江衢州-事业单位",
@@ -563,7 +573,8 @@
     "title_include": "招聘|招考|招录|引进|遴选|选调|公告|公示|简章|通知|方案",
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
     "browser_wait": 20000,
-    "browser_wait_until": "domcontentloaded"
+    "browser_wait_until": "domcontentloaded",
+    "browser_timeout": 90000
   },
   {
     "name": "浙江丽水-事业单位",
@@ -574,7 +585,8 @@
     "title_include": "招聘|招考|招录|引进|遴选|选调|公告|公示|简章|通知|方案",
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
     "browser_wait": 20000,
-    "browser_wait_until": "domcontentloaded"
+    "browser_wait_until": "domcontentloaded",
+    "browser_timeout": 90000
   },
   {
     "name": "江苏-省属事业单位",
