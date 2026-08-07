@@ -74,8 +74,14 @@ def _get_browser():
     if _browser is None:
         from playwright.sync_api import sync_playwright
         p = sync_playwright().start()
-        # --disable-blink-features=AutomationControlled 规避 navigator.webdriver 反爬检测
-        _browser = p.chromium.launch(headless=True, args=["--no-sandbox", "--disable-blink-features=AutomationControlled"])
+        # Chromium 网络参数：禁用代理(直连gov.cn)、强制IPv4、忽略SSL、规避反爬检测
+        _browser = p.chromium.launch(headless=True, args=[
+            "--no-sandbox",
+            "--disable-blink-features=AutomationControlled",
+            "--no-proxy-server",
+            "--disable-features=NetworkService",
+            "--ignore-certificate-errors",
+        ])
     return _browser
 
 
