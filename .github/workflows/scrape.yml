@@ -3,7 +3,7 @@ name: 公考事考公告抓取
 on:
   push:
     branches: [main]
-    # 监听源码变更 + 数据文件变更（浙江Runner推送数据后触发云端重部署Pages）
+    # 监听源码变更 + 数据文件变更（浙江Runner推送数据后触发Pages重部署）
     paths:
       - 'sources.json'
       - 'scraper.py'
@@ -29,8 +29,13 @@ permissions:
 
 jobs:
   # ---------- 云端：抓取除浙江外的所有源（关机也自动更新） ----------
+  # 注意：浙江Runner推送数据时也会触发此job(因为paths含index.html)，
+  # 但通过if条件跳过，避免无限循环(Runner推送→触发云端→云端推送→又触发...)
   scrape-cloud:
     runs-on: ubuntu-latest
+    if: |
+      (github.event_name == 'push' && !contains(github.event.head_commit.message, 'update zhejiang data')) ||
+      github.event_name != 'push'
     concurrency:
       group: cloud-scrape
       cancel-in-progress: true   # 新一次云端抓取开始就取消上一次，避免重叠写库
@@ -66,7 +71,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ steps.pwcache.outputs.cache-primary-key }}
+          key: ${{ steps.pwcache-primary-key }}
 
       - name: 抓取并更新看板（排除浙江）
         env:
@@ -82,6 +87,26 @@ jobs:
           git add -A
           git commit -m "chore: 定时更新公告(云端) $(date +'%Y-%m-%d %H:%M')" || echo "无变更"
           git push
+
+      - name: 上传 Pages 产物
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+
+      - name: 部署 Pages
+        uses: actions/deploy-pages@v5
+
+  # ---------- 浙江数据推送后：仅部署Pages（不抓取，避免循环） ----------
+  # 当浙江Runner推送notices.db/index.html时，scrape-cloud被if跳过，
+  # 由这个轻量job负责把最新代码部署到Pages
+  deploy-pages-zhejiang:
+    runs-on: ubuntu-latest
+    # 只在浙江Runner的数据提交时运行
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, 'update zhejiang data')
+    needs: []
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v5
 
       - name: 上传 Pages 产物
         uses: actions/upload-pages-artifact@v4
