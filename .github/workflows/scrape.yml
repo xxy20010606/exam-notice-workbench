@@ -98,8 +98,17 @@ jobs:
       group: zhejiang-self-hosted
       cancel-in-progress: true  # 只保留最新一次浙江抓取，避免关机多天后堆积重复任务
     steps:
+      - name: 配置git超时（自托管网络可能不稳定）
+        run: |
+          git config --global http.lowSpeedLimit 500
+          git config --global http.lowSpeedTime 120
+          git config --global http.postBuffer 524288000
+
       - name: 检出仓库
         uses: actions/checkout@v5
+        with:
+          clean: false
+          fetch-depth: 1
 
       - name: 同步云端最新数据（含非浙江公告，避免覆盖）
         run: |
@@ -124,14 +133,27 @@ jobs:
           PAGES_URL: ${{ secrets.PAGES_URL }}
         run: python cloud_run.py --only-region 浙江
 
-      - name: 提交更新
+      - name: 提交更新（含重试）
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
           $date = Get-Date -Format 'yyyy-MM-dd HH:mm'
           git commit -m "chore: 定时更新公告(浙江) $date" || echo "无变更"
-          git push
+          # 重试push最多3次（自托管网络可能不稳定）
+          $retry = 0
+          while ($retry -lt 3) {
+            try {
+              git push
+              Write-Host "Push succeeded"
+              break
+            } catch {
+              $retry++
+              if ($retry -ge 3) { throw }
+              Write-Host "Push failed (attempt $retry/3), retrying in 10s..."
+              Start-Sleep -Seconds 10
+            }
+          }
 
       - name: 上传 Pages 产物
         uses: actions/upload-pages-artifact@v4
