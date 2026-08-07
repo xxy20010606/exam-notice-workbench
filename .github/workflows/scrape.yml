@@ -169,7 +169,7 @@ jobs:
           $retry = 0
           while ($retry -lt 5) {
             try {
-              git push
+              git push origin HEAD:main
               Write-Host "Push succeeded"
               break
             } catch {
