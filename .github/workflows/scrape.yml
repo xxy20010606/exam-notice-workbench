@@ -138,8 +138,8 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "chore: update zhejiang data" || echo "no changes"
-          # retry push up to 3 times
+          git commit -m "chore: update zhejiang data"
+          if ($LASTEXITCODE -ne 0) { Write-Host "no changes" }
           $retry = 0
           while ($retry -lt 3) {
             try {
@@ -149,7 +149,7 @@ jobs:
             } catch {
               $retry++
               if ($retry -ge 3) { throw }
-              Write-Host "Push failed (attempt $retry/3), retrying in 10s..."
+              Write-Host "Push failed attempt $retry retrying..."
               Start-Sleep -Seconds 10
             }
           }
