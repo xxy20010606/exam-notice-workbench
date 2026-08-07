@@ -101,7 +101,7 @@ jobs:
       cancel-in-progress: true
     env:
       # 本地仓库路径（Runner和用户在同一台机器上）
-      LOCAL_REPO: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench
+      LOCAL_REPO: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench-new
     steps:
       - name: 配置git超时
         run: |

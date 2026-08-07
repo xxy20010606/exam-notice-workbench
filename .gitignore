@@ -16,3 +16,13 @@ package-lock.json
 
 # 临时预览截图
 preview/
+
+# GitHub Runner 二进制文件（巨大，绝不提交）
+bin/
+externals/
+runner.zip
+run.cmd
+config.cmd
+*.dll
+*.exe
+!*.exe.example
