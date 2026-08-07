@@ -97,12 +97,16 @@ jobs:
     concurrency:
       group: zhejiang-self-hosted
       cancel-in-progress: true  # 只保留最新一次浙江抓取，避免关机多天后堆积重复任务
+    env:
+      # Windows 自托管 Runner 连 GitHub 需要代理（按需修改为你的代理地址）
+      # 如果你的网络能直连 GitHub，下面两行可以删掉
+      HTTP_PROXY: http://127.0.0.1:7890
+      HTTPS_PROXY: http://127.0.0.1:7890
     steps:
       - name: 检出仓库
         uses: actions/checkout@v5
 
       - name: 同步云端最新数据（含非浙江公告，避免覆盖）
-        shell: bash
         run: |
           git fetch origin main
           git reset --hard origin/main
@@ -113,15 +117,12 @@ jobs:
           python-version: '3.11'
 
       - name: 安装依赖
-        shell: bash
         run: pip install -r requirements.txt
 
       - name: 安装 Playwright Chromium
-        shell: bash
         run: python -m playwright install chromium
 
       - name: 抓取浙江并更新看板
-        shell: bash
         env:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           RECIPIENT: ${{ secrets.RECIPIENT }}
@@ -129,12 +130,12 @@ jobs:
         run: python cloud_run.py --only-region 浙江
 
       - name: 提交更新
-        shell: bash
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git commit -m "chore: 定时更新公告(浙江) $(date +'%Y-%m-%d %H:%M')" || echo "无变更"
+          $date = Get-Date -Format "yyyy-MM-dd HH:mm"
+          git commit -m "chore: 定时更新公告(浙江) $date" || echo "无变更"
           git push
 
       - name: 上传 Pages 产物
