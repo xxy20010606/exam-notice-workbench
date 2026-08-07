@@ -3,7 +3,7 @@ name: 公考事考公告抓取
 on:
   push:
     branches: [main]
-    # 只监听源码变更，排除 CI 自己生成的 notices.db/index.html/DATA.generated，避免无限循环
+    # 监听源码变更 + 数据文件变更（浙江Runner推送数据后触发云端重部署Pages）
     paths:
       - 'sources.json'
       - 'scraper.py'
@@ -12,6 +12,8 @@ on:
       - 'service-worker.js'
       - 'requirements.txt'
       - '.github/workflows/scrape.yml'
+      - 'notices.db'
+      - 'index.html'
   schedule:
     # 每 6 小时跑一次（分钟取 17 避免整点拥堵）
     - cron: '17 */6 * * *'
