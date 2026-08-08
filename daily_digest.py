@@ -9,7 +9,9 @@
   SMTP_PASSWORD  163 邮箱「授权码」（非登录密码），必填才发邮件
   RECIPIENT      收件人，默认与发件人相同（发给自己）
   PAGES_URL      看板链接，写入邮件正文（可选）
-  DAILY_ALWAYS   设为 1 时，即使当天无新增也发一封「无新增」提示邮件
+
+默认每天发送：有新增发汇总，无新增发「今日暂无新增」提示邮件。
+覆盖 sources.json 中全部地区（国考 / 各省省考 / 浙江11市事业编 / 福建·江苏·上海等事业编）。
 """
 import os, sqlite3, smtplib, ssl
 from email.message import EmailMessage
@@ -78,16 +80,13 @@ def main():
     notices = fetch_today_notices(today)
     recipient = (os.environ.get("RECIPIENT", SENDER) or SENDER).strip() or SENDER
     pages = (os.environ.get("PAGES_URL", "") or "").strip()
-    always = os.environ.get("DAILY_ALWAYS", "").strip() == "1"
 
     if not notices:
-        if always:
-            body = f"{today} 公考/事考公告日报\n\n今日暂无新增公告。\n"
-            if pages:
-                body += f"\n查看完整看板：{pages}"
-            send_email(recipient, f"公考事考公告日报 {today}（无新增）", body)
-        else:
-            print(f"[日报] {today} 无新增公告，跳过发送（设 DAILY_ALWAYS=1 可强制发送提示邮件）")
+        print(f"[日报] {today} 无新增公告，发送提示邮件")
+        body = f"{today} 公考/事考公告日报\n\n今日暂无新增公告。\n"
+        if pages:
+            body += f"\n查看完整看板：{pages}"
+        send_email(recipient, f"公考事考公告日报 {today}（无新增）", body)
         return
 
     # 按地区分组，地区内按标题排序
