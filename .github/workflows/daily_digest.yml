@@ -22,9 +22,10 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: 发送每日汇总邮件
+      - name: 发送每日汇总（邮件 + 微信）
         env:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           RECIPIENT: ${{ secrets.RECIPIENT }}
           PAGES_URL: ${{ secrets.PAGES_URL }}
+          SERVERCHAN_KEY: ${{ secrets.SERVERCHAN_KEY }}
         run: python daily_digest.py

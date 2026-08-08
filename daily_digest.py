@@ -1,19 +1,22 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""每日公告汇总邮件：从 notices.db 筛选「当天新增」公告，发一封带日期的汇总邮件。
+"""每日公告汇总：从 notices.db 筛选「当天新增」公告，发一封带日期的汇总（邮件 + 微信）。
 
-独立于抓取流程，由 GitHub Actions 每日定时（北京时间约 23:55）运行。
+独立于抓取流程，由 GitHub Actions 每日定时（北京时间 19:00）运行。
 「当天新增」判定与看板一致：公告 date==今天 或 first_seen(入库时间)==今天。
 
 环境变量：
-  SMTP_PASSWORD  163 邮箱「授权码」（非登录密码），必填才发邮件
-  RECIPIENT      收件人，默认与发件人相同（发给自己）
-  PAGES_URL      看板链接，写入邮件正文（可选）
+  SMTP_PASSWORD   163 邮箱「授权码」（非登录密码），配置后才发邮件
+  RECIPIENT       收件人，默认与发件人相同（发给自己）
+  PAGES_URL       看板链接，写入正文（可选）
+  SERVERCHAN_KEY  Server酱 SendKey，配置后才推微信（sctp… 为 Server酱³，SCT… 为旧版 Turbo）
 
-默认每天发送：有新增发汇总，无新增发「今日暂无新增」提示邮件。
+邮件与微信互相独立：配了哪个就发哪个，都配就都发，都不配则只打印日志。
+默认每天发送：有新增发汇总，无新增发「今日暂无新增」提示。
 覆盖 sources.json 中全部地区（国考 / 各省省考 / 浙江11市事业编 / 福建·江苏·上海等事业编）。
 """
-import os, sqlite3, smtplib, ssl
+import os, re, json, sqlite3, smtplib, ssl
+import urllib.request, urllib.parse
 from email.message import EmailMessage
 from datetime import datetime, timezone, timedelta
 
@@ -22,6 +25,8 @@ DB = os.path.join(ROOT, "notices.db")
 SMTP_HOST = "smtp.163.com"
 SMTP_PORT = 465
 SENDER = "xxy1037550012@163.com"
+# 微信单条消息里最多列多少条公告，超出只给数量与看板链接（避免消息被平台截断）
+WX_MAX_ITEMS = 40
 
 
 def beijing_today():
@@ -75,6 +80,78 @@ def send_email(recipient, subject, body):
         return False
 
 
+def send_wechat(title, desp):
+    """通过 Server酱推送到微信。
+
+    Server酱³（SendKey 形如 sctp1234t****）：POST https://<uid>.push.ft07.com/send/<key>.send
+    旧版 Turbo（SendKey 形如 SCT****）：      POST https://sctapi.ftqq.com/<key>.send
+    desp 支持 Markdown。
+    """
+    key = (os.environ.get("SERVERCHAN_KEY", "") or "").strip()
+    if not key:
+        print("[微信] 未设置 SERVERCHAN_KEY，跳过推送")
+        return False
+
+    m = re.match(r"^sctp(\d+)t", key)
+    if m:                                   # Server酱³
+        url = f"https://{m.group(1)}.push.ft07.com/send/{key}.send"
+    else:                                   # 旧版 Turbo
+        url = f"https://sctapi.ftqq.com/{key}.send"
+
+    # 微信标题过长会显示不全，截断保护
+    payload = urllib.parse.urlencode(
+        {"title": title[:60], "desp": desp}
+    ).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=payload,
+        headers={"Content-Type": "application/x-www-form-urlencoded; charset=utf-8"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=20) as resp:
+            raw = resp.read().decode("utf-8", "ignore")
+        try:
+            data = json.loads(raw)
+        except Exception:
+            data = {}
+        code = data.get("code", data.get("data", {}).get("code"))
+        if code in (0, None) and '"code":4' not in raw:
+            print("[微信] 已推送")
+            return True
+        print(f"[微信] 推送返回异常：{raw[:200]}")
+        return False
+    except Exception as e:
+        print(f"[微信] 推送失败：{e}")
+        return False
+
+
+def build_wechat_markdown(today, notices, by_region, pages):
+    """微信正文（Markdown），条数过多时只列前 WX_MAX_ITEMS 条。"""
+    lines = [f"**{today} 新增 {len(notices)} 条**", ""]
+    shown = 0
+    truncated = False
+    for region in sorted(by_region):
+        if shown >= WX_MAX_ITEMS:
+            truncated = True
+            break
+        lines.append(f"**{region}**")
+        for it in by_region[region]:
+            if shown >= WX_MAX_ITEMS:
+                truncated = True
+                break
+            if it["url"]:
+                lines.append(f"- [{it['title']}]({it['url']})")
+            else:
+                lines.append(f"- {it['title']}")
+            shown += 1
+        lines.append("")
+    if truncated:
+        lines.append(f"> 还有 {len(notices) - shown} 条未列出，请查看完整看板。")
+        lines.append("")
+    if pages:
+        lines.append(f"[查看完整看板]({pages})")
+    return "\n".join(lines)
+
+
 def main():
     today = beijing_today()
     notices = fetch_today_notices(today)
@@ -82,11 +159,15 @@ def main():
     pages = (os.environ.get("PAGES_URL", "") or "").strip()
 
     if not notices:
-        print(f"[日报] {today} 无新增公告，发送提示邮件")
+        print(f"[日报] {today} 无新增公告，发送提示")
         body = f"{today} 公考/事考公告日报\n\n今日暂无新增公告。\n"
         if pages:
             body += f"\n查看完整看板：{pages}"
         send_email(recipient, f"公考事考公告日报 {today}（无新增）", body)
+        wx = f"**{today}**\n\n今日暂无新增公告。\n"
+        if pages:
+            wx += f"\n[查看完整看板]({pages})"
+        send_wechat(f"公考事考日报 {today}（无新增）", wx)
         return
 
     # 按地区分组，地区内按标题排序
@@ -108,6 +189,10 @@ def main():
         lines.append(f"查看完整看板：{pages}")
 
     send_email(recipient, f"公考事考公告日报 {today}（新增 {len(notices)} 条）", "\n".join(lines))
+    send_wechat(
+        f"公考事考日报 {today}｜新增 {len(notices)} 条",
+        build_wechat_markdown(today, notices, by_region, pages),
+    )
 
 
 if __name__ == "__main__":
