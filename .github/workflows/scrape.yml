@@ -3,7 +3,6 @@ name: 公考事考公告抓取
 on:
   push:
     branches: [main]
-    # 监听源码变更 + 数据文件变更（浙江Runner推送数据后触发Pages重部署）
     paths:
       - 'sources.json'
       - 'scraper.py'
@@ -12,8 +11,6 @@ on:
       - 'service-worker.js'
       - 'requirements.txt'
       - '.github/workflows/scrape.yml'
-      - 'notices.db'
-      - 'index.html'
   schedule:
     # 每 6 小时跑一次（分钟取 17 避免整点拥堵）
     - cron: '17 */6 * * *'
@@ -24,21 +21,20 @@ permissions:
   pages: write               # 发布看板到 GitHub Pages
   id-token: write
 
-# 注意：不在这里设置全局 concurrency，改用每个 job 各自的并发组，
-# 这样自托管 Runner（浙江）排队/离线不会阻塞云端（非浙江）的定时更新。
-
 jobs:
-  # ---------- 云端：抓取除浙江外的所有源（关机也自动更新） ----------
-  # 注意：浙江Runner推送数据时也会触发此job(因为paths含index.html)，
-  # 但通过if条件跳过，避免无限循环(Runner推送→触发云端→云端推送→又触发...)
+  # ---------- 云端：抓取所有源（含浙江），关机也自动更新 ----------
+  # scraper.py 已加 --disable-ipv6 强制 IPv4，GitHub 托管 ubuntu 本身是 IPv4 出口，
+  # 浙江 gov.cn 在云端即可直接抓取，无需本地 Runner。
+  # 防自循环：自己抓到数据后的提交（message 含“定时更新公告”）不再触发新一轮；
+  # 源码变更（paths 命中）或定时/手动触发时正常抓取全部地区。
   scrape-cloud:
     runs-on: ubuntu-latest
     if: |
-      (github.event_name == 'push' && !contains(github.event.head_commit.message, 'update zhejiang data')) ||
-      github.event_name != 'push'
+      github.event_name != 'push' ||
+      (github.event_name == 'push' && !contains(github.event.head_commit.message, '定时更新公告'))
     concurrency:
       group: cloud-scrape
-      cancel-in-progress: true   # 新一次云端抓取开始就取消上一次，避免重叠写库
+      cancel-in-progress: true   # 新一次抓取开始就取消上一次，避免重叠写库
     steps:
       - name: 检出仓库
         uses: actions/checkout@v5
@@ -73,12 +69,12 @@ jobs:
           path: ~/.cache/ms-playwright
           key: ${{ steps.pwcache-primary-key }}
 
-      - name: 抓取并更新看板（排除浙江）
+      - name: 抓取并更新看板（含浙江全部地区）
         env:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           RECIPIENT: ${{ secrets.RECIPIENT }}
           PAGES_URL: ${{ secrets.PAGES_URL }}
-        run: python cloud_run.py --exclude-region 浙江
+        run: python cloud_run.py
 
       - name: 提交更新
         run: |
@@ -99,133 +95,4 @@ jobs:
           path: .
 
       - name: 部署 Pages
-        uses: actions/deploy-pages@v5
-
-  # ---------- 浙江数据推送后：仅部署Pages（不抓取，避免循环） ----------
-  # 当浙江Runner推送notices.db/index.html时，scrape-cloud被if跳过，
-  # 由这个轻量job负责把最新代码部署到Pages
-  deploy-pages-zhejiang:
-    runs-on: ubuntu-latest
-    # 只在浙江Runner的数据提交时运行
-    if: github.event_name == 'push' && contains(github.event.head_commit.message, 'update zhejiang data')
-    needs: []
-    steps:
-      - name: 检出仓库
-        uses: actions/checkout@v5
-
-      - name: 上传 Pages 产物
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: .
-
-      - name: 部署 Pages
-        uses: actions/deploy-pages@v5
-
-  # ---------- 自托管 Runner：只抓取浙江源（电脑开机才更新） ----------
-  # 关键设计：使用本地仓库路径，不依赖GitHub网络做检出
-  # 只有git fetch和git push需要联网（带重试），抓取本身完全离线可用
-  scrape-zhejiang:
-    runs-on: self-hosted
-    timeout-minutes: 60
-    continue-on-error: true
-    concurrency:
-      group: zhejiang-self-hosted
-      cancel-in-progress: true
-    env:
-      # 本地仓库路径（Runner和用户在同一台机器上）
-      LOCAL_REPO: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench-new
-    steps:
-      - name: 配置git超时
-        run: |
-          git config --global http.lowSpeedLimit 500
-          git config --global http.lowSpeedTime 120
-          git config --global http.postBuffer 524288000
-
-      - name: 使用本地仓库（无需从GitHub克隆）
-        run: |
-          Write-Host "Using local repo: $env:LOCAL_REPO"
-          if (!(Test-Path $env:LOCAL_REPO)) {
-            Write-Error "Local repo not found at $env:LOCAL_REPO"
-            exit 1
-          }
-
-      - name: 同步云端最新数据（含重试）
-        working-directory: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench-new
-        run: |
-          $retry = 0
-          while ($retry -lt 5) {
-            try {
-              git fetch origin main
-              git reset --hard origin/main
-              Write-Host "Sync succeeded"
-              break
-            } catch {
-              $retry++
-              if ($retry -ge 5) {
-                Write-Host "Sync failed after $retry attempts, using local state"
-                break
-              }
-              Write-Host "Fetch failed attempt $retry, retrying in 15s..."
-              Start-Sleep -Seconds 15
-            }
-          }
-
-      - name: 配置 Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: 安装依赖
-        working-directory: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench-new
-        run: pip install -r requirements.txt
-
-      - name: 安装 Playwright Chromium
-        run: python -m playwright install chromium
-
-      - name: 抓取浙江并更新看板
-        working-directory: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench-new
-        env:
-          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
-          RECIPIENT: ${{ secrets.RECIPIENT }}
-          PAGES_URL: ${{ secrets.PAGES_URL }}
-        run: python cloud_run.py --only-region 浙江
-
-      - name: 提交更新（含重试）
-        working-directory: C:\Users\XX\WorkBuddy\2026-08-01-16-23-52\exam-notice-workbench-new
-        run: |
-          $newCount = 0
-          if (Test-Path .new_count) { $newCount = [int](Get-Content .new_count -Raw) }
-          if ($newCount -le 0) {
-            Write-Host "[跳过] 本次无新增浙江公告，不提交不推送（避免自循环）"
-            exit 0
-          }
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add -A
-          git commit -m "chore: update zhejiang data"
-          $retry = 0
-          while ($retry -lt 5) {
-            try {
-              git push origin HEAD:main
-              Write-Host "Push succeeded"
-              break
-            } catch {
-              $retry++
-              if ($retry -ge 5) {
-                Write-Host "Push failed after $retry attempts"
-                break
-              }
-              Write-Host "Push failed attempt $retry retrying in 15s..."
-              Start-Sleep -Seconds 15
-            }
-          }
-
-      - name: 上传 Pages 产物
-        continue-on-error: true
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: .
-
-      - name: 部署 Pages
-        continue-on-error: true
         uses: actions/deploy-pages@v5
