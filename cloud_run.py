@@ -75,20 +75,8 @@ def main():
     except Exception as _e:
         print(f"[warn] 写入 .new_count 失败: {_e}")
 
-    new = report["new"]
-    recipient = os.environ.get("RECIPIENT", SENDER).strip() or SENDER
-    if new:
-        pages = os.environ.get("PAGES_URL", "").strip()
-        lines = [f"本次新增 {len(new)} 条招考公告（{report['run_at']}）：", ""]
-        for it in new:
-            lines.append(f"【{it.get('category','')}·{it.get('region','')}】{it.get('title','')}")
-            lines.append(it.get("url", ""))
-            lines.append("")
-        if pages:
-            lines.append(f"查看完整看板：{pages}")
-        send_email(recipient, f"公考/事考公告更新：新增 {len(new)} 条", "\n".join(lines))
-    else:
-        print("[邮件] 无新增公告，不发送")
+    # 即时邮件已移除：改由每日汇总（daily_digest.py / daily_digest.yml）统一发送，
+    # 保证「每天一封」而非每次抓取一封。send_email 函数保留供 daily_digest 复用。
 
 
 if __name__ == "__main__":

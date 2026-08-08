@@ -1,0 +1,30 @@
+name: 每日公告汇总邮件
+
+# 独立于抓取流程：北京时间每天 23:55 汇总当天新增，发一封带日期的邮件。
+# 云端 ubuntu 运行，不依赖本地 Runner / 用户开机，保证每天都能发。
+on:
+  schedule:
+    - cron: '55 15 * * *'     # UTC 15:55 = 北京时间 23:55
+  workflow_dispatch: {}        # 允许手动触发测试
+
+permissions:
+  contents: read
+
+jobs:
+  daily-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出仓库（含最新 notices.db）
+        uses: actions/checkout@v5
+
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 发送每日汇总邮件
+        env:
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          RECIPIENT: ${{ secrets.RECIPIENT }}
+          PAGES_URL: ${{ secrets.PAGES_URL }}
+        run: python daily_digest.py
