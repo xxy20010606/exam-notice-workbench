@@ -28,6 +28,11 @@ SENDER = "xxy1037550012@163.com"
 # 微信单条消息里最多列多少条公告，超出只给数量与看板链接（避免消息被平台截断）
 WX_MAX_ITEMS = 40
 
+# 全局噪声关键词：标题含这些词的条目不是真正的招聘公告（政府采购/中标/询价等）
+NOISE_KEYWORDS = re.compile(
+    r"采购|中标|询价|成交|招标|竞价|政府采购|单一来源|资格预审.*采购"
+)
+
 
 def beijing_today():
     """返回北京时间（UTC+8）的日期字符串 YYYY-MM-DD。"""
@@ -170,8 +175,31 @@ def main():
         send_wechat(f"公考事考日报 {today}（无新增）", wx)
         return
 
+    # 全局噪声过滤：剔除采购/中标/询价等非招聘公告
+    real = []
+    noise = []
+    for it in notices:
+        if NOISE_KEYWORDS.search(it["title"]):
+            noise.append(it)
+        else:
+            real.append(it)
+    if noise:
+        print(f"[日报] 过滤掉 {len(noise)} 条噪声（采购/中标/询价等）")
+    notices = real
+
+    if not notices:
+        print(f"[日报] {today} 新增 {len(real) + len(noise)} 条但全部为噪声，发送提示")
+        body = f"{today} 公考/事考公告日报\n\n今日新增 {len(noise)} 条信息，但均为政府采购/中标/询价等非招聘公告，已自动过滤。\n"
+        if pages:
+            body += f"\n查看完整看板：{pages}"
+        send_email(recipient, f"公考事考公告日报 {today}（无有效招聘）", body)
+        wx = f"**{today}**\n\n今日新增 {len(noise)} 条，但均为采购/中标等非招聘信息，已过滤。\n"
+        if pages:
+            wx += f"\n[查看完整看板]({pages})"
+        send_wechat(f"公考事考日报 {today}（无有效招聘）", wx)
+        return
+
     # 按地区分组，地区内按标题排序
-    by_region = {}
     for it in notices:
         by_region.setdefault(it["region"] or "其他", []).append(it)
     for k in by_region:
