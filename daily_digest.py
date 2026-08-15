@@ -53,6 +53,9 @@ def fetch_source_health():
             "SELECT name, fail_streak, last_error, last_run FROM sources_status "
             "WHERE fail_streak > 0 OR (last_error IS NOT NULL AND last_error != '')"
         ).fetchall()
+    except sqlite3.OperationalError:
+        # 表尚未创建（如云端首次抓取前）：跳过健康提醒，不影响日报发送
+        return []
     finally:
         conn.close()
     out = []
