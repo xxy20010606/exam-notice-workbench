@@ -36,6 +36,46 @@ NOISE_KEYWORDS = re.compile(
     r"|^公开招聘$"  # 泛化栏目名
 )
 
+# 白名单：标题必须含以下招聘类关键词才视为有效公告。
+# 与上方黑名单叠加，从根本上挡住「未知类别」噪声（黑名单只拦已知类别）。
+RECRUIT_KEYWORDS = re.compile(
+    r"公务员|省考|选调|遴选|事业(单位|编)?|招聘|招考|招录|公考|引进"
+)
+
+
+def fetch_source_health():
+    """读取 sources_status，返回今日抓取异常（失败/被跳过）的源。"""
+    if not os.path.exists(DB):
+        return []
+    conn = sqlite3.connect(DB)
+    try:
+        rows = conn.execute(
+            "SELECT name, fail_streak, last_error, last_run FROM sources_status "
+            "WHERE fail_streak > 0 OR (last_error IS NOT NULL AND last_error != '')"
+        ).fetchall()
+    finally:
+        conn.close()
+    out = []
+    for r in rows:
+        out.append({"name": r[0] or "", "fail_streak": r[1] or 0,
+                    "last_error": (r[2] or "")[:120], "last_run": r[3] or ""})
+    return out
+
+
+def format_health(health):
+    """返回 (text_lines, md_lines)，供邮件/微信正文追加源健康提醒。"""
+    if not health:
+        return [], []
+    text = ["【源健康提醒】以下源今日抓取异常，可能漏收公告："]
+    md = ["**源健康提醒**：以下源今日抓取异常，可能漏收公告："]
+    for h in health:
+        reason = h["last_error"] or (f"连续失败 {h['fail_streak']} 次" if h["fail_streak"] else "未知错误")
+        text.append(f"  · {h['name']}：{reason}")
+        md.append(f"- {h['name']}：{reason}")
+    text.append("")
+    md.append("")
+    return text, md
+
 
 def beijing_today():
     """返回北京时间（UTC+8）的日期字符串 YYYY-MM-DD。"""
@@ -132,7 +172,7 @@ def send_wechat(title, desp):
         return False
 
 
-def build_wechat_markdown(today, notices, by_region, pages):
+def build_wechat_markdown(today, notices, by_region, pages, health_md=None):
     """微信正文（Markdown），条数过多时只列前 WX_MAX_ITEMS 条。"""
     lines = [f"**{today} 新增 {len(notices)} 条**", ""]
     shown = 0
@@ -157,6 +197,8 @@ def build_wechat_markdown(today, notices, by_region, pages):
         lines.append("")
     if pages:
         lines.append(f"[查看完整看板]({pages})")
+    if health_md:
+        lines.extend(health_md)
     return "\n".join(lines)
 
 
@@ -165,16 +207,22 @@ def main():
     notices = fetch_today_notices(today)
     recipient = (os.environ.get("RECIPIENT", SENDER) or SENDER).strip() or SENDER
     pages = (os.environ.get("PAGES_URL", "") or "").strip()
+    health = fetch_source_health()
+    htext, hmd = format_health(health)
 
     if not notices:
         print(f"[日报] {today} 无新增公告，发送提示")
         body = f"{today} 公考/事考公告日报\n\n今日暂无新增公告。\n"
         if pages:
             body += f"\n查看完整看板：{pages}"
+        if htext:
+            body += "\n" + "\n".join(htext)
         send_email(recipient, f"公考事考公告日报 {today}（无新增）", body)
         wx = f"**{today}**\n\n今日暂无新增公告。\n"
         if pages:
             wx += f"\n[查看完整看板]({pages})"
+        if hmd:
+            wx += "\n" + "\n".join(hmd)
         send_wechat(f"公考事考日报 {today}（无新增）", wx)
         return
 
@@ -190,19 +238,35 @@ def main():
         print(f"[日报] 过滤掉 {len(noise)} 条噪声（采购/中标/询价等）")
     notices = real
 
+    # 再白名单把关：只保留含招聘类关键词的标题，挡住未知噪声
+    kept = []
+    for it in real:
+        if RECRUIT_KEYWORDS.search(it["title"]):
+            kept.append(it)
+        else:
+            noise.append(it)
+    if noise:
+        print(f"[日报] 过滤掉 {len(noise)} 条噪声（采购/中标/询价/非招聘等）")
+    notices = kept
+
     if not notices:
         print(f"[日报] {today} 新增 {len(real) + len(noise)} 条但全部为噪声，发送提示")
         body = f"{today} 公考/事考公告日报\n\n今日新增 {len(noise)} 条信息，但均为政府采购/中标/询价等非招聘公告，已自动过滤。\n"
         if pages:
             body += f"\n查看完整看板：{pages}"
-        send_email(recipient, f"公考事考公告日报 {today}（无有效招聘）", body)
+        if htext:
+            body += "\n" + "\n".join(htext)
+        send_email(recipient, f"公考事考日报 {today}（无有效招聘）", body)
         wx = f"**{today}**\n\n今日新增 {len(noise)} 条，但均为采购/中标等非招聘信息，已过滤。\n"
         if pages:
             wx += f"\n[查看完整看板]({pages})"
+        if hmd:
+            wx += "\n" + "\n".join(hmd)
         send_wechat(f"公考事考日报 {today}（无有效招聘）", wx)
         return
 
     # 按地区分组，地区内按标题排序
+    by_region = {}
     for it in notices:
         by_region.setdefault(it["region"] or "其他", []).append(it)
     for k in by_region:
@@ -216,13 +280,15 @@ def main():
             if it["url"]:
                 lines.append(f"    {it['url']}")
         lines.append("")
+    if htext:
+        lines.extend(htext)
     if pages:
         lines.append(f"查看完整看板：{pages}")
 
     send_email(recipient, f"公考事考公告日报 {today}（新增 {len(notices)} 条）", "\n".join(lines))
     send_wechat(
         f"公考事考日报 {today}｜新增 {len(notices)} 条",
-        build_wechat_markdown(today, notices, by_region, pages),
+        build_wechat_markdown(today, notices, by_region, pages, hmd),
     )
 
 

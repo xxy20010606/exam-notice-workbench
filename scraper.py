@@ -19,8 +19,17 @@ DEFAULT_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 
 # 全局过滤：去掉导航/页脚等噪音链接
 GLOBAL_EXCLUDE = (r"首页|网站地图|联系我们|无障碍|English|EN$|登录|注册|后台|投稿|订阅|"
-                  r"邮箱|微信|微博|客户端|下载|帮助|指南|隐私|版权|备案|关于我们|站点|"
-                  r"留言|举报|督查|信访|繁體|无障碍版|纠错|收藏|分享")
+    r"邮箱|微信|微博|客户端|下载|帮助|指南|隐私|版权|备案|关于我们|站点|"
+    r"留言|举报|督查|信访|繁體|无障碍版|纠错|收藏|分享")
+
+# 全局噪声（非招聘公告）：与 daily_digest 保持一致，在「入库」环节即过滤，
+# 防止采购/中标/询价/导航文字/泛化栏目名等 junk 进入 notices.db 与看板。
+GLOBAL_NOISE = re.compile(
+    r"采购|中标|询价|成交|招标|竞价|政府采购|单一来源|资格预审.*采购"
+    r"|^/\s"                  # 导航栏文字（以 / 开头）
+    r"|^事业单位公开招聘$"     # 泛化栏目名（非具体公告）
+    r"|^公开招聘$"            # 泛化栏目名
+)
 
 DATE_RE = [re.compile(r"(\d{4})[-/年.](\d{1,2})[-/月.](\d{1,2})"),]
 URL_DATE_RE = re.compile(r"(\d{4})[-/_](\d{2})[-/_](\d{2})")
@@ -313,7 +322,12 @@ def url_id(u):
 def store(conn, source, items):
     new = []
     ts = now_iso()
+    dropped = 0
     for it in items:
+        # 入库即过滤全局噪声，避免 junk 污染 notices.db 与看板
+        if GLOBAL_NOISE.search(it["title"] or ""):
+            dropped += 1
+            continue
         uid = url_id(it["url"])
         cur = conn.execute("SELECT id FROM notices WHERE id=?", (uid,)).fetchone()
         if cur:
@@ -325,8 +339,37 @@ def store(conn, source, items):
                          (uid, source["name"], source.get("category", ""), source.get("region", ""),
                           it["title"], it["url"], it["date"], ts, ts))
             new.append(it)
+    if dropped:
+        print(f"[噪声] {source['name']} 入库时过滤 {dropped} 条 junk")
     conn.commit()
     return new
+
+
+def cleanup_noise():
+    """定期/幂等清理：删除库中遗留的全局噪声记录（入库过滤上线前的历史 junk）。
+
+    注意：采购/中标等用 LIKE 模糊匹配（真实招聘公告不会含这些词）；
+    而「事业单位公开招聘」「公开招聘」这类泛化栏目名必须用精确匹配，
+    否则会误删「XX事业单位公开招聘工作人员公告」等真实公告。
+    """
+    conn = init_db()
+    like_patterns = ["%采购%", "%中标%", "%询价%", "%成交%", "%招标%", "%竞价%",
+                     "%政府采购%", "%单一来源%", "/%"]
+    exact_patterns = ["事业单位公开招聘", "公开招聘"]
+    n = 0
+    for p in like_patterns:
+        for (rid,) in conn.execute("SELECT id FROM notices WHERE title LIKE ?", (p,)).fetchall():
+            conn.execute("DELETE FROM notices WHERE id=?", (rid,))
+            n += 1
+    for p in exact_patterns:
+        for (rid,) in conn.execute("SELECT id FROM notices WHERE title = ?", (p,)).fetchall():
+            conn.execute("DELETE FROM notices WHERE id=?", (rid,))
+            n += 1
+    conn.commit()
+    conn.close()
+    if n:
+        print(f"[清理] 删除 {n} 条历史噪声记录")
+    return n
 
 
 # ---------------- 主流程 ----------------
