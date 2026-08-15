@@ -35,7 +35,7 @@ TEMPLATE = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#F7F6F3">
+  <meta name="theme-color" content="#F4EEE3">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icon.svg">
@@ -43,16 +43,16 @@ TEMPLATE = r"""<!DOCTYPE html>
 <style>
   :root{
     /* minimalist-ui：暖白底 + 炭灰字 + 发丝边框 + 极淡彩标签 */
-    --bg:#F7F6F3; --surface:#FFFFFF; --surface-2:#FBFBFA;
-    --ink:#2F3437; --muted:#787774; --faint:#9B9A97;
-    --line:#EAEAEA; --line-2:rgba(0,0,0,.06);
-    --gk-bg:#FDEBEC; --gk-tx:#9F2F2D;
-    --sk-bg:#EDF3EC; --sk-tx:#346538;
-    --sy-bg:#E1F3FE; --sy-tx:#1F6C9F;
-    --new-bg:#E1F3FE; --new-tx:#1F6C9F;
+    --bg:#F4EEE3; --surface:#FFFCF6; --surface-2:#FBF4E9;
+    --ink:#2C2620; --muted:#8A7E70; --faint:#A89C8C;
+    --line:#ECE2D2; --line-2:rgba(120,90,55,.07);
+    --gk-bg:#FBE7E4; --gk-tx:#9F2F2D;
+    --sk-bg:#EAF0E1; --sk-tx:#3C6B3E;
+    --sy-bg:#E4ECEE; --sy-tx:#1F6E7A;
+    --new-bg:#E4ECEE; --new-tx:#1F6E7A;
     --badge-bg:#9F2F2D;
     --pin-bg:#FBF3DB; --pin-fg:#956400; --pin-grp-bg:#FBF3DB;
-    --cd-surface:#FFFFFF; --cd-cell:#FBFBFA;
+    --cd-surface:#FFFCF6; --cd-cell:#FBF4E9;
     --cd-line:rgba(0,0,0,.06); --cd-node:rgba(0,0,0,.04);
     --r:12px; --r-sm:6px; --r-pill:999px;
     --sans:'SF Pro Display','Helvetica Neue',-apple-system,'PingFang SC','Microsoft YaHei',sans-serif;
@@ -147,8 +147,8 @@ TEMPLATE = r"""<!DOCTYPE html>
   .empty{color:var(--muted);text-align:center;padding:36px 20px;line-height:1.6}
   .sub{color:var(--muted);font-size:12px}
   /* 已读 / 置顶 切换按钮（SVG 图标，无 emoji） */
-  .rd-toggle,.pin-toggle{width:28px;height:28px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;flex:none;display:flex;align-items:center;justify-content:center;padding:0;transition:background .15s,color .15s,border-color .15s}
-  .rd-toggle svg,.pin-toggle svg{width:14px;height:14px;display:block}
+  .rd-toggle,.pin-toggle{width:22px;height:22px;border-radius:var(--r-sm);border:1px solid var(--line);background:var(--surface);color:var(--muted);cursor:pointer;flex:none;display:flex;align-items:center;justify-content:center;padding:0;transition:background .15s,color .15s,border-color .15s}
+  .rd-toggle svg,.pin-toggle svg{width:12px;height:12px;display:block}
   .rd-toggle svg{opacity:0;transition:opacity .15s}
   .rd-toggle:hover{border-color:var(--ink);color:var(--ink)}
   .rd-toggle.read{background:var(--ink);border-color:var(--ink);color:#fff}
@@ -185,20 +185,20 @@ TEMPLATE = r"""<!DOCTYPE html>
   /* 深色模式对等（手机 PWA 自动跟随系统） */
   @media (prefers-color-scheme: dark){
     :root{
-      --bg:#1A1A18; --surface:#212120; --surface-2:#28271F;
-      --ink:#ECECE8; --muted:#9A9A93; --faint:#6E6E66;
-      --line:#2E2E2B; --line-2:rgba(255,255,255,.08);
+      --bg:#1C1813; --surface:#262320; --surface-2:#2E2922;
+      --ink:#F0EADC; --muted:#A89E8E; --faint:#766E60;
+      --line:#352F27; --line-2:rgba(255,240,210,.07);
       --gk-bg:#3A2A2A; --gk-tx:#E89A96;
-      --sk-bg:#26332A; --sk-tx:#9FC4A0;
-      --sy-bg:#26323C; --sy-tx:#9CC0E0;
-      --new-bg:#26323C; --new-tx:#9CC0E0;
+      --sk-bg:#2C3326; --sk-tx:#A6C9A4;
+      --sy-bg:#2B343A; --sy-tx:#A4C6DC;
+      --new-bg:#2B343A; --new-tx:#A4C6DC;
       --badge-bg:#E0837F;
       --pin-bg:#3A3320; --pin-fg:#E6C453; --pin-grp-bg:#332E1C;
       --cd-surface:#212120; --cd-cell:#28271F;
       --cd-line:rgba(255,255,255,.08); --cd-node:rgba(255,255,255,.06);
     }
-    .chip.active{background:var(--ink);color:#1A1A18;border-color:var(--ink)}
-    .rd-toggle.read{background:var(--ink);border-color:var(--ink);color:#1A1A18}
+    .chip.active{background:var(--ink);color:#1C1813;border-color:var(--ink)}
+    .rd-toggle.read{background:var(--ink);border-color:var(--ink);color:#1C1813}
     .rd-toggle.read svg{opacity:1}
     .pin-toggle.pinned{background:var(--pin-bg);border-color:var(--pin-fg);color:var(--pin-fg)}
     .card:hover{box-shadow:0 2px 8px rgba(0,0,0,.3)}
@@ -295,22 +295,22 @@ function cardHtml(n){
   const read = isRead(n);
   const pinned = isPinned(n);
   return `<div class="card${read?' read':''}">
-    <button class="pin-toggle${pinned?' pinned':''}" data-url="${enc(n.url)}" type="button" title="${pinned?'取消置顶':'置顶到顶部'}">${ICON_PIN}</button>
-    <button class="rd-toggle${read?' read':''}" data-url="${enc(n.url)}" type="button" title="${read?'标记为未读':'标记为已读'}">${ICON_CHECK}</button>
     <span class="tag ${catClass(n.category)}">${n.category||""}</span>
     <div class="body">
       <a href="${n.url}" data-url="${enc(n.url)}" target="_blank" rel="noopener">${n.title}${n.is_new?'<span class="new">今日新增</span>':''}</a>
       <div class="meta">${n.region||""} · ${fmt(n.date)} · 来源：${n.source||""}</div>
     </div>
+    <button class="pin-toggle${pinned?' pinned':''}" data-url="${enc(n.url)}" type="button" title="${pinned?'取消置顶':'置顶到顶部'}">${ICON_PIN}</button>
+    <button class="rd-toggle${read?' read':''}" data-url="${enc(n.url)}" type="button" title="${read?'标记为未读':'标记为已读'}">${ICON_CHECK}</button>
   </div>`;
 }
 function rowHtml(n){
   const read = isRead(n);
   return `<div class="row${read?' read':''}">
-    <button class="rd-toggle${read?' read':''}" data-url="${enc(n.url)}" type="button" title="${read?'标记为未读':'标记为已读'}">${ICON_CHECK}</button>
     <span class="tag ${catClass(n.category)}">${n.category||""}</span>
     <a href="${n.url}" data-url="${enc(n.url)}" target="_blank" rel="noopener" style="color:var(--ink);text-decoration:none;flex:1">${n.title}</a>
     <span class="sub">${n.region||""} · ${fmt(n.date)}</span>
+    <button class="rd-toggle${read?' read':''}" data-url="${enc(n.url)}" type="button" title="${read?'标记为未读':'标记为已读'}">${ICON_CHECK}</button>
   </div>`;
 }
 document.addEventListener('click', function(e){
