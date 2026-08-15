@@ -467,7 +467,8 @@
     "browser_wait": 20000,
     "browser_wait_until": "domcontentloaded",
     "browser_timeout": 90000,
-    "alert_zero": true
+    "alert_zero": true,
+    "container": "div.page-content"
   },
   {
     "name": "浙江杭州-事业单位",
@@ -480,7 +481,8 @@
     "browser_wait": 20000,
     "browser_wait_until": "domcontentloaded",
     "browser_timeout": 90000,
-    "alert_zero": true
+    "alert_zero": true,
+    "container": "div.zwxxgk_bd"
   },
   {
     "name": "浙江温州-事业单位",
@@ -506,7 +508,8 @@
     "browser_wait": 20000,
     "browser_wait_until": "domcontentloaded",
     "browser_timeout": 90000,
-    "alert_zero": true
+    "alert_zero": true,
+    "container": "ul.contain"
   },
   {
     "name": "浙江绍兴-事业单位",
@@ -519,7 +522,8 @@
     "browser_wait": 20000,
     "browser_wait_until": "domcontentloaded",
     "browser_timeout": 90000,
-    "alert_zero": true
+    "alert_zero": true,
+    "container": "div.list1.mt10"
   },
   {
     "name": "浙江台州-事业单位",
@@ -545,7 +549,8 @@
     "browser_wait": 20000,
     "browser_wait_until": "domcontentloaded",
     "browser_timeout": 90000,
-    "alert_zero": true
+    "alert_zero": true,
+    "container": "div.news_list_group01"
   },
   {
     "name": "浙江嘉兴-事业单位",
@@ -571,7 +576,8 @@
     "browser_wait": 20000,
     "browser_wait_until": "domcontentloaded",
     "browser_timeout": 90000,
-    "alert_zero": true
+    "alert_zero": true,
+    "container": "div.mainr"
   },
   {
     "name": "浙江衢州-事业单位",
@@ -584,7 +590,8 @@
     "browser_wait": 20000,
     "browser_wait_until": "domcontentloaded",
     "browser_timeout": 90000,
-    "alert_zero": true
+    "alert_zero": true,
+    "container": "div.news-lists"
   },
   {
     "name": "浙江丽水-事业单位",
@@ -597,7 +604,8 @@
     "browser_wait": 20000,
     "browser_wait_until": "domcontentloaded",
     "browser_timeout": 90000,
-    "alert_zero": true
+    "alert_zero": true,
+    "container": "div.page-content"
   },
   {
     "name": "江苏-省属事业单位",
