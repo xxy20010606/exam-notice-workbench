@@ -141,6 +141,17 @@ TEMPLATE = r"""<!DOCTYPE html>
   .search-wrap{position:relative;display:inline-flex;align-items:center}
   .search-wrap input{padding-right:28px}
   .qclear{position:absolute;right:6px;border:none;background:transparent;color:var(--muted);font-size:16px;cursor:pointer;line-height:1;padding:4px}
+  /* 公告汇总：按日期分组折叠 */
+  .grp{border:1px solid var(--border);border-radius:14px;margin-bottom:10px;background:var(--card);overflow:hidden}
+  .grp>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:8px;padding:11px 14px;font-weight:700;font-size:14px;user-select:none}
+  .grp>summary::-webkit-details-marker{display:none}
+  .grp .grp-chev{color:var(--muted);font-size:11px;transition:transform .15s}
+  .grp[open] .grp-chev{transform:rotate(90deg)}
+  .grp .grpt{flex:1}
+  .grp .grpc{background:var(--accent-soft);color:var(--accent);font-size:12px;padding:1px 9px;border-radius:999px;font-weight:700}
+  .grp .card,.grp .empty{margin-bottom:0;border-radius:0;border-left:none;border-right:none;border-bottom:none}
+  .grp .card:first-of-type{border-top:none}
+  .home-search{margin:4px 0 10px}
 </style>
 </head>
 <body>
@@ -158,6 +169,7 @@ TEMPLATE = r"""<!DOCTYPE html>
       <div class="grid2" id="countdown-grid"></div>
       <div class="latest">
         <h2>最新公告</h2>
+        <div class="search-wrap home-search"><input id="q-home" placeholder="搜索标题/地区/来源…"><button id="qclear-home" class="qclear" type="button" aria-label="清除">×</button></div>
         <div id="latest-list"></div>
       </div>
     </div>
@@ -272,15 +284,21 @@ function renderCountdown(){
   }).join("");
 }
 
-function renderLatest(){
-  const list = [...DATA.notices].sort((a,b)=>{
+function renderLatest(qArg){
+  const q=(qArg||"").trim().toLowerCase();
+  let list=[...DATA.notices].sort((a,b)=>{
     const ha=!!a.date, hb=!!b.date;
     if(ha!==hb) return hb-ha;  // 有 date 的排前
     if(ha) return b.date.localeCompare(a.date);
     return (b.first_seen||"").localeCompare(a.first_seen||"");
   });
-  const top = list.slice(0,10);
-  document.getElementById("latest-list").innerHTML = top.map(rowHtml).join("") || `<div class="empty">🍃 暂无公告</div>`;
+  if(q){
+    list=list.filter(n=>(n.title+" "+n.region+" "+n.source).toLowerCase().includes(q));
+    list=list.slice(0,50);
+  } else {
+    list=list.slice(0,10);
+  }
+  document.getElementById("latest-list").innerHTML = list.map(rowHtml).join("") || `<div class="empty">🍃 ${q?"没有匹配的公告":"暂无公告"}</div>`;
 }
 
 function renderNotices(){
@@ -303,8 +321,22 @@ function renderNotices(){
     if(ha) return b.date.localeCompare(a.date);
     return (b.first_seen||"").localeCompare(a.first_seen||"");
   });
-  document.getElementById("list").innerHTML = list.map(cardHtml).join("");
-  document.getElementById("empty").style.display = list.length?"none":"block";
+  // 按日期分组（日期未知放最后），每组可折叠
+  const groups={};
+  list.forEach(n=>{
+    const k = n.date ? n.date : "日期未知";
+    (groups[k]||(groups[k]=[])).push(n);
+  });
+  const keys=Object.keys(groups).sort((a,b)=>{
+    if(a==="日期未知") return 1;
+    if(b==="日期未知") return -1;
+    return b.localeCompare(a);
+  });
+  const html = keys.length ? keys.map(k=>
+    `<details class="grp" open><summary><span class="grp-chev">▶</span><span class="grpt">${k}</span><span class="grpc">${groups[k].length}</span></summary>${groups[k].map(cardHtml).join("")}</details>`
+  ).join("") : `<div class="empty">🍃 没有匹配的公告</div>`;
+  document.getElementById("list").innerHTML = html;
+  document.getElementById("empty").style.display = "none";
 }
 
 function markAllRead(){
@@ -327,6 +359,7 @@ function switchView(v){
   document.querySelectorAll("nav a[data-view]").forEach(a=>a.classList.toggle("active", a.dataset.view===v));
   document.querySelectorAll(".mobile-tab a[data-view]").forEach(a=>a.classList.toggle("active", a.dataset.view===v));
   if(v==="notices") renderNotices();
+  if(v==="home") renderLatest(document.getElementById("q-home").value);
 }
 
 function init(){
@@ -347,6 +380,8 @@ function init(){
   document.getElementById("q").oninput=renderNotices;
   document.getElementById("qclear").onclick=()=>{ document.getElementById("q").value=""; renderNotices(); };
   document.getElementById("markall").onclick=markAllRead;
+  document.getElementById("q-home").oninput=()=>renderLatest(document.getElementById("q-home").value);
+  document.getElementById("qclear-home").onclick=()=>{ document.getElementById("q-home").value=""; renderLatest(""); };
   updateBadge();
 }
 init();
