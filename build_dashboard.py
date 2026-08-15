@@ -23,7 +23,7 @@ def now_iso():
 def render_sidebar():
     return (
         '<a data-view="home" class="active">⌛ 倒计时</a>\n'
-        '<a data-view="notices">📋 公告汇总</a>'
+        '<a data-view="notices">📋 公告汇总<span class="badge" data-badge="notices"></span></a>'
     )
 
 
@@ -128,6 +128,19 @@ TEMPLATE = r"""<!DOCTYPE html>
   .new{background:var(--newbg);color:var(--newtx);font-size:10px;padding:1px 6px;border-radius:999px;margin-left:6px}
   .empty{color:var(--muted);text-align:center;padding:30px}
   .sub{color:var(--muted);font-size:12px}
+  /* 已读状态 + 搜索增强 */
+  .rd-toggle{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border);background:#fff;color:var(--muted);cursor:pointer;font-size:13px;flex:none;display:flex;align-items:center;justify-content:center;line-height:1;padding:0}
+  .rd-toggle.read{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .card.read{opacity:.5}
+  .card.read a{font-weight:400}
+  .row.read{opacity:.5}
+  .badge{display:none;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:999px;background:#e5484d;color:#fff;font-size:11px;font-weight:700;line-height:1}
+  .badge.show{display:inline-flex}
+  .btn{padding:5px 12px;border:1px solid var(--border);border-radius:999px;background:#fff;cursor:pointer;font-size:13px}
+  .btn:active{background:var(--accent-soft)}
+  .search-wrap{position:relative;display:inline-flex;align-items:center}
+  .search-wrap input{padding-right:28px}
+  .qclear{position:absolute;right:6px;border:none;background:transparent;color:var(--muted);font-size:16px;cursor:pointer;line-height:1;padding:4px}
 </style>
 </head>
 <body>
@@ -156,8 +169,10 @@ TEMPLATE = r"""<!DOCTYPE html>
         <span class="chip" data-cat="国考">国考</span>
         <span class="chip" data-cat="省考">省考</span>
         <span class="chip" data-cat="事业编">事业单位</span>
+        <span class="chip" data-cat="未读">未读</span>
         <select id="region"><option value="">全部地区</option></select>
-        <input id="q" placeholder="搜索标题关键字…">
+        <div class="search-wrap"><input id="q" placeholder="搜索标题/地区/来源…"><button id="qclear" class="qclear" type="button" aria-label="清除">×</button></div>
+        <button id="markall" class="btn" type="button">全部已读</button>
       </div>
       <div id="list"></div>
       <div class="empty" id="empty" style="display:none">🍃 没有匹配的公告</div>
@@ -166,11 +181,55 @@ TEMPLATE = r"""<!DOCTYPE html>
 </div>
 <nav class="mobile-tab">
   <a data-view="home" class="active"><span class="ico">⌛</span><span class="txt">倒计时</span></a>
-  <a data-view="notices"><span class="ico">📋</span><span class="txt">公告</span></a>
+  <a data-view="notices"><span class="ico">📋</span><span class="txt">公告</span><span class="badge" data-badge="notices"></span></a>
 </nav>
 <script>
 const DATA = /*__DATA__*/;
 const EXAM = /*__EXAM__*/;
+
+// ===== 已读状态（localStorage，按 url 标识） =====
+const READ_KEY = "enw_read_v1";
+function loadRead(){ try{ return new Set(JSON.parse(localStorage.getItem(READ_KEY)||"[]")); }catch(e){ return new Set(); } }
+function saveRead(s){ try{ localStorage.setItem(READ_KEY, JSON.stringify([...s])); }catch(e){} }
+let readSet = loadRead();
+function isRead(n){ return readSet.has(n.url); }
+function markRead(url){ if(!readSet.has(url)){ readSet.add(url); saveRead(readSet); afterReadChange(); } }
+function toggleRead(url){ if(readSet.has(url)) readSet.delete(url); else readSet.add(url); saveRead(readSet); afterReadChange(); }
+function afterReadChange(){ renderNotices(); renderLatest(); updateBadge(); }
+function updateBadge(){
+  const unread = DATA.notices.filter(n=>!isRead(n)).length;
+  document.querySelectorAll('[data-badge="notices"]').forEach(b=>{
+    b.textContent = unread>0 ? unread : "";
+    b.classList.toggle("show", unread>0);
+  });
+}
+function enc(u){ return encodeURIComponent(u); }
+function cardHtml(n){
+  const read = isRead(n);
+  return `<div class="card${read?' read':''}">
+    <button class="rd-toggle${read?' read':''}" data-url="${enc(n.url)}" type="button" title="${read?'标记为未读':'标记为已读'}">${read?'✓':'○'}</button>
+    <span class="tag ${catClass(n.category)}">${n.category||""}</span>
+    <div class="body">
+      <a href="${n.url}" data-url="${enc(n.url)}" target="_blank" rel="noopener">${n.title}${n.is_new?'<span class="new">今日新增</span>':''}</a>
+      <div class="meta">${n.region||""} · ${fmt(n.date)} · 来源：${n.source||""}</div>
+    </div>
+  </div>`;
+}
+function rowHtml(n){
+  const read = isRead(n);
+  return `<div class="row${read?' read':''}">
+    <button class="rd-toggle${read?' read':''}" data-url="${enc(n.url)}" type="button" title="${read?'标记为未读':'标记为已读'}">${read?'✓':'○'}</button>
+    <span class="tag ${catClass(n.category)}">${n.category||""}</span>
+    <a href="${n.url}" data-url="${enc(n.url)}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;flex:1">${n.title}</a>
+    <span class="sub">${n.region||""} · ${fmt(n.date)}</span>
+  </div>`;
+}
+document.addEventListener('click', function(e){
+  const btn = e.target.closest('.rd-toggle');
+  if(btn){ e.preventDefault(); toggleRead(decodeURIComponent(btn.dataset.url)); return; }
+  const a = e.target.closest('a[data-url]');
+  if(a && a.dataset.url){ markRead(decodeURIComponent(a.dataset.url)); }
+});
 
 function catClass(c){return (["国考","省考","事业编"].includes(c)?c:"")}
 function fmt(d){return d||"日期未知"}
@@ -221,22 +280,21 @@ function renderLatest(){
     return (b.first_seen||"").localeCompare(a.first_seen||"");
   });
   const top = list.slice(0,10);
-  document.getElementById("latest-list").innerHTML = top.map(n=>`
-    <div class="row">
-      <span class="tag ${catClass(n.category)}">${n.category||""}</span>
-      <a href="${n.url}" target="_blank" rel="noopener" style="color:var(--text);text-decoration:none;flex:1">${n.title}</a>
-      <span class="sub">${n.region||""} · ${fmt(n.date)}</span>
-    </div>`).join("") || `<div class="empty">🍃 暂无公告</div>`;
+  document.getElementById("latest-list").innerHTML = top.map(rowHtml).join("") || `<div class="empty">🍃 暂无公告</div>`;
 }
 
 function renderNotices(){
   const cat=document.querySelector(".chip.active").dataset.cat;
   const region=document.getElementById("region").value;
-  const q=document.getElementById("q").value.trim();
+  const q=document.getElementById("q").value.trim().toLowerCase();
   let list=DATA.notices.filter(n=>{
-    if(cat!=="全部"&&n.category!==cat) return false;
+    if(cat!=="全部"&&cat!=="未读"&&n.category!==cat) return false;
+    if(cat==="未读"&&isRead(n)) return false;
     if(region&&n.region!==region) return false;
-    if(q&&!n.title.includes(q)) return false;
+    if(q){
+      const hay=(n.title+" "+n.region+" "+n.source).toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
     return true;
   });
   list.sort((a,b)=>{
@@ -245,15 +303,22 @@ function renderNotices(){
     if(ha) return b.date.localeCompare(a.date);
     return (b.first_seen||"").localeCompare(a.first_seen||"");
   });
-  document.getElementById("list").innerHTML = list.map(n=>`
-    <div class="card">
-      <span class="tag ${catClass(n.category)}">${n.category||""}</span>
-      <div class="body">
-        <a href="${n.url}" target="_blank" rel="noopener">${n.title}${n.is_new?'<span class="new">今日新增</span>':''}</a>
-        <div class="meta">${n.region||""} · ${fmt(n.date)} · 来源：${n.source||""}</div>
-      </div>
-    </div>`).join("");
+  document.getElementById("list").innerHTML = list.map(cardHtml).join("");
   document.getElementById("empty").style.display = list.length?"none":"block";
+}
+
+function markAllRead(){
+  const cat=document.querySelector(".chip.active").dataset.cat;
+  const region=document.getElementById("region").value;
+  const q=document.getElementById("q").value.trim().toLowerCase();
+  DATA.notices.forEach(n=>{
+    if(cat!=="全部"&&cat!=="未读"&&n.category!==cat) return;
+    if(cat==="未读"&&isRead(n)) return;
+    if(region&&n.region!==region) return;
+    if(q && !((n.title+" "+n.region+" "+n.source).toLowerCase().includes(q))) return;
+    readSet.add(n.url);
+  });
+  saveRead(readSet); afterReadChange();
 }
 
 function switchView(v){
@@ -280,6 +345,9 @@ function init(){
   document.querySelectorAll(".chip").forEach(c=>c.onclick=()=>{document.querySelectorAll(".chip").forEach(x=>x.classList.remove("active"));c.classList.add("active");renderNotices();});
   sel.onchange=renderNotices;
   document.getElementById("q").oninput=renderNotices;
+  document.getElementById("qclear").onclick=()=>{ document.getElementById("q").value=""; renderNotices(); };
+  document.getElementById("markall").onclick=markAllRead;
+  updateBadge();
 }
 init();
 </script>
