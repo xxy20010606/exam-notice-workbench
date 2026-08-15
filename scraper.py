@@ -94,37 +94,65 @@ def _get_browser():
     return _browser
 
 
-def fetch_browser(url, timeout=90000, wait=3000, wait_until="domcontentloaded"):
-    browser = _get_browser()
-    ctx = browser.new_context(user_agent=DEFAULT_UA, ignore_https_errors=True)
-    page = ctx.new_page()
+def _block_heavy(route, request):
+    """拦截图片/媒体/字体/样式表等重资源：gov 站这些常拖到 90s 超时。
+    只保留文档与脚本，大幅加快页面可达，避免网络超时（iframe 主文档为
+    document 类型不会被拦截，列表内容照常抓取）。"""
     try:
-        page.goto(url, timeout=timeout, wait_until=wait_until)
-        page.wait_for_timeout(wait)
-        html = page.content()
-        # 浙江 JCMS 等政府站群把文章列表放在 <iframe> 内，主文档无 <a> 链接；
-        # 必须把所有 iframe 的渲染内容也拼进来，否则抓不到任何公告
+        if request.resource_type in ("image", "media", "font", "stylesheet"):
+            route.abort()
+            return
+    except Exception:
+        pass
+    try:
+        route.continue_()
+    except Exception:
+        pass
+
+
+def fetch_browser(url, timeout=90000, wait=3000, wait_until="domcontentloaded", retries=2):
+    last = None
+    for attempt in range(retries + 1):
         try:
-            for frame in page.frames:
-                if frame is page.main_frame:
-                    continue
+            browser = _get_browser()
+            ctx = browser.new_context(user_agent=DEFAULT_UA, ignore_https_errors=True)
+            try:
+                ctx.route("**/*", _block_heavy)
+            except Exception:
+                pass
+            page = ctx.new_page()
+            try:
+                page.goto(url, timeout=timeout, wait_until=wait_until)
+                page.wait_for_timeout(wait)
+                html = page.content()
+                # 浙江 JCMS 等政府站群把文章列表放在 <iframe> 内，主文档无 <a> 链接；
+                # 必须把所有 iframe 的渲染内容也拼进来，否则抓不到任何公告
                 try:
-                    fhtml = frame.content()
-                    if fhtml:
-                        html += "\n" + fhtml
+                    for frame in page.frames:
+                        if frame is page.main_frame:
+                            continue
+                        try:
+                            fhtml = frame.content()
+                            if fhtml:
+                                html += "\n" + fhtml
+                        except Exception:
+                            pass
                 except Exception:
                     pass
-        except Exception:
-            pass
-        # 国考等反爬：JS 设 cookie 后 location 跳转，若仍是挑战页则重载再等
-        if "EO_Bot" in html or "tads" in html:
-            page.reload(wait_until=wait_until)
-            page.wait_for_timeout(wait + 1500)
-            html = page.content()
-        return html
-    finally:
-        page.close()
-        ctx.close()
+                # 国考等反爬：JS 设 cookie 后 location 跳转，若仍是挑战页则重载再等
+                if "EO_Bot" in html or "tads" in html:
+                    page.reload(wait_until=wait_until)
+                    page.wait_for_timeout(wait + 1500)
+                    html = page.content()
+                return html
+            finally:
+                page.close()
+                ctx.close()
+        except Exception as e:
+            last = e
+            if attempt < retries:
+                time.sleep(2 * (attempt + 1))
+    raise last
 
 
 def _raw_fetch(url, method, encoding=None, browser_wait=3000, browser_wait_until="domcontentloaded", browser_timeout=90000, http_timeout=15):
