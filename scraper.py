@@ -200,6 +200,7 @@ def fetch(source):
 
 # ---------------- 解析 ----------------
 def extract_date(text, url):
+    text = re.sub(r"\s+", "", text or "")  # 归一化（如嘉兴日期 span 内 "2026- 08- 13" 带空格）
     m = URL_DATE_RE.search(url)
     if m:
         return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
@@ -220,6 +221,7 @@ def parse_source(source, html):
             scope = node
     inc = re.compile(source["title_include"]) if source.get("title_include") else None
     exc_src = re.compile(source["title_exclude"]) if source.get("title_exclude") else None
+    href_inc = re.compile(source["href_include"]) if source.get("href_include") else None
     exc_glob = re.compile(GLOBAL_EXCLUDE)
 
     # 表格行模式：Vue / Ant-Design 等 SPA 列表，条目为 <tr> 且不含 <a> 链接
@@ -276,6 +278,10 @@ def parse_source(source, html):
         if (exc_src and exc_src.search(title)) or exc_glob.search(title):
             continue
         href = (a.get("href") or "").strip()
+        # href_include：仅保留链接命中该正则的 <a>（如 JCMS 文章详情页 /art/，
+        # 排除 /col/.../index.html 等栏目导航链接），从源头杜绝导航噪声漏入
+        if href_inc and href and not href_inc.search(href):
+            continue
         # 处理 onclick 拼接的真实链接（如黑龙江公务员考试网 queryDetail('mkxh','tzid')）
         if (not href or href.startswith(("#", "javascript:", "mailto:", "tel:"))) and o_re and o_tpl:
             onclick = a.get("onclick") or ""

@@ -132,6 +132,10 @@ TEMPLATE = r"""<!DOCTYPE html>
   .rd-toggle{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border);background:#fff;color:var(--muted);cursor:pointer;font-size:13px;flex:none;display:flex;align-items:center;justify-content:center;line-height:1;padding:0}
   .rd-toggle.read{background:var(--accent);color:#fff;border-color:var(--accent)}
   /* 已读不降低透明度/字重，保持清晰 */
+  /* 置顶按钮 */
+  .pin-toggle{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border);background:#fff;color:var(--muted);cursor:pointer;font-size:13px;flex:none;display:flex;align-items:center;justify-content:center;line-height:1;padding:0}
+  .pin-toggle.pinned{background:#fff3cd;border-color:#e0a800;color:#e0a800}
+  .grp.pin-grp>summary{background:#fff8e6}
   .badge{display:none;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:999px;background:#e5484d;color:#fff;font-size:11px;font-weight:700;line-height:1}
   .badge.show{display:inline-flex}
   .btn{padding:5px 12px;border:1px solid var(--border);border-radius:999px;background:#fff;cursor:pointer;font-size:13px}
@@ -214,9 +218,25 @@ function updateBadge(){
   });
 }
 function enc(u){ return encodeURIComponent(u); }
+// ===== 置顶状态（localStorage，按 url 标识） =====
+const PIN_KEY = "enw_pin_v1";
+function loadPin(){ try{ return new Set(JSON.parse(localStorage.getItem(PIN_KEY)||"[]")); }catch(e){ return new Set(); } }
+function savePin(s){ try{ localStorage.setItem(PIN_KEY, JSON.stringify([...s])); }catch(e){} }
+let pinSet = loadPin();
+function isPinned(n){ return pinSet.has(n.url); }
+function togglePin(url){ if(pinSet.has(url)) pinSet.delete(url); else pinSet.add(url); savePin(pinSet); renderNotices(); }
+// 距今天数（用于分组默认展开最近 7 天）
+function daysAgo(dateStr){
+  if(!dateStr || dateStr==="日期未知") return null;
+  const t = new Date(dateStr+" 00:00:00").getTime();
+  const n = new Date(); n.setHours(0,0,0,0);
+  return Math.round((n.getTime()-t)/86400000);
+}
 function cardHtml(n){
   const read = isRead(n);
+  const pinned = isPinned(n);
   return `<div class="card${read?' read':''}">
+    <button class="pin-toggle${pinned?' pinned':''}" data-url="${enc(n.url)}" type="button" title="${pinned?'取消置顶':'置顶到顶部'}">${pinned?'📌':'📍'}</button>
     <button class="rd-toggle${read?' read':''}" data-url="${enc(n.url)}" type="button" title="${read?'标记为未读':'标记为已读'}">${read?'✓':'○'}</button>
     <span class="tag ${catClass(n.category)}">${n.category||""}</span>
     <div class="body">
@@ -235,6 +255,8 @@ function rowHtml(n){
   </div>`;
 }
 document.addEventListener('click', function(e){
+  const pbtn = e.target.closest('.pin-toggle');
+  if(pbtn){ e.preventDefault(); togglePin(decodeURIComponent(pbtn.dataset.url)); return; }
   const btn = e.target.closest('.rd-toggle');
   if(btn){ e.preventDefault(); toggleRead(decodeURIComponent(btn.dataset.url)); return; }
   const a = e.target.closest('a[data-url]');
@@ -319,9 +341,11 @@ function renderNotices(){
     if(ha) return b.date.localeCompare(a.date);
     return (b.first_seen||"").localeCompare(a.first_seen||"");
   });
-  // 按日期分组（日期未知放最后），每组可折叠
+  // 置顶公告（始终展示，不参与日期折叠）；其余按日期分组
+  const pinned = list.filter(n=>isPinned(n));
+  const normal  = list.filter(n=>!isPinned(n));
   const groups={};
-  list.forEach(n=>{
+  normal.forEach(n=>{
     const k = n.date ? n.date : "日期未知";
     (groups[k]||(groups[k]=[])).push(n);
   });
@@ -330,10 +354,20 @@ function renderNotices(){
     if(b==="日期未知") return -1;
     return b.localeCompare(a);
   });
-  const html = keys.length ? keys.map(k=>
-    `<details class="grp" open><summary><span class="grp-chev">▶</span><span class="grpt">${k}</span><span class="grpc">${groups[k].length}</span></summary>${groups[k].map(cardHtml).join("")}</details>`
-  ).join("") : `<div class="empty">🍃 没有匹配的公告</div>`;
-  document.getElementById("list").innerHTML = html;
+  const pinHtml = pinned.length
+    ? `<details class="grp pin-grp" open><summary><span class="grp-chev">▶</span><span class="grpt">📌 置顶公告</span><span class="grpc">${pinned.length}</span></summary>${pinned.map(cardHtml).join("")}</details>`
+    : "";
+  const groupsHtml = keys.length
+    ? keys.map(k=>{
+        const open = (k==="日期未知") || (daysAgo(k)!==null && daysAgo(k)<=6);
+        return `<details class="grp"${open?' open':''}><summary><span class="grp-chev">▶</span><span class="grpt">${k}</span><span class="grpc">${groups[k].length}</span></summary>${groups[k].map(cardHtml).join("")}</details>`;
+      }).join("")
+    : "";
+  if(list.length===0){
+    document.getElementById("list").innerHTML = `<div class="empty">🍃 没有匹配的公告</div>`;
+  } else {
+    document.getElementById("list").innerHTML = pinHtml + groupsHtml;
+  }
   document.getElementById("empty").style.display = "none";
 }
 
