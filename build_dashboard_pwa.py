@@ -46,7 +46,7 @@ TEMPLATE = r"""<!DOCTYPE html>
     --bg:#F4F7F1; --card:#FFFFFF; --text:#243024; --muted:#5E6B59;
     --border:#E3EAE0; --sidebg:#FFFFFF;
     --accent:#4F7D3F; --accent-soft:#E9F0E3; --accent-text:#3C6B2E;
-    --gk:#C0764A; --sk:#4F7D3F; --sy:#5F7CA0;
+    --gk:#C0764A; --sk:#4F7D3F; --sy:#4A7BB8;
     --newbg:#1F5FD0; --newtx:#FFFFFF;
     --badge-bg:#E5484D;
     --pin-bg:#FBF1D4; --pin-fg:#B8860B; --pin-grp-bg:#FCF6E3;
@@ -121,8 +121,9 @@ TEMPLATE = r"""<!DOCTYPE html>
   .latest h2{font-size:15px;margin:0 0 10px;font-weight:700}
   .latest .row{display:flex;gap:10px;padding:9px 12px;border-bottom:1px solid var(--border);font-size:13px}
   .latest .row:last-child{border-bottom:none}
-  .tag{font-size:11px;padding:2px 9px;border-radius:var(--r-pill);color:#fff;white-space:nowrap;font-weight:600;font-variant-numeric:tabular-nums}
+  .tag{font-size:11px;padding:2px 10px;border-radius:var(--r-pill);color:#fff;white-space:nowrap;font-weight:600;font-variant-numeric:tabular-nums;display:inline-flex;align-items:center;justify-content:center;text-align:center;min-width:40px}
   .tag.国考{background:var(--gk)}.tag.省考{background:var(--sk)}.tag.事业编{background:var(--sy)}
+  .card.read .tag{opacity:1}
   .bar{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:8px 0 14px;position:sticky;top:0;background:var(--bg);padding:6px 0;z-index:5}
   .chip{padding:6px 14px;border:1px solid var(--border);border-radius:var(--r-pill);background:var(--card);cursor:pointer;font-size:13px;transition:background .15s,color .15s,border-color .15s}
   .chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
