@@ -131,9 +131,7 @@ TEMPLATE = r"""<!DOCTYPE html>
   /* 已读状态 + 搜索增强 */
   .rd-toggle{width:26px;height:26px;border-radius:50%;border:1.5px solid var(--border);background:#fff;color:var(--muted);cursor:pointer;font-size:13px;flex:none;display:flex;align-items:center;justify-content:center;line-height:1;padding:0}
   .rd-toggle.read{background:var(--accent);color:#fff;border-color:var(--accent)}
-  .card.read{opacity:.5}
-  .card.read a{font-weight:400}
-  .row.read{opacity:.5}
+  /* 已读不降低透明度/字重，保持清晰 */
   .badge{display:none;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;margin-left:6px;border-radius:999px;background:#e5484d;color:#fff;font-size:11px;font-weight:700;line-height:1}
   .badge.show{display:inline-flex}
   .btn{padding:5px 12px;border:1px solid var(--border);border-radius:999px;background:#fff;cursor:pointer;font-size:13px}
