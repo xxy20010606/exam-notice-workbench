@@ -48,6 +48,9 @@ jobs:
           cache: 'pip'
           cache-dependency-path: requirements.txt
 
+      - name: 校验 sources.json（防呆：坏配置在抓取前即失败，避免把错误配置推上云端 scraper）
+        run: python validate_sources.py
+
       - name: 安装依赖
         run: pip install -r requirements.txt
 
