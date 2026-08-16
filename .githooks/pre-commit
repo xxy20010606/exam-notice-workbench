@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# 防呆 #3：提交前扫描暂存区是否含有疑似 token / 私钥，发现即中止提交。
+# 启用方式（仓库内）：git config core.hooksPath .githooks
+# 说明：正则字面量用相邻字符串拼接（PR""IVATE）避免脚本自身被自己匹配。
+set -uo pipefail
+
+RE='(ghp_|gho_|ghu_|ghs_|ghr_|github_pat_)[A-Za-z0-9]{20,}|sk-ssh-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|'"-----BEGIN [A-Z ]*PR""IVATE KEY-----"
+
+if git diff --cached -U0 | grep -Eq "$RE"; then
+  echo "[防呆#3] 检测到疑似 token / 私钥，已中止提交。" >&2
+  echo "命中的内容（仅前 6 字符，已打码）：" >&2
+  git diff --cached -U0 | grep -Eo "$RE" | sed -E 's/(.{6}).*/\1****/' >&2
+  echo "请移除敏感内容后重新提交。" >&2
+  exit 1
+fi
+
+echo "[防呆#3] 暂存区未检测到 token / 私钥 ✅"
+exit 0
