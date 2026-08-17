@@ -79,6 +79,10 @@ jobs:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           RECIPIENT: ${{ secrets.RECIPIENT }}
           PAGES_URL: ${{ secrets.PAGES_URL }}
+          # 国内代理（可选）：值形如 http://user:pass@host:port 或 http://host:port
+          # 未配置该 Secret 时留空 → 纯直连（当前行为，不影响任何现有源）
+          # 配置后：抓取先直连，被封的 gov.cn 源直连失败会自动回退走此代理
+          SCRAPE_PROXY: ${{ secrets.SCRAPE_PROXY }}
         run: python cloud_run.py
 
       - name: 提交更新

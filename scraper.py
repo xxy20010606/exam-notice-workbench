@@ -40,8 +40,21 @@ def now_iso():
 
 
 # ---------------- 抓取 ----------------
+def _decode_response(r, encoding):
+    """读取 urllib 响应并解码（处理 gzip / 推断 charset）。"""
+    raw = r.read()
+    if r.headers.get("Content-Encoding") == "gzip":
+        import gzip
+        raw = gzip.decompress(raw)
+    cs = encoding if encoding else None
+    if not cs:
+        m = re.search(r"charset=([\w-]+)", r.headers.get("Content-Type", ""))
+        cs = (m.group(1).lower() if m else "utf-8")
+    return raw.decode(cs, errors="ignore")
+
+
 def fetch_http(url, timeout=30, retries=2, encoding=None):
-    import urllib.request, ssl, gzip
+    import urllib.request, ssl
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
@@ -51,27 +64,33 @@ def fetch_http(url, timeout=30, retries=2, encoding=None):
             ctx.options |= ssl.OP_LEGACY_SERVER_CONNECT
         except Exception:
             pass
+    proxy = os.environ.get("SCRAPE_PROXY", "").strip()
+    headers = {
+        "User-Agent": DEFAULT_UA,
+        "Accept-Encoding": "gzip",
+        "Accept-Language": "zh-CN,zh;q=0.9",
+        "Referer": url,
+    }
     last = None
+    # 第一轮：直连（保持当前行为，正常源不走代理、零回归）
     for _ in range(retries + 1):
         try:
-            req = urllib.request.Request(url, headers={
-                "User-Agent": DEFAULT_UA,
-                "Accept-Encoding": "gzip",
-                "Accept-Language": "zh-CN,zh;q=0.9",
-                "Referer": url,
-            })
+            req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
-                raw = r.read()
-                if r.headers.get("Content-Encoding") == "gzip":
-                    raw = gzip.decompress(raw)
-                cs = encoding if encoding else None
-                if not cs:
-                    m = re.search(r"charset=([\w-]+)", r.headers.get("Content-Type", ""))
-                    cs = (m.group(1).lower() if m else "utf-8")
-                return raw.decode(cs, errors="ignore")
+                return _decode_response(r, encoding)
         except Exception as e:
             last = e
             time.sleep(1.5)
+    # 第二轮：直连全失败且配置了代理 → 回退走国内代理
+    if proxy:
+        try:
+            opener = urllib.request.build_opener(
+                urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
+            req = urllib.request.Request(url, headers=headers)
+            with opener.open(req, timeout=timeout, context=ctx) as r:
+                return _decode_response(r, encoding)
+        except Exception as e:
+            last = e
     raise last
 
 
@@ -83,15 +102,59 @@ def _get_browser():
     if _browser is None:
         from playwright.sync_api import sync_playwright
         p = sync_playwright().start()
-        # Chromium 网络参数：禁用代理(直连gov.cn)、强制IPv4、忽略SSL、规避反爬检测
-        _browser = p.chromium.launch(headless=True, args=[
+        # Chromium 网络参数：强制IPv4、忽略SSL、规避反爬检测
+        # 仅在「未配置代理」时强制直连(--no-proxy-server)；
+        # 配置了 SCRAPE_PROXY 时交给 context 级 proxy 控制（见 _new_context）
+        args = [
             "--no-sandbox",
             "--disable-blink-features=AutomationControlled",
-            "--no-proxy-server",
             "--disable-ipv6",
             "--ignore-certificate-errors",
-        ])
+        ]
+        if not os.environ.get("SCRAPE_PROXY", "").strip():
+            args.append("--no-proxy-server")
+        _browser = p.chromium.launch(headless=True, args=args)
     return _browser
+
+
+def _new_context(browser, proxy=None):
+    """创建浏览器上下文；proxy 非空时走国内代理（直连失败回退用）。"""
+    if proxy:
+        return browser.new_context(user_agent=DEFAULT_UA, ignore_https_errors=True,
+                                   proxy={"server": proxy})
+    return browser.new_context(user_agent=DEFAULT_UA, ignore_https_errors=True)
+
+
+def _browse(ctx, url, timeout, wait, wait_until):
+    """在上下文里打开页面、等待、抽取 HTML（含 iframe 内容）。返回 html 字符串。"""
+    page = ctx.new_page()
+    try:
+        page.goto(url, timeout=timeout, wait_until=wait_until)
+        page.wait_for_timeout(wait)
+        html = page.content()
+        # 浙江 JCMS 等政府站群把文章列表放在 <iframe> 内，主文档无 <a> 链接；
+        # 必须把所有 iframe 的渲染内容也拼进来，否则抓不到任何公告
+        try:
+            for frame in page.frames:
+                if frame is page.main_frame:
+                    continue
+                try:
+                    fhtml = frame.content()
+                    if fhtml:
+                        html += "\n" + fhtml
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        # 国考等反爬：JS 设 cookie 后 location 跳转，若仍是挑战页则重载再等
+        if "EO_Bot" in html or "tads" in html:
+            page.reload(wait_until=wait_until)
+            page.wait_for_timeout(wait + 1500)
+            html = page.content()
+        return html
+    finally:
+        page.close()
+        ctx.close()
 
 
 def _block_heavy(route, request):
@@ -111,47 +174,34 @@ def _block_heavy(route, request):
 
 
 def fetch_browser(url, timeout=90000, wait=3000, wait_until="domcontentloaded", retries=2):
+    proxy = os.environ.get("SCRAPE_PROXY", "").strip()
     last = None
+    # 第一轮：直连
     for attempt in range(retries + 1):
         try:
             browser = _get_browser()
-            ctx = browser.new_context(user_agent=DEFAULT_UA, ignore_https_errors=True)
+            ctx = _new_context(browser)
             try:
                 ctx.route("**/*", _block_heavy)
             except Exception:
                 pass
-            page = ctx.new_page()
-            try:
-                page.goto(url, timeout=timeout, wait_until=wait_until)
-                page.wait_for_timeout(wait)
-                html = page.content()
-                # 浙江 JCMS 等政府站群把文章列表放在 <iframe> 内，主文档无 <a> 链接；
-                # 必须把所有 iframe 的渲染内容也拼进来，否则抓不到任何公告
-                try:
-                    for frame in page.frames:
-                        if frame is page.main_frame:
-                            continue
-                        try:
-                            fhtml = frame.content()
-                            if fhtml:
-                                html += "\n" + fhtml
-                        except Exception:
-                            pass
-                except Exception:
-                    pass
-                # 国考等反爬：JS 设 cookie 后 location 跳转，若仍是挑战页则重载再等
-                if "EO_Bot" in html or "tads" in html:
-                    page.reload(wait_until=wait_until)
-                    page.wait_for_timeout(wait + 1500)
-                    html = page.content()
-                return html
-            finally:
-                page.close()
-                ctx.close()
+            return _browse(ctx, url, timeout, wait, wait_until)
         except Exception as e:
             last = e
             if attempt < retries:
                 time.sleep(2 * (attempt + 1))
+    # 第二轮：直连全失败且配置了代理 → 回退走国内代理
+    if proxy:
+        try:
+            browser = _get_browser()
+            ctx = _new_context(browser, proxy=proxy)
+            try:
+                ctx.route("**/*", _block_heavy)
+            except Exception:
+                pass
+            return _browse(ctx, url, timeout, wait, wait_until)
+        except Exception as e:
+            last = e
     raise last
 
 

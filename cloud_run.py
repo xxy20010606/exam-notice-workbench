@@ -20,6 +20,10 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT)
 import scraper, build_dashboard, exam_sync
 
+# 代理状态提示：配置了 SCRAPE_PROXY 则抓取走国内代理（直连失败自动回退），否则纯直连
+_PROXY = os.environ.get("SCRAPE_PROXY", "").strip()
+print(f"[代理] {'已启用国内代理（直连失败自动回退）' if _PROXY else '未配置，纯直连（当前行为）'}")
+
 SMTP_HOST = "smtp.163.com"
 SMTP_PORT = 465
 SENDER = "xxy1037550012@163.com"
