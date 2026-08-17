@@ -43,35 +43,21 @@ RECRUIT_KEYWORDS = re.compile(
 )
 
 
-def _fragile_zero_names():
-    """读取 sources.json，返回标记了 alert_zero 的源名集合（这些脆源若 0 条需报警）。"""
-    try:
-        p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sources.json")
-        if not os.path.exists(p):
-            return set()
-        data = json.load(open(p, encoding="utf-8"))
-        if isinstance(data, dict):
-            data = data.get("sources", [])
-        return {s.get("name") for s in data if isinstance(s, dict) and s.get("alert_zero")}
-    except Exception:
-        return set()
-
-
 def fetch_source_health():
-    """读取 sources_status，返回今日抓取异常（失败/被跳过）或脆源 0 条的源。
+    """读取 sources_status，返回今日「抓取失败 / 异常」的源。
 
-    注意：整页抓 <a> 的脆源（浙江事业编）若网站改版会静默返回 0 条，
-    代码会记成「成功 0 条」（fail_streak=0、last_error=空），常规查询看不到；
-    因此对标记 alert_zero 的源额外报警 last_count=0。
+    判定口径（贴合用户需求）：
+      · 抓取异常（网络不可达 / 超时 / 403 等）→ 提示
+      · 抓取成功但结果为 0（今日该源确实无新公告）→ 不提示
+    因此只筛选 fail_streak>0 或 last_error 非空；last_count=0 一律视为正常空源。
     """
     if not os.path.exists(DB):
         return []
-    fragile = _fragile_zero_names()
     conn = sqlite3.connect(DB)
     try:
         rows = conn.execute(
-            "SELECT name, fail_streak, last_error, last_run, last_count FROM sources_status "
-            "WHERE fail_streak > 0 OR (last_error IS NOT NULL AND last_error != '') OR last_count = 0"
+            "SELECT name, fail_streak, last_error FROM sources_status "
+            "WHERE fail_streak > 0 OR (last_error IS NOT NULL AND last_error != '')"
         ).fetchall()
     except sqlite3.OperationalError:
         # 表尚未创建（如云端首次抓取前）：跳过健康提醒，不影响日报发送
@@ -83,14 +69,8 @@ def fetch_source_health():
         name = r[0] or ""
         fail_streak = r[1] or 0
         last_error = (r[2] or "")
-        last_count = r[4] if r[4] is not None else -1
-        if fail_streak > 0 or last_error:
-            reason = (last_error[:120] or f"连续失败 {fail_streak} 次")
-            out.append({"name": name, "kind": "error", "reason": reason})
-        elif last_count == 0 and name in fragile:
-            out.append({"name": name, "kind": "zero",
-                        "reason": "0 条结果（可能源改版/整页抓空，请检查）"})
-        # 其余 0 条（非脆源）视为正常空源，不报警
+        reason = (last_error[:120] or f"连续失败 {fail_streak} 次")
+        out.append({"name": name, "kind": "error", "reason": reason})
     return out
 
 
@@ -98,8 +78,8 @@ def format_health(health):
     """返回 (text_lines, md_lines)，供邮件/微信正文追加源健康提醒。"""
     if not health:
         return [], []
-    text = ["【源健康提醒】以下源今日抓取异常或结果为 0，可能漏收公告："]
-    md = ["**源健康提醒**：以下源今日抓取异常或结果为 0，可能漏收公告："]
+    text = ["【源健康提醒】以下源今日抓取失败/异常，可能漏收公告："]
+    md = ["**源健康提醒**：以下源今日抓取失败/异常，可能漏收公告："]
     for h in health:
         text.append(f"  · {h['name']}：{h['reason']}")
         md.append(f"- {h['name']}：{h['reason']}")
