@@ -157,32 +157,54 @@ def _browse(ctx, url, timeout, wait, wait_until):
         ctx.close()
 
 
+def _make_route_handler(block_external=False, base_url=None):
+    """生成路由拦截器。block_external=True 时屏蔽所有第三方域名请求（解决 SPA 外部脚本卡死问题）。"""
+    from urllib.parse import urlparse
+
+    allowed_host = None
+    if block_external and base_url:
+        try:
+            allowed_host = urlparse(base_url).hostname or urlparse(base_url).netloc.split(":")[0]
+        except Exception:
+            pass
+
+    def handler(route, request):
+        try:
+            if request.resource_type in ("image", "media", "font", "stylesheet"):
+                route.abort()
+                return
+        except Exception:
+            pass
+        if allowed_host:
+            try:
+                req_host = (request.urlparse.hostname or "").split(":")[0]
+                if req_host and req_host != allowed_host and req_host != "localhost" and req_host != "127.0.0.1":
+                    route.abort()
+                    return
+            except Exception:
+                pass
+        try:
+            route.continue_()
+        except Exception:
+            pass
+
+    return handler
+
+
 def _block_heavy(route, request):
-    """拦截图片/媒体/字体/样式表等重资源：gov 站这些常拖到 90s 超时。
-    只保留文档与脚本，大幅加快页面可达，避免网络超时（iframe 主文档为
-    document 类型不会被拦截，列表内容照常抓取）。"""
-    try:
-        if request.resource_type in ("image", "media", "font", "stylesheet"):
-            route.abort()
-            return
-    except Exception:
-        pass
-    try:
-        route.continue_()
-    except Exception:
-        pass
+    _make_route_handler()(route, request)
 
 
-def fetch_browser(url, timeout=90000, wait=3000, wait_until="domcontentloaded", retries=2):
+def fetch_browser(url, timeout=90000, wait=3000, wait_until="domcontentloaded", retries=2, block_external=False):
     proxy = os.environ.get("SCRAPE_PROXY", "").strip()
     last = None
-    # 第一轮：直连
+    route_handler = _make_route_handler(block_external=block_external, base_url=url)
     for attempt in range(retries + 1):
         try:
             browser = _get_browser()
             ctx = _new_context(browser)
             try:
-                ctx.route("**/*", _block_heavy)
+                ctx.route("**/*", route_handler)
             except Exception:
                 pass
             return _browse(ctx, url, timeout, wait, wait_until)
@@ -190,13 +212,12 @@ def fetch_browser(url, timeout=90000, wait=3000, wait_until="domcontentloaded", 
             last = e
             if attempt < retries:
                 time.sleep(2 * (attempt + 1))
-    # 第二轮：直连全失败且配置了代理 → 回退走国内代理
     if proxy:
         try:
             browser = _get_browser()
             ctx = _new_context(browser, proxy=proxy)
             try:
-                ctx.route("**/*", _block_heavy)
+                ctx.route("**/*", route_handler)
             except Exception:
                 pass
             return _browse(ctx, url, timeout, wait, wait_until)
@@ -205,10 +226,11 @@ def fetch_browser(url, timeout=90000, wait=3000, wait_until="domcontentloaded", 
     raise last
 
 
-def _raw_fetch(url, method, encoding=None, browser_wait=3000, browser_wait_until="domcontentloaded", browser_timeout=90000, http_timeout=15):
+
+def _raw_fetch(url, method, encoding=None, browser_wait=3000, browser_wait_until="domcontentloaded", browser_timeout=90000, http_timeout=15, block_external=False):
     if method == "browser":
         try:
-            return fetch_browser(url, timeout=browser_timeout, wait=browser_wait, wait_until=browser_wait_until)
+            return fetch_browser(url, timeout=browser_timeout, wait=browser_wait, wait_until=browser_wait_until, block_external=block_external)
         except Exception as e:
             msg = str(e)
             if "playwright" in msg.lower() or "no module" in msg.lower():
@@ -225,9 +247,11 @@ def fetch(source):
     browser_wait_until = source.get("browser_wait_until", "domcontentloaded")
     browser_timeout = source.get("browser_timeout", 90000)
     http_timeout = source.get("http_timeout", 15)
+    block_external = source.get("block_external", False)
     html = _raw_fetch(source["url"], method, encoding=encoding,
                       browser_wait=browser_wait, browser_wait_until=browser_wait_until,
-                      browser_timeout=browser_timeout, http_timeout=http_timeout)
+                      browser_timeout=browser_timeout, http_timeout=http_timeout,
+                      block_external=block_external)
     clr = source.get("column_link_regex")
     if clr:
         soup = BeautifulSoup(html, "html.parser")
@@ -238,7 +262,7 @@ def fetch(source):
             if t and pat.search(t) and href and not href.startswith(("#", "javascript:")):
                 col_url = urljoin(source["url"], href)
                 try:
-                    col = _raw_fetch(col_url, method, encoding=encoding, browser_wait=browser_wait)
+                    col = _raw_fetch(col_url, method, encoding=encoding, browser_wait=browser_wait, block_external=block_external)
                     html = html + "\n" + col   # 合并首页与专栏，避免错过任一处公告
                 except Exception:
                     pass
@@ -261,7 +285,8 @@ def fetch(source):
                     break
                 try:
                     ph = _raw_fetch(purl, method, encoding=encoding,
-                                   browser_wait=browser_wait, browser_wait_until=browser_wait_until)
+                                   browser_wait=browser_wait, browser_wait_until=browser_wait_until,
+                                   block_external=block_external)
                     html = html + "\n" + ph
                 except Exception:
                     pass
