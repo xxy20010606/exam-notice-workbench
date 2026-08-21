@@ -1,0 +1,20 @@
+version: '1.0'
+name: exam-notice-scrape
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'   # 每 6 小时（Gitee Go 用标准 5 段 cron）
+  push:
+    branches:
+      - main
+
+stages:
+  scrape:
+    stage: scrape
+    steps:
+      - name: "安装依赖并抓取"
+        run: |
+          set -e
+          pip install -r requirements.txt -q
+          playwright install chromium --with-deps 2>/dev/null || playwright install chromium
+          bash ci_scrape.sh
