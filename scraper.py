@@ -281,11 +281,17 @@ def extract_date(text, url):
     text = re.sub(r"\s+", "", text or "")  # 归一化（如嘉兴日期 span 内 "2026- 08- 13" 带空格）
     m = URL_DATE_RE.search(url)
     if m:
-        return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if 1 <= mo <= 12 and 1 <= d <= 31:
+            return f"{y}-{mo:02d}-{d:02d}"
+        return ""
     for r in DATE_RE:
         m = r.search(text or "")
         if m:
-            return f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}"
+            y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+            if 1 <= mo <= 12 and 1 <= d <= 31:
+                return f"{y}-{mo:02d}-{d:02d}"
+            continue
     return ""
 
 
