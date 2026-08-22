@@ -177,7 +177,7 @@ def _make_route_handler(block_external=False, base_url=None):
             pass
         if allowed_host:
             try:
-                req_host = (request.urlparse.hostname or "").split(":")[0]
+                req_host = (urlparse(request.url).hostname or "").split(":")[0]
                 if req_host and req_host != allowed_host and req_host != "localhost" and req_host != "127.0.0.1":
                     route.abort()
                     return
