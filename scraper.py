@@ -25,7 +25,7 @@ GLOBAL_EXCLUDE = (r"首页|网站地图|联系我们|无障碍|English|EN$|登�
 # 全局噪声（非招聘公告）：与 daily_digest 保持一致，在「入库」环节即过滤，
 # 防止采购/中标/询价/导航文字/泛化栏目名等 junk 进入 notices.db 与看板。
 GLOBAL_NOISE = re.compile(
-    r"采购|中标|询价|成交|招标|竞价|政府采购|单一来源|资格预审.*采购"
+    r"采购|中标|询价|成交|招标|竞价|政府采购|单一来源|资格预审.*采购|磋商|比价|验收|合同公告|选聘|审计"
     r"|^/\s"                  # 导航栏文字（以 / 开头）
     r"|^事业单位公开招聘$"     # 泛化栏目名（非具体公告）
     r"|^公开招聘$"            # 泛化栏目名
@@ -478,6 +478,13 @@ def cleanup_noise():
             n += 1
     for p in exact_patterns:
         for (rid,) in conn.execute("SELECT id FROM notices WHERE title = ?", (p,)).fetchall():
+            conn.execute("DELETE FROM notices WHERE id=?", (rid,))
+            n += 1
+    # 上海源反向白名单：政府门户公告/通知栏目混杂大量市政/行政/采购文，
+    # 仅保留含招聘专属词的条目，其余（磋商/验收/决算/任免/规划/闭馆等）一律清理。
+    RECRUIT_KEEP = re.compile(r"招聘|招考|招录|引进|遴选|选调|竞聘|交流|招聘会|人员招录")
+    for (rid, title) in conn.execute("SELECT id,title FROM notices WHERE region='上海'").fetchall():
+        if title and not RECRUIT_KEEP.search(title):
             conn.execute("DELETE FROM notices WHERE id=?", (rid,))
             n += 1
     conn.commit()
