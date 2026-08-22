@@ -40,9 +40,13 @@ DATE_RE = [
     re.compile(r"(?<![\d])(\d{4})(\d{2})(\d{2})(?![\d])"),        # 紧凑 20260814（文本中连续8位数字）
 ]
 URL_DATE_RE = re.compile(
-    r"(?:[/_\-\.t]|^)"          # 分隔符或 t 前缀（如 t20260814、/2026-08-14）
-    r"(\d{4})(\d{2})(\d{2})"  # YYYYMMDD
-    r"(?:[_/\.\-]|$)"           # 后缀分隔符或结束
+    r"(?:[/_\-\.t]|^)"                          # 分隔符或 t 前缀
+    r"(\d{4})"                                  # 年 YYYY
+    r"(?:"
+    r"(?:[-/._](\d{1,2})[-/._](\d{1,2}))"         # 分隔格式 YYYY-MM-DD / YYYY/MM/DD
+    r"|(\d{2})(\d{2})"                           # 连续格式 YYYYMMDD
+    r")"
+    r"(?:[_/\.\-]|$)"                           # 后缀分隔符或结束
 )
 
 
@@ -325,7 +329,9 @@ def extract_date(text, url):
     # 优先从 URL 提取（最可靠）
     m = URL_DATE_RE.search(url)
     if m:
-        y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        y = int(m.group(1))
+        mo = int(m.group(2)) if m.group(2) else int(m.group(4))
+        d = int(m.group(3)) if m.group(3) else int(m.group(5))
         if 1 <= mo <= 12 and 1 <= d <= 31:
             return f"{y}-{mo:02d}-{d:02d}"
 
@@ -447,8 +453,8 @@ def parse_source(source, html):
             ggp = gp.parent if gp else None
             if ggp and ggp.name: candidates.append(ggp.get_text(" ", strip=True)[:200])
             # 近邻含 date/time 类名的元素
-            for el in parent.find_all(class_=re.compile(r'date|time|publish', re.I)):
-                candidates.append(el.get_text(" ", strip=True))
+            for el in parent.find_all(class_=re.compile(r'date|time|publish', re.I), recursive=False):
+                candidates.append(el.get_text(" ", strip=True)[:200])
             # 用第一个能提取到日期的候选文本
             for cand in candidates:
                 d = extract_date(cand, absurl)

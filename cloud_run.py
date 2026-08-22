@@ -57,16 +57,31 @@ def main():
     ap.add_argument("--only-region", help="只抓取 region 包含该关键字的源（如 浙江）")
     ap.add_argument("--exclude-region", help="跳过 region 包含该关键字的源（如 浙江）")
     args = ap.parse_args()
-    report = scraper.run_all(only_region=args.only_region, exclude_region=args.exclude_region)
-    # 清理历史噪声记录（入库过滤上线前的 junk），保证看板与数据库干净
-    n_clean = scraper.cleanup_noise()
-    # 回填历史公告缺失的 date 字段（增强提取规则后的存量修正，幂等）
-    n_back = scraper.date_backfill()
-    # 若本次新增了国考/福建省考招录公告，自动从详情页校准倒计时日期
-    exam_sync.sync(report["new"])
-    n = build_dashboard.build()
-    report["dashboard_notices"] = n
-    new_count = len(report["new"])
+    # 各步骤独立 try-catch：单步异常不致命，确保数据质量改动（清噪声/回填）无论抓取到否都能落库，
+    # 避免「抓取偶发失败 → 整个 job 崩 → .has_change 不写 → 改动被锁死」的死循环。
+    try:
+        report = scraper.run_all(only_region=args.only_region, exclude_region=args.exclude_region)
+    except Exception as _e:
+        print(f"[warn] run_all 异常（仍继续 cleanup/回填）: {_e}")
+        report = {"new": [], "run_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "sources": []}
+    try:
+        n_clean = scraper.cleanup_noise()
+    except Exception as _e:
+        print(f"[warn] cleanup_noise 异常: {_e}"); n_clean = 0
+    try:
+        n_back = scraper.date_backfill()
+    except Exception as _e:
+        print(f"[warn] date_backfill 异常: {_e}"); n_back = 0
+    try:
+        exam_sync.sync(report.get("new", []))
+    except Exception as _e:
+        print(f"[warn] exam_sync 异常: {_e}")
+    try:
+        n = build_dashboard.build()
+        report["dashboard_notices"] = n
+    except Exception as _e:
+        print(f"[warn] build_dashboard 异常: {_e}"); n = 0
+    new_count = len(report.get("new", []))
     report["new_count"] = new_count
     # 精简摘要打印
     print(json.dumps({
