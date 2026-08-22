@@ -87,9 +87,10 @@ jobs:
 
       - name: 提交更新
         run: |
-          NEW_COUNT=$(cat .new_count 2>/dev/null || echo 0)
-          if [ "$NEW_COUNT" -le 0 ]; then
-            echo "[跳过] 本次无新增公告，不提交不推送（避免自循环）"
+          # 任何数据变化都推送：新增 / 清噪声 / 回填日期（避免数据质量改动被锁死）
+          HAS_CHANGE=$(cat .has_change 2>/dev/null || echo 0)
+          if [ "$HAS_CHANGE" -le 0 ]; then
+            echo "[跳过] 本次无数据变化（无新增/无清理/无回填），不提交不推送"
             exit 0
           fi
           git config user.name "github-actions[bot]"

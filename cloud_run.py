@@ -59,27 +59,42 @@ def main():
     args = ap.parse_args()
     report = scraper.run_all(only_region=args.only_region, exclude_region=args.exclude_region)
     # 清理历史噪声记录（入库过滤上线前的 junk），保证看板与数据库干净
-    scraper.cleanup_noise()
+    n_clean = scraper.cleanup_noise()
+    # 回填历史公告缺失的 date 字段（增强提取规则后的存量修正，幂等）
+    n_back = scraper.date_backfill()
     # 若本次新增了国考/福建省考招录公告，自动从详情页校准倒计时日期
     exam_sync.sync(report["new"])
     n = build_dashboard.build()
     report["dashboard_notices"] = n
-    report["new_count"] = len(report["new"])
+    new_count = len(report["new"])
+    report["new_count"] = new_count
     # 精简摘要打印
     print(json.dumps({
         "run_at": report["run_at"],
         "dashboard_notices": n,
-        "new_count": len(report["new"]),
+        "new_count": new_count,
+        "cleaned": n_clean,
+        "date_backfilled": n_back,
         "new": report["new"],
     }, ensure_ascii=False, indent=2))
 
-    # 把本次新增数量写入 .new_count，供 CI 判断是否提交
-    # （无新数据时不提交/不推送，从根本上避免 Runner 自循环）
+    # 写 .new_count：本次新增公告数（兼容旧逻辑 / 日志查看）
     try:
         with open(os.path.join(ROOT, ".new_count"), "w", encoding="utf-8") as _f:
-            _f.write(str(len(report["new"])))
+            _f.write(str(new_count))
     except Exception as _e:
         print(f"[warn] 写入 .new_count 失败: {_e}")
+
+    # 写 .has_change：任何数据变化都需推送（新增 / 清噪声 / 回填日期）。
+    # 不再以「仅新增」为唯一推送条件——否则 cleanup / date 修复等数据质量改动
+    # 会被「无新公告不推送」锁死、永远无法落库。
+    # 自循环防护仍由 commit message 含「定时更新公告」+ workflow 防重入保证。
+    has_change = 1 if (new_count > 0 or n_clean > 0 or n_back > 0) else 0
+    try:
+        with open(os.path.join(ROOT, ".has_change"), "w", encoding="utf-8") as _f:
+            _f.write(str(has_change))
+    except Exception as _e:
+        print(f"[warn] 写入 .has_change 失败: {_e}")
 
     # 即时邮件已移除：改由每日汇总（daily_digest.py / daily_digest.yml）统一发送，
     # 保证「每天一封」而非每次抓取一封。send_email 函数保留供 daily_digest 复用。

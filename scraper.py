@@ -568,6 +568,29 @@ def cleanup_noise():
     return n
 
 
+def date_backfill():
+    """对库内 date 为空的记录，用增强后的 extract_date 重新提取日期并 UPDATE。
+
+    幂等：只更新能成功提取的；已回填的再次运行不会重复处理。
+    返回更新的条数（供 CI 判断是否需推送，避免数据质量改动被锁死）。
+    """
+    conn = init_db()
+    rows = conn.execute(
+        "SELECT id, title, url, date FROM notices WHERE date IS NULL OR date=''"
+    ).fetchall()
+    updated = 0
+    for rid, title, url, _ in rows:
+        d = extract_date(title or "", url or "")
+        if d:
+            conn.execute("UPDATE notices SET date=? WHERE id=?", (d, rid))
+            updated += 1
+    conn.commit()
+    conn.close()
+    if updated:
+        print(f"[回填] 修正 {updated} 条历史公告的 date 字段")
+    return updated
+
+
 # ---------------- 主流程 ----------------
 def _work(s, limit_per_source=40):
     """单源抓取+解析（线程安全：不碰 DB）。返回 (source, items, error)。"""

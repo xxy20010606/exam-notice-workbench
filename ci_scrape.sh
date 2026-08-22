@@ -38,9 +38,9 @@ python3 -m playwright install --with-deps chromium || python3 -m playwright inst
 python3 cloud_run.py
 
 # 5. 仅在有新增时才提交/推送（防自循环）
-NEW_COUNT=$(cat .new_count 2>/dev/null || echo 0)
-if [ "$NEW_COUNT" -le 0 ]; then
-  echo "[跳过] 本次无新增公告，不提交不推送"
+HAS_CHANGE=$(cat .has_change 2>/dev/null || echo 0)
+if [ "$HAS_CHANGE" -le 0 ]; then
+  echo "[跳过] 本次无数据变化（无新增/无清理/无回填），不提交不推送"
 else
   git config user.name "ci-bot"
   git config user.email "ci@exam-notice.local"
