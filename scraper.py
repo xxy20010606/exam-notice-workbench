@@ -31,8 +31,19 @@ GLOBAL_NOISE = re.compile(
     r"|^公开招聘$"            # 泛化栏目名
 )
 
-DATE_RE = [re.compile(r"(\d{4})[-/年.](\d{1,2})[-/月.](\d{1,2})"),]
-URL_DATE_RE = re.compile(r"(\d{4})[-/_](\d{2})[-/_](\d{2})")
+# 日期提取正则（按优先级排序）：
+#   1) URL_DATE_RE: 从 URL 路径提取（覆盖中国政务站常见格式）
+#      匹配 /2026-08-14/ 、 /2026/0814/ 、 t20260814_ 、 _20260814. 等
+#   2) DATE_RE: 从页面文本提取（标准分隔符 + 紧凑8位数字）
+DATE_RE = [
+    re.compile(r"(\d{4})[-/年.](\d{1,2})[-/月.](\d{1,2})"),     # 2026-08-14 / 2026年8月14日 / 2026.08.14
+    re.compile(r"(?<![\d])(\d{4})(\d{2})(\d{2})(?![\d])"),        # 紧凑 20260814（文本中连续8位数字）
+]
+URL_DATE_RE = re.compile(
+    r"(?:[/_\-\.t]|^)"          # 分隔符或 t 前缀（如 t20260814、/2026-08-14）
+    r"(\d{4})(\d{2})(\d{2})"  # YYYYMMDD
+    r"(?:[_/\.\-]|$)"           # 后缀分隔符或结束
+)
 
 
 def now_iso():
@@ -303,13 +314,22 @@ def fetch(source):
 
 # ---------------- 解析 ----------------
 def extract_date(text, url):
+    """从 URL 或文本中提取公告日期，返回 YYYY-MM-DD 或空串。
+
+    覆盖格式：
+      URL:  /2026-08-14/ | /2026/0814/ | t20260814_ | _20260814.htm
+      文本: 2026-08-14 | 2026年8月14日 | 2026.08.14 | 20260814
+    """
     text = re.sub(r"\s+", "", text or "")  # 归一化（如嘉兴日期 span 内 "2026- 08- 13" 带空格）
+
+    # 优先从 URL 提取（最可靠）
     m = URL_DATE_RE.search(url)
     if m:
         y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
         if 1 <= mo <= 12 and 1 <= d <= 31:
             return f"{y}-{mo:02d}-{d:02d}"
-        return ""
+
+    # 再从文本提取
     for r in DATE_RE:
         m = r.search(text or "")
         if m:
@@ -317,6 +337,12 @@ def extract_date(text, url):
             if 1 <= mo <= 12 and 1 <= d <= 31:
                 return f"{y}-{mo:02d}-{d:02d}"
             continue
+
+    # 兜底：URL 中任意位置出现的 8 位纯数字日期（宽松匹配，误判风险低）
+    m = re.search(r"(?<![\d])(20[2-9]\d)(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?![\d])", url)
+    if m:
+        return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+
     return ""
 
 
@@ -406,8 +432,29 @@ def parse_source(source, html):
         if absurl in seen:
             continue
         seen.add(absurl)
+        # 日期提取：从多层上下文搜索（SPA 源的日期常在兄弟/远祖元素里）
         parent = a.find_parent(["li", "div", "tr", "td", "p"]) or a
         ptext = parent.get_text(" ", strip=True) if parent else title
+        # 如果父元素文本没提取到日期，扩大搜索：兄弟元素 + 祖先 + 近邻 date 类节点
+        if not extract_date(ptext, absurl):
+            candidates = []
+            # 兄弟元素（前3个后3个）
+            for sib in list(parent.previous_siblings)[-3:] + list(parent.next_siblings)[:3]:
+                if sib.name: candidates.append(sib.get_text(" ", strip=True))
+            # 祖先链（向上2层）
+            gp = parent.parent
+            if gp and gp.name: candidates.append(gp.get_text(" ", strip=True))
+            ggp = gp.parent if gp else None
+            if ggp and ggp.name: candidates.append(ggp.get_text(" ", strip=True)[:200])
+            # 近邻含 date/time 类名的元素
+            for el in parent.find_all(class_=re.compile(r'date|time|publish', re.I)):
+                candidates.append(el.get_text(" ", strip=True))
+            # 用第一个能提取到日期的候选文本
+            for cand in candidates:
+                d = extract_date(cand, absurl)
+                if d:
+                    ptext = ptext + " " + cand  # 追加到 ptext 让 extract_date 能匹配
+                    break
         items.append({"title": title[:200], "url": absurl, "date": extract_date(ptext, absurl)})
     return items
 
@@ -496,6 +543,21 @@ def cleanup_noise():
             n += 1
     # 统一平台入口噪声：导航菜单链接的"福建省事业单位公开招聘服务平台"（非真实公告）
     for (rid,) in conn.execute("SELECT id FROM notices WHERE title LIKE ?", ("%公开招聘服务平台%",)).fetchall():
+        conn.execute("DELETE FROM notices WHERE id=?", (rid,))
+        n += 1
+    # 省考/公务员导航噪声：专题页、index页、系统首页、泛化栏目名（标题短或含"专题/系统/管理/报名管理"且无具体招聘信息）
+    nav_patterns = [
+        "%专题%", "%考试录用公务员专题%", "%招录考试%",
+        "%网上报名管理系统%", "%报名管理系统%",
+    ]
+    for pat in nav_patterns:
+        for (rid,) in conn.execute("SELECT id FROM notices WHERE title LIKE ?", (pat,)).fetchall():
+            conn.execute("DELETE FROM notices WHERE id=?", (rid,))
+            n += 1
+    # URL 含 /col/.../index.html 或以 index.html 结尾的导航页（非具体公告详情）
+    for (rid,) in conn.execute(
+        "SELECT id FROM notices WHERE url LIKE '%/col/%/index.html' OR url LIKE '%/index.html'"
+    ).fetchall():
         conn.execute("DELETE FROM notices WHERE id=?", (rid,))
         n += 1
 
@@ -635,6 +697,21 @@ def run_all(limit_per_source=40, max_workers=8,
             n += 1
     # 统一平台入口噪声：导航菜单链接的"福建省事业单位公开招聘服务平台"（非真实公告）
     for (rid,) in conn.execute("SELECT id FROM notices WHERE title LIKE ?", ("%公开招聘服务平台%",)).fetchall():
+        conn.execute("DELETE FROM notices WHERE id=?", (rid,))
+        n += 1
+    # 省考/公务员导航噪声：专题页、index页、系统首页、泛化栏目名（标题短或含"专题/系统/管理/报名管理"且无具体招聘信息）
+    nav_patterns = [
+        "%专题%", "%考试录用公务员专题%", "%招录考试%",
+        "%网上报名管理系统%", "%报名管理系统%",
+    ]
+    for pat in nav_patterns:
+        for (rid,) in conn.execute("SELECT id FROM notices WHERE title LIKE ?", (pat,)).fetchall():
+            conn.execute("DELETE FROM notices WHERE id=?", (rid,))
+            n += 1
+    # URL 含 /col/.../index.html 或以 index.html 结尾的导航页（非具体公告详情）
+    for (rid,) in conn.execute(
+        "SELECT id FROM notices WHERE url LIKE '%/col/%/index.html' OR url LIKE '%/index.html'"
+    ).fetchall():
         conn.execute("DELETE FROM notices WHERE id=?", (rid,))
         n += 1
 
