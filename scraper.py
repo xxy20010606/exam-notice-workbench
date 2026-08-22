@@ -20,7 +20,7 @@ DEFAULT_UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
 # 全局过滤：去掉导航/页脚等噪音链接
 GLOBAL_EXCLUDE = (r"首页|网站地图|联系我们|无障碍|English|EN$|登录|注册|后台|投稿|订阅|"
     r"邮箱|微信|微博|客户端|下载|帮助|指南|隐私|版权|备案|关于我们|站点|"
-    r"留言|举报|督查|信访|繁體|无障碍版|纠错|收藏|分享")
+    r"留言|举报|督查|信访|繁體|无障碍版|纠错|收藏|分享|要闻公告|最新公告|仲裁公告|公告查询|事业单位进人公告|通知公告")
 
 # 全局噪声（非招聘公告）：与 daily_digest 保持一致，在「入库」环节即过滤，
 # 防止采购/中标/询价/导航文字/泛化栏目名等 junk 进入 notices.db 与看板。
@@ -487,6 +487,18 @@ def cleanup_noise():
         if title and not RECRUIT_KEEP.search(title):
             conn.execute("DELETE FROM notices WHERE id=?", (rid,))
             n += 1
+    # 全局占位/栏目名噪声（导航栏目被当公告标题，如"要闻公告""通知公告"）：精确删除
+    PLACEHOLDER = ["要闻公告", "最新公告", "仲裁公告", "公告查询",
+                   "事业单位进人公告", "通知公告", "公告", "首页", "栏目"]
+    for p in PLACEHOLDER:
+        for (rid,) in conn.execute("SELECT id FROM notices WHERE title = ?", (p,)).fetchall():
+            conn.execute("DELETE FROM notices WHERE id=?", (rid,))
+            n += 1
+    # 统一平台入口噪声：导航菜单链接的"福建省事业单位公开招聘服务平台"（非真实公告）
+    for (rid,) in conn.execute("SELECT id FROM notices WHERE title LIKE ?", ("%公开招聘服务平台%",)).fetchall():
+        conn.execute("DELETE FROM notices WHERE id=?", (rid,))
+        n += 1
+
     conn.commit()
     conn.close()
     if n:
@@ -613,6 +625,18 @@ def run_all(limit_per_source=40, max_workers=8,
     for s, _reason in skipped_sources:
         conn.execute("""UPDATE sources_status SET last_run=? WHERE name=?""",
                      (now_str, s["name"]))
+
+    # 全局占位/栏目名噪声（导航栏目被当公告标题，如"要闻公告""通知公告"）：精确删除
+    PLACEHOLDER = ["要闻公告", "最新公告", "仲裁公告", "公告查询",
+                   "事业单位进人公告", "通知公告", "公告", "首页", "栏目"]
+    for p in PLACEHOLDER:
+        for (rid,) in conn.execute("SELECT id FROM notices WHERE title = ?", (p,)).fetchall():
+            conn.execute("DELETE FROM notices WHERE id=?", (rid,))
+            n += 1
+    # 统一平台入口噪声：导航菜单链接的"福建省事业单位公开招聘服务平台"（非真实公告）
+    for (rid,) in conn.execute("SELECT id FROM notices WHERE title LIKE ?", ("%公开招聘服务平台%",)).fetchall():
+        conn.execute("DELETE FROM notices WHERE id=?", (rid,))
+        n += 1
 
     conn.commit()
     conn.close()
