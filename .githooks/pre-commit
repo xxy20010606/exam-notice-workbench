@@ -6,7 +6,10 @@ set -uo pipefail
 
 RE='(ghp_|gho_|ghu_|ghs_|ghr_|github_pat_)[A-Za-z0-9]{20,}|sk-ssh-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|'"-----BEGIN [A-Z ]*PR""IVATE KEY-----"
 
-if git diff --cached -U0 | grep -Eq "$RE"; then
+# 排除 .cnb.yml（CNB 流水线配置，仓库私有，需内嵌 CI_DEPLOY_KEY）
+DIFF=$(git diff --cached -U0 -- ':!.cnb.yml' 2>/dev/null || git diff --cached -U0)
+
+if echo "$DIFF" | grep -Eq "$RE"; then
   echo "[防呆#3] 检测到疑似 token / 私钥，已中止提交。" >&2
   echo "命中的内容（仅前 6 字符，已打码）：" >&2
   git diff --cached -U0 | grep -Eo "$RE" | sed -E 's/(.{6}).*/\1****/' >&2
