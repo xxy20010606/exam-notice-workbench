@@ -15,6 +15,10 @@
 #   · 无新增时不推送，避免自循环
 set -euo pipefail
 
+# 0. 国内 CI 常封锁 SSH 端口 22，强制 git 走 HTTPS
+git config --global url."https://github.com/".insteadOf "git@github.com:"
+export DEBIAN_FRONTEND=noninteractive
+
 # 1. 把 CI 私钥写入临时文件（用后即删）
 KEY_DIR="$(mktemp -d)"
 KEY_FILE="$KEY_DIR/id_ci"
@@ -30,9 +34,9 @@ git clone "$REPO_SSH" work
 cd work
 
 # 3. 安装依赖 + Playwright Chromium
-pip install -r requirements.txt
-# --with-deps 需要 root + apt；阿里云效 Ubuntu runner 通常为 root，失败则退回不带 deps
-python3 -m playwright install --with-deps chromium || python3 -m playwright install chromium
+pip install -r requirements.txt -q
+# 不用 --with-deps（避免 apt-get 交互确认卡死）；国内 CI runner 通常已预装系统依赖
+python3 -m playwright install chromium 2>/dev/null || true
 
 # 4. 抓取全部源 + 重建看板（国内 IP 直连，被封源自动恢复）
 python3 cloud_run.py

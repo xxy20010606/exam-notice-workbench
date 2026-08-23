@@ -15,6 +15,9 @@ stages:
       - name: "安装依赖并抓取"
         run: |
           set -e
+          export DEBIAN_FRONTEND=noninteractive
+          # 国内 CI 常封锁 SSH 端口 22，强制走 HTTPS
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
           pip install -r requirements.txt -q
-          playwright install chromium --with-deps 2>/dev/null || playwright install chromium
+          playwright install chromium 2>/dev/null || true
           bash ci_scrape.sh
