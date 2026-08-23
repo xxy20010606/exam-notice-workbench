@@ -29,6 +29,7 @@ GLOBAL_NOISE = re.compile(
     r"|^/\s"                  # 导航栏文字（以 / 开头）
     r"|^事业单位公开招聘$"     # 泛化栏目名（非具体公告）
     r"|^公开招聘$"            # 泛化栏目名
+    r"|公开招聘服务平台"       # 统一平台导航名（非真实公告）
 )
 
 # 日期提取正则（按优先级排序）：
@@ -69,7 +70,7 @@ def _decode_response(r, encoding):
 
 
 def fetch_http(url, timeout=30, retries=2, encoding=None):
-    import urllib.request, ssl
+    import urllib.request, ssl, socket as _socket_mod
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
@@ -86,25 +87,36 @@ def fetch_http(url, timeout=30, retries=2, encoding=None):
         "Accept-Language": "zh-CN,zh;q=0.9",
         "Referer": url,
     }
+    # 强制 IPv4：GitHub Actions ubuntu 默认优先 IPv6，国内 gov.cn 仅 IPv4 可达
+    # 通过临时 monkey-patch socket.getaddrinfo 实现（仅影响本函数内 urllib 调用）
+    _orig_gai = _socket_mod.getaddrinfo
+    def _ipv4_only(host, port, family=0, *a, **kw):
+        return _orig_gai(host, port, _socket_mod.AF_INET if family == 0 else family, *a, **kw)
+
     last = None
-    # 第一轮：直连（保持当前行为，正常源不走代理、零回归）
     for _ in range(retries + 1):
         try:
+            _socket_mod.getaddrinfo = _ipv4_only
             req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
+                _socket_mod.getaddrinfo = _orig_gai
                 return _decode_response(r, encoding)
         except Exception as e:
+            _socket_mod.getaddrinfo = _orig_gai
             last = e
             time.sleep(1.5)
-    # 第二轮：直连全失败且配置了代理 → 回退走国内代理
+    # 第二轮：直连全失败且配置了代理 → 回退走国内代理（同样强制 IPv4）
     if proxy:
         try:
+            _socket_mod.getaddrinfo = _ipv4_only
             opener = urllib.request.build_opener(
                 urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
             req = urllib.request.Request(url, headers=headers)
             with opener.open(req, timeout=timeout, context=ctx) as r:
+                _socket_mod.getaddrinfo = _orig_gai
                 return _decode_response(r, encoding)
         except Exception as e:
+            _socket_mod.getaddrinfo = _orig_gai
             last = e
     raise last
 
@@ -716,33 +728,6 @@ def run_all(limit_per_source=40, max_workers=8,
     for s, _reason in skipped_sources:
         conn.execute("""UPDATE sources_status SET last_run=? WHERE name=?""",
                      (now_str, s["name"]))
-
-    # 全局占位/栏目名噪声（导航栏目被当公告标题，如"要闻公告""通知公告"）：精确删除
-    PLACEHOLDER = ["要闻公告", "最新公告", "仲裁公告", "公告查询",
-                   "事业单位进人公告", "通知公告", "公告", "首页", "栏目"]
-    for p in PLACEHOLDER:
-        for (rid,) in conn.execute("SELECT id FROM notices WHERE title = ?", (p,)).fetchall():
-            conn.execute("DELETE FROM notices WHERE id=?", (rid,))
-            n += 1
-    # 统一平台入口噪声：导航菜单链接的"福建省事业单位公开招聘服务平台"（非真实公告）
-    for (rid,) in conn.execute("SELECT id FROM notices WHERE title LIKE ?", ("%公开招聘服务平台%",)).fetchall():
-        conn.execute("DELETE FROM notices WHERE id=?", (rid,))
-        n += 1
-    # 省考/公务员导航噪声：专题页、index页、系统首页、泛化栏目名（标题短或含"专题/系统/管理/报名管理"且无具体招聘信息）
-    nav_patterns = [
-        "%专题%", "%考试录用公务员专题%", "%招录考试%",
-        "%网上报名管理系统%", "%报名管理系统%",
-    ]
-    for pat in nav_patterns:
-        for (rid,) in conn.execute("SELECT id FROM notices WHERE title LIKE ?", (pat,)).fetchall():
-            conn.execute("DELETE FROM notices WHERE id=?", (rid,))
-            n += 1
-    # URL 含 /col/.../index.html 或以 index.html 结尾的导航页（非具体公告详情）
-    for (rid,) in conn.execute(
-        "SELECT id FROM notices WHERE url LIKE '%/col/%/index.html' OR url LIKE '%/index.html'"
-    ).fetchall():
-        conn.execute("DELETE FROM notices WHERE id=?", (rid,))
-        n += 1
 
     conn.commit()
     conn.close()
