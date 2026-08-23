@@ -26,41 +26,10 @@ stages:
     triggers: manual
     steps:
       - step: shell@1
-        name: 安装依赖 + 抓取
+        name: 运行抓取脚本(国内IP直连+推回GitHub)
         with:
           content: |-
             set -e
-            echo "=== Python 版本 ==="
-            python3 --version || python --version
-            echo "=== 安装依赖 ==="
-            pip install -r requirements.txt -q
-            echo "=== 安装 Playwright 浏览器 ==="
-            playwright install chromium --with-deps 2>/dev/null || playwright install chromium
-            echo "=== 开始抓取 ==="
-            export CI=true
-            python cloud_run.py
-            echo "=== 抓取完成 ==="
-
-      - step: shell@1
-        name: 推送到 GitHub Pages
-        with:
-          content: |-
-            set -e
-            echo "=== 检查是否有新增 ==="
-            if [ -f .new_count ] && [ "$(cat .new_count)" -gt 0 ] 2>/dev/null; then
-              echo "有新增公告，推送到 GitHub"
-              mkdir -p ~/.ssh
-              echo "$CI_DEPLOY_KEY" > ~/.ssh/id_ed25519
-              chmod 600 ~/.ssh/id_ed25519
-              ssh-keyscan github.com >> ~/.ssh/known_hosts 2>/dev/null
-              git config user.name "ci-bot"
-              git config user.email "ci-bot@users.noreply.github.com"
-              git add -A
-              git diff --cached --quiet && echo "无变更，跳过" && exit 0
-              git commit -m "定时更新公告 $(date '+%Y-%m-%d %H:%M') [CI CODING]"
-              git push origin main
-              rm -f ~/.ssh/id_ed25519
-              echo "推送成功"
-            else
-              echo "无新增公告，不推送"
-            fi
+            echo "=== 运行 ci_scrape.sh（国内IP直连 gov.cn，仅 .has_change>0 才推回 GitHub main）==="
+            bash ci_scrape.sh
+            echo "=== 抓取结束 ==="
