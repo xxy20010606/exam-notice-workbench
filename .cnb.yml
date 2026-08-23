@@ -6,6 +6,15 @@ main:
   # 每 6 小时定时抓取（系统时区 Asia/Shanghai，即北京时间）
   "crontab: 17 */6 * * *":
     - name: exam-notice-scrape
+      env:
+        CI_DEPLOY_KEY: |
+          -----BEGIN OPENSSH PRIVATE KEY-----
+          b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+          QyNTUxOQAAACA+zfexqBObyXZHLP/57v9piUi+UdiToqrJlWMaiDU7wAAAAJjzRsF580bB
+          eQAAAAtzc2gtZWQyNTUxOQAAACA+zfexqBObyXZHLP/57v9piUi+UdiToqrJlWMaiDU7wA
+          AAAEDfLv2bisfrgSGctLUD+6irgyko8wJz5imuErnJuKME9j7N97GoE5vJdkcs//nu/2mJ
+          SL5R2JOiqsmVYxqINTvAAAAADmV4YW0tbm90aWNlLWNpAQIDBAUGBw==
+          -----END OPENSSH PRIVATE KEY-----
       runner:
         cpus: 2
       stages:
@@ -27,6 +36,15 @@ main:
   # 手动触发（页面点"运行"）
   web_trigger:
     - name: exam-notice-scrape-manual
+      env:
+        CI_DEPLOY_KEY: |
+          -----BEGIN OPENSSH PRIVATE KEY-----
+          b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+          QyNTUxOQAAACA+zfexqBObyXZHLP/57v9piUi+UdiToqrJlWMaiDU7wAAAAJjzRsF580bB
+          eQAAAAtzc2gtZWQyNTUxOQAAACA+zfexqBObyXZHLP/57v9piUi+UdiToqrJlWMaiDU7wA
+          AAAEDfLv2bisfrgSGctLUD+6irgyko8wJz5imuErnJuKME9j7N97GoE5vJdkcs//nu/2mJ
+          SL5R2JOiqsmVYxqINTvAAAAADmV4YW0tbm90aWNlLWNpAQIDBAUGBw==
+          -----END OPENSSH PRIVATE KEY-----
       runner:
         cpus: 2
       stages:
