@@ -24,6 +24,27 @@ import scraper, build_dashboard, exam_sync
 _PROXY = os.environ.get("SCRAPE_PROXY", "").strip()
 print(f"[代理] {'已启用国内代理（直连失败自动回退）' if _PROXY else '未配置，纯直连（当前行为）'}")
 
+# === 临时探测：福建统一平台 API 在 GitHub 云端连通性 ===
+# （非业务代码，仅打印日志观察。结果不影响抓取流程，跑完即弃。）
+import urllib.request
+try:
+    req = urllib.request.Request(
+        "http://220.160.53.33:8903/ksbm/student/home/newsList?userId=&year=&orderBy=1&pageNum=1&pageSize=3&flag=2&isProject=1",
+        headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"},
+    )
+    r = urllib.request.urlopen(req, timeout=20)
+    body = r.read().decode("utf-8", "ignore")
+    import json as _json
+    j = _json.loads(body)
+    data = j.get("data", {})
+    rows = data.get("rows", []) if isinstance(data, dict) else []
+    total = data.get("total") if isinstance(data, dict) else len(rows)
+    print(f"[PROBE-福建API] ✅ 通！HTTP {r.status} 本页{len(rows)}条 total={total}")
+    for row in rows[:2]:
+        print(f"   - {str(row.get('proTitle') or row.get('title'))[:50]}")
+except Exception as _e:
+    print(f"[PROBE-福建API] ❌ 不通：{type(_e).__name__}: {str(_e)[:200]}")
+
 SMTP_HOST = "smtp.163.com"
 SMTP_PORT = 465
 SENDER = "xxy1037550012@163.com"
