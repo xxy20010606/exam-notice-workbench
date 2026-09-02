@@ -61,5 +61,8 @@ fi
 
 # ---------- 推送（禁用 --force） ----------
 echo "[info] 推送 $REMOTE/$BRANCH（禁用 --force）..."
-git push "$REMOTE" "$BRANCH" --no-force-with-lease
+if ! git push "$REMOTE" "$BRANCH" --no-force-with-lease; then
+  echo "[FAIL] git push 失败（错误见上方 git 输出），本次未推送成功" >&2
+  exit 1
+fi
 echo "[OK] 推送完成 ✅"

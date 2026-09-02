@@ -254,7 +254,7 @@ def fetch_browser(url, timeout=90000, wait=3000, wait_until="domcontentloaded", 
 
 
 
-def _raw_fetch(url, method, encoding=None, browser_wait=3000, browser_wait_until="domcontentloaded", browser_timeout=90000, http_timeout=15, block_external=False):
+def _raw_fetch(url, method, encoding=None, browser_wait=3000, browser_wait_until="domcontentloaded", browser_timeout=90000, http_timeout=30, block_external=False):
     if method == "browser":
         try:
             return fetch_browser(url, timeout=browser_timeout, wait=browser_wait, wait_until=browser_wait_until, block_external=block_external)
@@ -273,7 +273,7 @@ def fetch(source):
     browser_wait = source.get("browser_wait", 3000)
     browser_wait_until = source.get("browser_wait_until", "domcontentloaded")
     browser_timeout = source.get("browser_timeout", 90000)
-    http_timeout = source.get("http_timeout", 15)
+    http_timeout = source.get("http_timeout", 30)
     block_external = source.get("block_external", False)
     html = _raw_fetch(source["url"], method, encoding=encoding,
                       browser_wait=browser_wait, browser_wait_until=browser_wait_until,
