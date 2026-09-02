@@ -1,4 +1,5 @@
 name: probe-fujian-api
+
 on:
   workflow_dispatch:
 
@@ -6,9 +7,9 @@ jobs:
   probe:
     runs-on: ubuntu-latest
     steps:
-      - name: 探测福建统一平台API连通性
+      - name: 探测福建统一平台 API 在 GitHub 云端连通性
         run: |
-          echo "=== 1. 测试 newsList API (HTTP直连) ==="
+          echo "=== 1. newsList HTTP 直连 ==="
           set +e
           curl -s -o /tmp/resp1.json -w "HTTP_CODE=%{http_code} TIME=%{time_total}s SIZE=%{size_download}\n" \
             --max-time 25 \
@@ -18,7 +19,7 @@ jobs:
           head -c 400 /tmp/resp1.json 2>/dev/null
           echo ""
           echo ""
-          echo "=== 2. 用 python 解析验证 ==="
+          echo "=== 2. python 解析验证 ==="
           python3 - <<'PY'
 import json,urllib.request
 try:
