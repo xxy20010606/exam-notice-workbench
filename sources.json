@@ -164,7 +164,7 @@
     "row_date_idx": 1,
     "enabled": false,
     "note": "已禁用:GHA-IP封锁,无可达替代URL(省门户无省考统一栏目)。需代理恢复",
-    "browser_timeout": 30000
+    "browser_timeout": 12000
   },
   {
     "name": "山西-省考",
@@ -213,7 +213,7 @@
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
     "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
     "container": null,
-    "browser_timeout": 30000
+    "browser_timeout": 12000
   },
   {
     "name": "黑龙江-省考",
@@ -227,7 +227,7 @@
     "container": null,
     "onclick_regex": "queryDetail\\(\\s*'(\\d+)'\\s*,\\s*'(\\d+)'\\s*\\)",
     "onclick_url_template": "https://www.hljsgwy.org.cn/tyzpwb/website/queryDetail.htm?mkxh={0}&tzid={1}",
-    "browser_timeout": 30000
+    "browser_timeout": 12000
   },
   {
     "name": "江苏-省考",
@@ -282,7 +282,7 @@
     "container": null,
     "browser_wait_until": "domcontentloaded",
     "browser_wait": 8000,
-    "browser_timeout": 30000
+    "browser_timeout": 12000
   },
   {
     "name": "山东-省考",
@@ -296,7 +296,7 @@
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
     "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
     "container": null,
-    "browser_timeout": 30000
+    "browser_timeout": 12000
   },
   {
     "name": "河南-省考",
@@ -381,7 +381,7 @@
     "column_link_regex": "公务员|gwy|省考|招录",
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
     "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
-    "browser_timeout": 30000
+    "browser_timeout": 12000
   },
   {
     "name": "贵州-省考",
@@ -421,7 +421,7 @@
       "https://hrss.xizang.gov.cn/xwzx/tzgg/index_2.html",
       "https://hrss.xizang.gov.cn/xwzx/tzgg/index_3.html"
     ],
-    "browser_timeout": 30000
+    "browser_timeout": 12000
   },
   {
     "name": "陕西-省考",
@@ -509,7 +509,7 @@
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
     "browser_wait": 20000,
     "browser_wait_until": "domcontentloaded",
-    "browser_timeout": 30000,
+    "browser_timeout": 12000,
     "alert_zero": true,
     "container": "div.page-content"
   },
@@ -523,7 +523,7 @@
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
     "browser_wait": 20000,
     "browser_wait_until": "domcontentloaded",
-    "browser_timeout": 30000,
+    "browser_timeout": 12000,
     "alert_zero": true,
     "container": "div.zwxxgk_bd"
   },
@@ -537,7 +537,7 @@
     "title_exclude": "须知|温馨提示|提醒|政策|解读|征集|意见|咨询|申诉|延长",
     "browser_wait": 20000,
     "browser_wait_until": "domcontentloaded",
-    "browser_timeout": 30000,
+    "browser_timeout": 12000,
     "alert_zero": true,
     "href_include": "/art/",
     "container": "ul.newslist.clearfix"
@@ -552,7 +552,7 @@
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
     "browser_wait": 20000,
     "browser_wait_until": "domcontentloaded",
-    "browser_timeout": 30000,
+    "browser_timeout": 12000,
     "alert_zero": true,
     "container": "ul.contain"
   },
@@ -566,7 +566,7 @@
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
     "browser_wait": 20000,
     "browser_wait_until": "domcontentloaded",
-    "browser_timeout": 30000,
+    "browser_timeout": 12000,
     "alert_zero": true,
     "container": "div.list1.mt10"
   },
@@ -580,7 +580,7 @@
     "title_exclude": "须知|温馨提示|提醒|政策|解读|征集|意见|咨询|申诉|延长",
     "browser_wait": 20000,
     "browser_wait_until": "domcontentloaded",
-    "browser_timeout": 30000,
+    "browser_timeout": 12000,
     "alert_zero": true,
     "href_include": "/art/"
   },
@@ -594,7 +594,7 @@
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
     "browser_wait": 20000,
     "browser_wait_until": "domcontentloaded",
-    "browser_timeout": 30000,
+    "browser_timeout": 12000,
     "alert_zero": true,
     "container": "div.news_list_group01"
   },
@@ -608,7 +608,7 @@
     "title_exclude": "须知|温馨提示|提醒|政策|解读|征集|意见|咨询|申诉|延长",
     "browser_wait": 20000,
     "browser_wait_until": "domcontentloaded",
-    "browser_timeout": 30000,
+    "browser_timeout": 12000,
     "alert_zero": true,
     "href_include": "/art/",
     "container": "div.page-content"
@@ -623,7 +623,7 @@
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
     "browser_wait": 20000,
     "browser_wait_until": "domcontentloaded",
-    "browser_timeout": 30000,
+    "browser_timeout": 12000,
     "alert_zero": true,
     "container": "div.mainr"
   },
@@ -637,7 +637,7 @@
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
     "browser_wait": 20000,
     "browser_wait_until": "domcontentloaded",
-    "browser_timeout": 30000,
+    "browser_timeout": 12000,
     "alert_zero": true,
     "container": "div.news-lists"
   },
@@ -651,7 +651,7 @@
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
     "browser_wait": 20000,
     "browser_wait_until": "domcontentloaded",
-    "browser_timeout": 30000,
+    "browser_timeout": 12000,
     "alert_zero": true,
     "container": "div.page-content"
   },
