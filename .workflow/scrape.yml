@@ -1,5 +1,6 @@
 version: '1.0'
 name: exam-notice-scrape
+displayName: exam-notice-scrape
 
 on:
   schedule:
