@@ -5,7 +5,7 @@ sources.json 推送前 / 抓取前自动校验（防呆）：
 
   - 顶层必须是 list（源数组）
   - 每条必填 name（非空字符串，且全局唯一） / url（非空、合法 http(s) 地址）
-  - method ∈ {http, browser}（若提供）
+  - method ∈ {http, browser, api}（若提供；api 用于纯 HTTP JSON API 分页源，如福建统一平台）
   - 所有 *_include / *_exclude / *_regex / *_re / *_pattern 字段必须是合法正则
   - browser_wait 必须是 >=0 的整数（若提供）
   - browser_wait_until ∈ {load, domcontentloaded, networkidle}（若提供）
@@ -25,7 +25,7 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 SOURCES = os.path.join(ROOT, "sources.json")
 
 REGEX_KEY_RE = re.compile(r"(include|exclude|regex|_re|_pattern)$", re.IGNORECASE)
-VALID_METHODS = {"http", "browser"}
+VALID_METHODS = {"http", "browser", "api"}
 VALID_WAIT_UNTIL = {"load", "domcontentloaded", "networkidle"}
 VALID_URL_RE = re.compile(r"^https?://[^\s/]+", re.IGNORECASE)
 
