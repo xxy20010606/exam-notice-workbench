@@ -10,8 +10,7 @@ on:
       - main
 
 stages:
-  scrape:
-    stage: scrape
+  - name: scrape
     steps:
       - name: "安装依赖并抓取"
         run: |
