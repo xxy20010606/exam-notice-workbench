@@ -1,0 +1,39 @@
+# ============================================================
+# 阿里云效 Flow 流水线 — 公考事考公告抓取（国内 IP 直连 gov.cn）
+# ============================================================
+# 【如何用】云效 Flow 控制台 → 我的流水线 → 新建流水线
+#    选「YAML 化编排」+ 空模板 → 把本文件内容粘贴进「流程配置」编辑器
+#    然后在左侧分别添加：
+#      ① 代码源：GitHub 服务连接授权 → xxy20010606/exam-notice-workbench, 分支 main
+#      ② 定时触发：cron = 0 */6 * * *（北京时区）
+#    再到「变量与缓存」添加：
+#      CI_DEPLOY_KEY（私密变量，值 = 新私钥全文，8 行 OpenSSH）
+#      SMTP_PASSWORD / RECIPIENT / SERVERCHAN_KEY（可选，用于日报推送）
+#    最后右上角「保存并运行」
+#
+# 说明：ci_scrape.sh 内部会自行 clone 最新 main 到 ./work 并抓取，
+#       无数据变化(无新增/清理/回填)时不会推送，避免自循环。
+# ============================================================
+
+name: exam-notice-scrape
+
+stages:
+  scrape_stage:
+    name: 抓取并推回 GitHub
+    jobs:
+      scrape_job:
+        name: 抓取公告(国内IP)
+        runsOn: public/cn-beijing   # 北京公共构建集群（国内 IP，直连 gov.cn）
+        steps:
+          prepare_step:
+            step: Command
+            name: 准备环境并抓取
+            with:
+              run: |
+                set -e
+                export DEBIAN_FRONTEND=noninteractive
+                echo "=== 工作区已有代码源 checkout（含 ci_scrape.sh / cloud_run.py / sources.json）==="
+                echo "=== 运行 ci_scrape.sh（国内 IP 直连 gov.cn，按 .has_change 推回 GitHub main）==="
+                # 需要依赖注入：CI_DEPLOY_KEY(SSH私钥) 由 Flow 变量提供
+                bash ci_scrape.sh
+                echo "=== 抓取结束 ==="
