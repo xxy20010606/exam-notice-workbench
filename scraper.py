@@ -4,6 +4,8 @@
 公告聚合爬虫：读取 sources.json，按源抓取并解析公告，存入 SQLite，返回本次新增。
 - method="http"    : 直接 requests 式抓取（适用于服务端渲染、未封 IP 的站点）
 - method="browser" : 用 Playwright 无头浏览器执行 JS（适用于反爬/JS 渲染站点，如国考）
+- method="manda"   : 上海站群站内搜索(POST JSON 到 ss.shanghai.gov.cn/manda-app)。
+                    源需含 manda_token + manda_queries；返回带 title/url/date 的 items。
 """
 import json, os, sqlite3, hashlib, re, time, datetime
 from urllib.parse import urljoin
@@ -119,6 +121,156 @@ def fetch_http(url, timeout=30, retries=2, encoding=None):
             _socket_mod.getaddrinfo = _orig_gai
             last = e
     raise last
+
+
+def _http_post_json(url, payload, timeout=30, retries=2):
+    """POST JSON(body 以 text/plain 发送，兼容 manda 搜索接口)，强制 IPv4 + 代理回退。
+    返回解析后的 dict（JSON）。失败抛异常。
+    """
+    import urllib.request, ssl, socket as _socket_mod, json as _json
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    proxy = os.environ.get("SCRAPE_PROXY", "").strip()
+    data = _json.dumps(payload).encode("utf-8")
+    headers = {
+        "User-Agent": DEFAULT_UA,
+        "Content-Type": "text/plain",
+        "Accept": "application/json",
+        "Referer": "https://www.jingan.gov.cn/",
+    }
+    _orig_gai = _socket_mod.getaddrinfo
+    def _ipv4_only(host, port, family=0, *a, **kw):
+        return _orig_gai(host, port, _socket_mod.AF_INET if family == 0 else family, *a, **kw)
+    last = None
+    for _ in range(retries + 1):
+        try:
+            _socket_mod.getaddrinfo = _ipv4_only
+            req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+            with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
+                _socket_mod.getaddrinfo = _orig_gai
+                return _json.loads(r.read().decode("utf-8", errors="ignore"))
+        except Exception as e:
+            _socket_mod.getaddrinfo = _orig_gai
+            last = e
+            time.sleep(1.0)
+    if proxy:
+        try:
+            _socket_mod.getaddrinfo = _ipv4_only
+            opener = urllib.request.build_opener(
+                urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
+            req = urllib.request.Request(url, data=data, headers=headers, method="POST")
+            with opener.open(req, timeout=timeout, context=ctx) as r:
+                _socket_mod.getaddrinfo = _orig_gai
+                return _json.loads(r.read().decode("utf-8", errors="ignore"))
+        except Exception as e:
+            _socket_mod.getaddrinfo = _orig_gai
+            last = e
+    raise last
+
+
+def _manda_items(source):
+    """上海站群 manda 站内搜索抓取。
+    源需含：
+      method: "manda"
+      manda_token: 站点 token（如 17q2lm8）
+      manda_queries: 关键词列表（如 ["招聘", "事业单位招聘"]）
+      manda_razor: 可选频道 alias（如 jamh_search / fxss_razor），缺省自动探测 ui
+    返回 items 列表（title/url/date）。
+    """
+    token = source["manda_token"]
+    base = "https://ss.shanghai.gov.cn/manda-app/api/app/search/v1"
+    queries = source.get("manda_queries") or ["招聘"]
+    razor = source.get("manda_razor")
+    size = int(source.get("manda_size", 40))
+    # 若未指定 razor，先用 ui 接口探测可用搜索频道（取第一个 *_search / *_razor 非 suggest/imgsearch）
+    if not razor:
+        try:
+            ui = _http_post_json(f"{base}/{token}/ui", {}, timeout=20)
+            for rz in (ui.get("razors") or []):
+                alias = rz.get("alias", "")
+                if alias and alias not in ("suggest", "imgsearch", "service_search", "leader_search", "wsbs", "ask_razor"):
+                    razor = alias
+                    break
+        except Exception:
+            razor = None
+    items, seen = [], set()
+    for q in queries:
+        body = {"query": q, "current": 1, "size": size, "cid": token}
+        if razor:
+            body["razor"] = razor
+        try:
+            out = _http_post_json(f"{base}/{token}/search", body, timeout=25)
+        except Exception as e:
+            print(f"[manda] {source['name']} query[{q}] 请求失败: {e}")
+            continue
+        if not out.get("success"):
+            print(f"[manda] {source['name']} query[{q}] 失败: {out.get('reason') or (out.get('_meta') or {}).get('reason','')}")
+            continue
+        for it in (out.get("result") or {}).get("items") or []:
+            title = ((it.get("title") or {}).get("raw") or "").strip()
+            u = ((it.get("url") or {}).get("raw") or "").strip()
+            if not title or not u:
+                continue
+            date = ""
+            if it.get("date") and isinstance(it.get("date"), dict):
+                date = (it["date"].get("raw") or "").strip()
+            if date and not re.match(r"^\d{4}-\d{2}-\d{2}$", date):
+                date = extract_date(date, u)
+            if not date:
+                date = extract_date(title + " " + u, u)
+            key = u.split("#")[0]
+            if key in seen:
+                continue
+            seen.add(key)
+            items.append({"title": title[:200], "url": u, "date": date})
+    return items
+
+
+def _filter_manda_items(source, items):
+    """对 manda 搜索返回的 items 应用源的 include/exclude + 标题去重 + 日期窗口。
+
+    保留规则：
+      - 必须命中 title_include（白名单：公开招聘/招聘公告/招录/选调等）
+      - 剔除命中 title_exclude 的噪声（公示/名单/成绩/新闻/问答等）
+      - 同标题仅留一条（manda 会把同一公告镜像到多个局子站/人社局站，URL 不同但内容同）
+      - 有明确日期且超过 manda_days 天的丢弃（默认 400 天，避免灌入上古历史）
+    """
+    inc = re.compile(source["title_include"]) if source.get("title_include") else None
+    exc = re.compile(source["title_exclude"]) if source.get("title_exclude") else None
+    days = int(source.get("manda_days", 400))
+    now = datetime.date.today()
+    def _norm(t):
+        t = re.sub(r"^【[^】]*】", "", t or "")          # 去【区教育局】等前缀
+        t = re.sub(r"^(就业招聘|招聘)\s*[|｜]\s*", "", t)  # 去 "就业招聘 | " 前缀
+        return re.sub(r"\s+", "", t)
+    seen = set()
+    out = []
+    for it in items:
+        t = it["title"] or ""
+        nt = _norm(t)
+        if inc and not inc.search(nt):
+            continue
+        if exc and exc.search(nt):
+            continue
+        if GLOBAL_NOISE.search(nt):
+            continue
+        key = nt[:40]
+        if key in seen:
+            continue
+        seen.add(key)
+        # 日期窗口：有明确日期但超过窗口丢弃；无日期保留（等 extract/store 处理）
+        d = it.get("date") or ""
+        if re.match(r"^\d{4}-\d{2}-\d{2}$", d):
+            try:
+                y, mo, dd = map(int, d.split("-"))
+                age = (now - datetime.date(y, mo, dd)).days
+                if age > days:
+                    continue
+            except Exception:
+                pass
+        out.append(it)
+    return out
 
 
 _browser = None
@@ -613,6 +765,13 @@ def date_backfill():
 def _work(s, limit_per_source=40):
     """单源抓取+解析（线程安全：不碰 DB）。返回 (source, items, error)。"""
     try:
+        if s.get("method") == "manda":
+            # 站内搜索 API 源：直接返回 items（title/url/date），不走 HTML 解析
+            # 注意：先过滤再去重截断（manda 相关性排序会把近期公告排到靠后，
+            # 若先截断再过滤会丢失排位靠后的近期真公告）
+            s2 = dict(s)
+            items = _filter_manda_items(s2, _manda_items(s2))
+            return s2, items[:limit_per_source], None
         html = fetch(s)
         items = parse_source(s, html)[:limit_per_source]
         return s, items, None

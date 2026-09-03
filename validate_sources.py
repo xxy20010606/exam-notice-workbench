@@ -25,7 +25,8 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 SOURCES = os.path.join(ROOT, "sources.json")
 
 REGEX_KEY_RE = re.compile(r"(include|exclude|regex|_re|_pattern)$", re.IGNORECASE)
-VALID_METHODS = {"http", "browser", "api"}
+# api 用于纯 HTTP JSON API 分页源（福建统一平台）；manda 用于上海站群站内搜索(POST JSON)
+VALID_METHODS = {"http", "browser", "api", "manda"}
 VALID_WAIT_UNTIL = {"load", "domcontentloaded", "networkidle"}
 VALID_URL_RE = re.compile(r"^https?://[^\s/]+", re.IGNORECASE)
 
