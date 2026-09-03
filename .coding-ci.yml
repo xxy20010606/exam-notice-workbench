@@ -1,15 +1,15 @@
 # 腾讯云 CODING 持续集成 — 公考事考公告抓取
 # 国内 IP 直连 gov.cn，解决 GitHub Actions 海外 IP 被封问题
-# 用法：导入到 dev.tencent.com 项目 → 开启持续集成 → 定时触发
+# 用法：导入到 coding.tencent.com 项目 → 开启持续集成 → 定时触发
 
 name: exam-notice-scrape
 
 trigger_config:
   trigger_type: cron
-  cron_expr: "0 */6 * * *"  # 每 6 小时（与 GHA scrape-cloud 对齐）
+  cron_expr: "0 */6 * * *"  # 每 6 小时（5 段 Unix cron，与 GHA scrape-cloud 对齐）
   enable: true
 
-# 手动触发也保留
+# push 触发：每次 GitHub main 更新后跑一次（保证数据最新）
 on:
   push:
     branches:
@@ -20,16 +20,24 @@ on:
       include:
         - main
 
+# 不再加默认 artifacts / cache，保持简单
 stages:
   - name: 抓取并部署
     strategy: naturally
     triggers: manual
     steps:
       - step: shell@1
-        name: 运行抓取脚本(国内IP直连+推回GitHub)
+        name: 安装依赖并抓取(国内IP直连+推回GitHub)
         with:
           content: |-
             set -e
-            echo "=== 运行 ci_scrape.sh（国内IP直连 gov.cn，仅 .has_change>0 才推回 GitHub main）==="
+            export DEBIAN_FRONTEND=noninteractive
+            echo "=== 国内 CI 环境准备：把 git SSH 改走 HTTPS（Gitee Coding 内部网络常封 22 端口）==="
+            git config --global url."https://github.com/".insteadOf "git@github.com:"
+            echo "=== 装 Python 依赖 ==="
+            pip install -r requirements.txt -q
+            echo "=== 装 Playwright Chromium（忽略失败以防镜像源不通）==="
+            playwright install chromium 2>/dev/null || true
+            echo "=== 抓取并按 .has_change 推回 GitHub main ==="
             bash ci_scrape.sh
             echo "=== 抓取结束 ==="
