@@ -2,16 +2,19 @@ version: '1.0'
 name: exam-notice-scrape
 displayName: exam-notice-scrape
 
-# 触发器：定时 + push main
-# 注：Gitee Go 用 triggers（不是 on:），push.branches.precise 是精确匹配
+# 触发器：仅 push main（方案X：Gitee Go 手动/schedule 资源池报 agents not available，
+# 但 push 触发走不同资源池可能能跑。由 GitHub Actions scrape-cloud 每6小时跑完
+# push main → 此处 Gitee Go 收到 push 事件 → 在国内 IP 补抓一次）
 triggers:
   push:
     branches:
       precise:
         - main
     commitMessages: []   # 不过滤 commit message，避免被防重入锁死
-  schedule:
-    cron: '0 0 */6 * * *'   # 每 6 小时（Quartz 6 段：秒 分 时 日 月 周，dict 形式）
+
+# 注：schedule 段已移除——Gitee Go 定时/手动触发资源池报 agents not available，
+# 且 cron 字段在个人版文档缺失易踩坑。保留 push 触发（GitHub Actions scrape-cloud
+# 每6小时跑完会 push main → 此处 Gitee Go 收到 push 在国内 IP 补抓一次）
 
 stages:
   - name: scrape
