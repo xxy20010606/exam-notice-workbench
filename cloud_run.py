@@ -24,26 +24,25 @@ import scraper, build_dashboard, exam_sync
 _PROXY = os.environ.get("SCRAPE_PROXY", "").strip()
 print(f"[代理] {'已启用国内代理（直连失败自动回退）' if _PROXY else '未配置，纯直连（当前行为）'}")
 
-# === 临时探测：福建统一平台 API 在 GitHub 云端连通性 ===
+# === 临时探测：浙江通用招聘网报平台(qssy.zjks.com) 在 GitHub 云端连通性 ===
 # （非业务代码，仅打印日志观察。结果不影响抓取流程，跑完即弃。）
-import urllib.request
+import urllib.request, urllib.parse as _up
 try:
+    _data = _up.urlencode({"mkxh": "2", "dsdm": ""}).encode()
     req = urllib.request.Request(
-        "http://220.160.53.33:8903/ksbm/student/home/newsList?userId=&year=&orderBy=1&pageNum=1&pageSize=3&flag=2&isProject=1",
-        headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"},
+        "http://qssy.zjks.com/tyzpwb/website/queryMore.htm", data=_data,
+        headers={"User-Agent": "Mozilla/5.0",
+                 "Content-Type": "application/x-www-form-urlencoded"},
     )
-    r = urllib.request.urlopen(req, timeout=20)
+    r = urllib.request.urlopen(req, timeout=25)
     body = r.read().decode("utf-8", "ignore")
-    import json as _json
-    j = _json.loads(body)
-    data = j.get("data", {})
-    rows = data.get("rows", []) if isinstance(data, dict) else []
-    total = data.get("total") if isinstance(data, dict) else len(rows)
-    print(f"[PROBE-福建API] ✅ 通！HTTP {r.status} 本页{len(rows)}条 total={total}")
-    for row in rows[:2]:
-        print(f"   - {str(row.get('proTitle') or row.get('title'))[:50]}")
+    import re as _re
+    rows = _re.findall(r"onclick=\"queryDetail\([^)]*\);?\"[^>]*>([^<]+)</a>", body)
+    print(f"[PROBE-浙江平台] ✅ 通！HTTP {r.status} size={len(body)} 公告 {len(rows)} 条")
+    for t in rows[:3]:
+        print(f"   - {t.strip()[:60]}")
 except Exception as _e:
-    print(f"[PROBE-福建API] ❌ 不通：{type(_e).__name__}: {str(_e)[:200]}")
+    print(f"[PROBE-浙江平台] ❌ 不通：{type(_e).__name__}: {str(_e)[:200]}")
 
 SMTP_HOST = "smtp.163.com"
 SMTP_PORT = 465
