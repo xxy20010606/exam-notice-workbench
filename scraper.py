@@ -641,6 +641,8 @@ def run_all(limit_per_source=40, max_workers=8,
         sources = [s for s in sources if only_region in (s.get("region", "") or "")]
     if exclude_region:
         sources = [s for s in sources if exclude_region not in (s.get("region", "") or "")]
+    # 显式 enabled:false 的源一律跳过（不再被误抓）。历史遗留/被替代源用此字段关闭。
+    sources = [s for s in sources if s.get("enabled", True) is not False]
     conn = init_db()
     report = {"run_at": now_iso(), "sources": [], "new": []}
 
