@@ -11,7 +11,7 @@ triggers:
         - main
     commitMessages: []   # 不过滤 commit message，避免被防重入锁死
   schedule:
-    - cron: '0 */6 * * *'   # 每 6 小时（Gitee Go 标准 5 段 cron）
+    - cron: '0 0 */6 * * *'   # 每 6 小时（Quartz 6 段：秒 分 时 日 月 周）
 
 stages:
   - name: scrape
