@@ -3,13 +3,16 @@
 GitHub Actions 的 runner 是海外 IP，被国内 gov.cn 封（Network unreachable / 403 / 超时）。
 本方案把抓取迁到 **Gitee Go**（Gitee 持续集成，国内 IP 直连通畅）。
 
-## 一、GitHub 侧（已完成 ✅）
+## 一、GitHub 侧（2026-09-03 已轮换新密钥，公钥待重新添加）
 
-GitHub Deploy keys 已加 `ci-domestic`（read/write，指纹 `SHA256:hh+wWh9m...`）。
-若需重新添加：https://github.com/xxy20010606/exam-notice-workbench/settings/keys
-公钥：
+> ⚠️ 旧 `ci-domestic` 私钥曾在历史提交中疑似泄露，已于 2026-09-03 轮换为新密钥对。
+> **需在 https://github.com/xxy20010606/exam-notice-workbench/settings/keys 执行：**
+> 1. 删除旧 `ci-domestic` deploy key
+> 2. Add deploy key → Title 填 `ci-domestic` → 勾选 **Allow write access** → 粘贴下面新公钥
+
+新公钥（指纹 `SHA256:XBwewF/td9zXrJVN8jfMWeG4BVREvDYfC2NWM9T3BtM`）：
 ```
-ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAID7N97GoE5vJdkcs//nu/2mJSL5R2JOiqsmVYxqINTvA exam-notice-ci
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKAYXPWPXdhXm3U5fXvxl/BzqDZg3zRFXFwCn+cQBoVg exam-notice-ci
 ```
 
 ## 二、Gitee 侧配置（5 步）
