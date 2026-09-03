@@ -2,22 +2,35 @@ version: '1.0'
 name: exam-notice-scrape
 displayName: exam-notice-scrape
 
-on:
-  schedule:
-    - cron: '0 */6 * * *'   # 每 6 小时（Gitee Go 用标准 5 段 cron）
+# 触发器：定时 + push main
+# 注：Gitee Go 用 triggers（不是 on:），push.branches.precise 是精确匹配
+triggers:
   push:
     branches:
-      - main
+      precise:
+        - main
+    commitMessages: []   # 不过滤 commit message，避免被防重入锁死
+  schedule:
+    - cron: '0 */6 * * *'   # 每 6 小时（Gitee Go 标准 5 段 cron）
 
 stages:
   - name: scrape
+    displayName: 抓取公告
+    strategy: naturally   # 自然失败（并行任务互不影响；本流水线单 stage 不影响）
+    trigger: auto
     steps:
-      - name: "安装依赖并抓取"
-        run: |
+      - step: shell@agent    # 自定义 shell 脚本插件（官方插件标识）
+        name: run-scrape
+        displayName: 抓取并推回 GitHub
+        # hostGroupID 可不填，用 Gitee Go 默认 linux agent
+        script: |
           set -e
           export DEBIAN_FRONTEND=noninteractive
-          # 国内 CI 常封锁 SSH 端口 22，强制走 HTTPS
-          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          # 国内 CI 常封锁 SSH 端口 22，强制走 HTTPS（push.sh 已配 SSH，此处可保 HTTPS fallback）
+          git config --global url."https://github.com/".insteadOf "git@github.com:" || true
+          # 装依赖
           pip install -r requirements.txt -q
+          # 装 playwright chromium（忽略失败以防无网环境）
           playwright install chromium 2>/dev/null || true
+          # 抓取并按 .has_change 推回 GitHub main
           bash ci_scrape.sh
