@@ -459,6 +459,20 @@
     "container": "div.page-content"
   },
   {
+    "name": "浙江-事业单位(通用网报平台)",
+    "category": "事业编",
+    "region": "浙江",
+    "url": "http://qssy.zjks.com/tyzpwb/website/queryMore.htm?mkxh=2",
+    "method": "http",
+    "http_timeout": 30,
+    "container": "table.footable tbody",
+    "onclick_regex": "queryDetail\\(\\s*['\"]?(\\d+)['\"]?\\s*,\\s*['\"](\\d+)['\"]?\\s*\\)",
+    "onclick_url_template": "http://qssy.zjks.com/tyzpwb/website/queryDetail.htm?mkxh={0}&tzid={1}",
+    "title_include": "招聘|招考|招录|引进|遴选|选调|选聘|招募|招贤|引才",
+    "title_exclude": "公示|拟聘|拟录用|拟招|体检|考察|面试|笔试|成绩|递补|复审|核减|岗位核减|准考证|缴费|须知|温馨|提醒|咨询|调剂|补录|成绩公布",
+    "note": "浙江省通用招聘网报平台(qssy.zjks.com,阿里云IP 47.94.212.85 不被GitHub海外IP封锁)。mkxh=2=招考公告，服务端渲染全省11市+省直+各区县事业单位公告，标题自带[浙江省-城市-区县]前缀。GET可直取详情(queryDetail.htm?mkxh&tzid)。container限表格体排除导航噪声。替代因GHA-IP封锁而全挂的浙江各市gov.cn源。"
+  },
+  {
     "name": "浙江杭州-事业单位",
     "category": "事业编",
     "region": "浙江",

@@ -24,26 +24,6 @@ import scraper, build_dashboard, exam_sync
 _PROXY = os.environ.get("SCRAPE_PROXY", "").strip()
 print(f"[代理] {'已启用国内代理（直连失败自动回退）' if _PROXY else '未配置，纯直连（当前行为）'}")
 
-# === 临时探测：浙江通用招聘网报平台(qssy.zjks.com) 在 GitHub 云端连通性 ===
-# （非业务代码，仅打印日志观察。结果不影响抓取流程，跑完即弃。）
-import urllib.request, urllib.parse as _up
-try:
-    _data = _up.urlencode({"mkxh": "2", "dsdm": ""}).encode()
-    req = urllib.request.Request(
-        "http://qssy.zjks.com/tyzpwb/website/queryMore.htm", data=_data,
-        headers={"User-Agent": "Mozilla/5.0",
-                 "Content-Type": "application/x-www-form-urlencoded"},
-    )
-    r = urllib.request.urlopen(req, timeout=25)
-    body = r.read().decode("utf-8", "ignore")
-    import re as _re
-    rows = _re.findall(r"onclick=\"queryDetail\([^)]*\);?\"[^>]*>([^<]+)</a>", body)
-    print(f"[PROBE-浙江平台] ✅ 通！HTTP {r.status} size={len(body)} 公告 {len(rows)} 条")
-    for t in rows[:3]:
-        print(f"   - {t.strip()[:60]}")
-except Exception as _e:
-    print(f"[PROBE-浙江平台] ❌ 不通：{type(_e).__name__}: {str(_e)[:200]}")
-
 SMTP_HOST = "smtp.163.com"
 SMTP_PORT = 465
 SENDER = "xxy1037550012@163.com"
