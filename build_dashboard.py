@@ -8,7 +8,7 @@
 
 纯静态单文件，无外部依赖、可离线打开。
 """
-import sqlite3, os, json, datetime
+import sqlite3, os, json, datetime, re
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 DB = os.path.join(ROOT, "notices.db")
@@ -18,6 +18,58 @@ OUT = os.path.join(ROOT, "index.html")
 
 def now_iso():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
+# 泛化聚合 region（福建统一平台整省打成一个 region），真城市 region 优先于它展示
+_GENERIC_REGIONS = {"福建", "江苏", "浙江", "上海", "全国"}
+
+
+def _norm_title(t):
+    """看板展示层标题规范化：用于跨源镜像去重（与 scraper._norm_title 同思路，保持保守）。
+    只去【机构】方括号前缀 / 就业|招聘|前缀 / 全半角空白与常见装饰标点；
+    **不去括号注（如 （二）（三） 是不同批次，必须区分）**，避免误合并不同公告。
+    只作「判断两条是否同公告」用，不改展示原文。
+    """
+    t = re.sub(r"^【[^】]*】", "", t or "")
+    t = re.sub(r"^(?:就业招聘|人才招聘|招聘|招考|招录)\s*[|｜]\s*", "", t)
+    t = re.sub(r"[\s\u3000·、，,。．.!！!？?：:；;~～—\-–→　]", "", t)
+    return t
+
+
+def _region_rank(region):
+    """城市粒度 region 优于泛化聚合 region（如 龙岩 > 福建），用于保留哪条。"""
+    r = (region or "").strip()
+    return 0 if r in _GENERIC_REGIONS else 1
+
+
+def _dedup_notices(notices):
+    """展示层去重：同一规范化标题（跨源镜像）只保留一条。
+    优先保留「城市粒度 region + first_seen 更早」的一条，丢弃泛化聚合 region 的镜像。
+    """
+    best = {}  # norm_title -> 该组应保留的 index
+    empty_ok = set()  # 无有效标题的公告一律保留
+    for i, n in enumerate(notices):
+        key = _norm_title(n.get("title") or "")
+        if not key:
+            empty_ok.add(i)
+            continue
+        if key not in best:
+            best[key] = i
+            continue
+        j = best[key]
+        a, b = notices[j], n
+        # 城市 region 优先；同级比 first_seen 早；再同级保 index 早（稳定）
+        if _region_rank(b.get("region")) < _region_rank(a.get("region")):
+            continue
+        if _region_rank(b.get("region")) > _region_rank(a.get("region")):
+            best[key] = i
+            continue
+        afs, bfs = a.get("first_seen") or "", b.get("first_seen") or ""
+        if bfs and (not afs or bfs < afs):
+            best[key] = i
+    # 每组规范化标题只保留 best 那条；无有效标题的公告(empty_ok)与唯一标题公告全保留
+    keep = set(best.values()) | empty_ok
+    return [n for i, n in enumerate(notices) if i in keep]
 
 
 def render_sidebar():
@@ -509,6 +561,9 @@ def build():
             "url": r[4], "date": r[5], "first_seen": r[6], "last_seen": r[7],
             "is_new": (r[5] == today) or (r[6] and r[6][:10] == today),
         })
+    # 展示层去重：同一公告被多个源镜像（如福建统一平台 36 条 vs 福州/泉州/龙岩 子源）
+    # 只保留一条，优先城市粒度 region。仅影响看板展示，不删库。
+    notices = _dedup_notices(notices)
     data = {"generated": now_iso(), "notices": notices}
     exam = {}
     if os.path.exists(EXAM_FILE):
