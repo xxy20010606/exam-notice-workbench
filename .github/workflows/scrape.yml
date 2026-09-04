@@ -13,6 +13,7 @@ on:
       - 'requirements.txt'
       - '.github/workflows/scrape.yml'
       - 'notices.db'
+      - 'index.html'
   schedule:
     # 每 6 小时跑一次（分钟取 17 避免整点拥堵）
     - cron: '17 */6 * * *'
