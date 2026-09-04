@@ -1030,6 +1030,8 @@ def date_backfill():
 def _work(s, limit_per_source=40):
     """单源抓取+解析（线程安全：不碰 DB）。返回 (source, items, error)。"""
     try:
+        # 每源 limit 覆盖：sources.json 里配 "limit": N 可单独调大该源入库条数
+        limit_per_source = s.get("limit", limit_per_source)
         if s.get("method") == "api":
             # 福建统一平台 JSON API 源：抓取 newsList → items，复用 manda 的过滤链
             # (include/exclude + GLOBAL_NOISE + 规范化标题去重 + 日期窗口)。

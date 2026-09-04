@@ -39,9 +39,10 @@
     "api_days": 400,
     "title_include": "招聘|招考|招录|引进|选调|遴选|招募|招才",
     "title_exclude": "公示|拟聘|拟录用|拟招|拟录|拟选|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|招聘会|专场招聘会|活动预告|校园招聘|网络招聘|线上招聘|人才市场|报道|新闻|导语|考前|考点|笔试时间|补充通知|公告发布",
-    "note": "福建统一平台新闻feed API(flag=2&isProject=1)覆盖全省9市+平潭的公开招聘公告。SPA首页/home是壳无公告,故改用其XHR数据端点newsList(JSON,无需登录,规避GHA对各地市gov子站封锁)。标题含真实公告URL+noticeTime日期。",
+    "note": "福建统一平台新闻feed API(flag=2&isProject=1)覆盖全省9市+平潭的公开招聘公告。SPA首页/home是壳无公告,故改用其XHR数据端点newsList(JSON,无需登录,规避GHA对各地市gov子站封锁)。标题含真实公告URL+noticeTime日期。；limit=200 解决统一平台第47位后(龙岩中医院/石狮等)被全局默认40截断的覆盖瓶颈",
     "block_external": true,
-    "url": "http://220.160.53.33:8903/home"
+    "url": "http://220.160.53.33:8903/home",
+    "limit": 200
   },
   {
     "name": "泉州-事业单位招聘",
@@ -618,12 +619,10 @@
     "category": "事业编",
     "region": "江苏",
     "url": "https://rsj.nanjing.gov.cn/site/njss/search.html?searchWord=%E6%8B%9B%E8%81%98&siteId=45&pageSize=20&orderBy=time&orderByOrder=desc",
-    "method": "browser",
+    "method": "http",
     "title_include": "招聘|招考|招录|引进|遴选|选调|公告|公示|简章|通知|方案",
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
-    "browser_wait": 10000,
-    "browser_wait_until": "domcontentloaded",
-    "browser_timeout": 30000
+    "note": "国内IP http直连 rsj.nanjing.gov.cn 首页可行(2026-09-04实测200/54KB含当日公告)。⚠加速乐WAF按频率封IP(连测8+次触发403封禁)，6h一轮的单次请求低频安全；若遇403由fail_streak自适应退避兜底"
   },
   {
     "name": "江苏苏州-事业单位",
