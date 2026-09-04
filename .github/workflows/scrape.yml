@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     if: |
       github.event_name != 'push' ||
-      (github.event_name == 'push' && !contains(github.event.head_commit.message, '定时更新公告'))
+      (github.event_name == 'push' && !contains(github.event.head_commit.message, '定时更新公告') && !contains(github.event.head_commit.message, 'WorkBuddy国内抓取'))
     concurrency:
       group: cloud-scrape
       cancel-in-progress: true   # 新一次抓取开始就取消上一次，避免重叠写库
@@ -98,6 +98,37 @@ jobs:
           git add -A
           git commit -m "chore: 定时更新公告(云端) $(date +'%Y-%m-%d %H:%M')"
           git push
+
+      - name: 上传 Pages 产物
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .
+
+      - name: 部署 Pages
+        uses: actions/deploy-pages@v5
+
+  # ---------- WorkBuddy 国内通道：国内自动化 push 的数据 commit 只重建看板并部署 ----------
+  # 国内自动化（WorkBuddy 沙箱，中国出口 IP）抓取非 browser 源并 push notices.db/index.html，
+  # message 含「WorkBuddy国内抓取」。此 job 不抓取，仅用最新库重建看板并发布 Pages，
+  # 解决「数据 commit 不在 push.paths 内、GHA 抓取 job 又被海外 IP 封锁」的部署断点。
+  deploy-wb:
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name == 'push' && contains(github.event.head_commit.message, 'WorkBuddy国内抓取')
+    concurrency:
+      group: pages-deploy
+      cancel-in-progress: true
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v5
+
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: 重建看板（用 push 来的最新 notices.db）
+        run: python build_dashboard.py
 
       - name: 上传 Pages 产物
         uses: actions/upload-pages-artifact@v4
