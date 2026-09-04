@@ -18,9 +18,21 @@ sys.path.insert(0, ROOT)
 import scraper, build_dashboard
 
 
-def main():
+def _playwright_available():
+    """自动检测：playwright 可用则 browser 源也走国内通道（实测国内 IP 对
+    rsj.lyg/hrss.zhenjiang 等可直接访问），不可用则自动跳过（仅跑轻量源）。"""
     try:
-        report = scraper.run_all(skip_browser=True)
+        import playwright  # noqa: F401
+        return True
+    except Exception:
+        return False
+
+
+def main():
+    skip_browser = not _playwright_available()
+    print(f"[lite] playwright {'可用，browser 源纳入国内抓取' if not skip_browser else '不可用，跳过 browser 源'}")
+    try:
+        report = scraper.run_all(skip_browser=skip_browser)
     except Exception as _e:
         print(f"[warn] run_all 异常（仍继续 cleanup/回填）: {_e}")
         report = {"new": [], "run_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "sources": []}
