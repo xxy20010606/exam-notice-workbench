@@ -32,15 +32,16 @@
     "name": "福建-全省事业单位(统一平台)",
     "category": "事业编",
     "region": "福建",
-    "url": "http://220.160.53.33:8903/home",
-    "method": "browser",
-    "browser_wait": 10000,
-    "browser_wait_until": "domcontentloaded",
-    "title_include": "事业单位.{0,6}(公开)?(招聘|招考|招录)|公开招聘(事业单位|工作人员)|(省属|市直|区县).{0,10}(招聘|招考|招录)",
-    "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|补充通知|高层次人才招聘方案$|招聘会|专场招聘会|活动预告|百日千万|政商开放|资质事先|企业|公司|人力资源服务|网络招聘|线上招聘|校园招聘|人才市场",
-    "note": "福建省事业单位公开招聘统一平台(福建就业网,220.160.53.33:8903)，覆盖全省9市+平潭。title_include已收紧为仅匹配'事业单位公开招聘'类公告，排除招聘会/活动/企业通知噪声。SPA需browser模式。替代被GHA-IP封锁的5个地市子域(厦漳莆南宁)",
+    "method": "api",
+    "api_url": "http://220.160.53.33:8903/ksbm/student/home/newsList?userId=&year=&orderBy=1&pageNum={pageNum}&pageSize=100&flag=2&isProject=1",
+    "api_referer": "http://220.160.53.33:8903/home",
+    "api_pages": 15,
+    "api_days": 400,
+    "title_include": "招聘|招考|招录|引进|选调|遴选|招募|招才",
+    "title_exclude": "公示|拟聘|拟录用|拟招|拟录|拟选|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|名单|有关事宜|延长|申诉|开考|岗位开考|有关事项|招聘会|专场招聘会|活动预告|校园招聘|网络招聘|线上招聘|人才市场|报道|新闻|导语|考前|考点|笔试时间|补充通知|公告发布",
+    "note": "福建统一平台新闻feed API(flag=2&isProject=1)覆盖全省9市+平潭的公开招聘公告。SPA首页/home是壳无公告,故改用其XHR数据端点newsList(JSON,无需登录,规避GHA对各地市gov子站封锁)。标题含真实公告URL+noticeTime日期。",
     "block_external": true,
-    "browser_timeout": 30000
+    "url": "http://220.160.53.33:8903/home"
   },
   {
     "name": "泉州-事业单位招聘",
@@ -963,7 +964,11 @@
     "method": "manda",
     "manda_token": "17q2lm8",
     "manda_razor": "jamh_search",
-    "manda_queries": ["公开招聘", "招聘公告", "招录"],
+    "manda_queries": [
+      "公开招聘",
+      "招聘公告",
+      "招录"
+    ],
     "manda_size": 50,
     "manda_days": 180,
     "title_include": "公开招聘|招录公告|招聘公告|选调|引进人才|(教师|社区工作者|编外|国企|事业单位|社工).{0,8}(公开招聘|招聘)|招聘启事",
@@ -977,7 +982,11 @@
     "method": "manda",
     "manda_token": "1g0ruv4",
     "manda_razor": "fxss_razor",
-    "manda_queries": ["公开招聘", "招聘公告", "招录"],
+    "manda_queries": [
+      "公开招聘",
+      "招聘公告",
+      "招录"
+    ],
     "manda_size": 50,
     "manda_days": 180,
     "title_include": "公开招聘|招录公告|招聘公告|选调|引进人才|(教师|社区工作者|编外|国企|事业单位|社工).{0,8}(公开招聘|招聘)|招聘启事",
@@ -990,7 +999,11 @@
     "url": "https://www.shmh.gov.cn/shmh/webrobot/index.html",
     "method": "manda",
     "manda_token": "gxrmu1",
-    "manda_queries": ["公开招聘", "招聘公告", "招录"],
+    "manda_queries": [
+      "公开招聘",
+      "招聘公告",
+      "招录"
+    ],
     "manda_size": 50,
     "manda_days": 180,
     "title_include": "公开招聘|招录公告|招聘公告|选调|引进人才|(教师|社区工作者|编外|国企|事业单位|社工).{0,8}(公开招聘|招聘)|招聘启事",
@@ -1003,7 +1016,11 @@
     "url": "https://www.shcm.gov.cn/zcsearch/webrobot.html",
     "method": "manda",
     "manda_token": "739c5s",
-    "manda_queries": ["公开招聘", "招聘公告", "招录"],
+    "manda_queries": [
+      "公开招聘",
+      "招聘公告",
+      "招录"
+    ],
     "manda_size": 50,
     "manda_days": 180,
     "title_include": "公开招聘|招录公告|招聘公告|选调|引进人才|(教师|社区工作者|编外|国企|事业单位|社工).{0,8}(公开招聘|招聘)|招聘启事",
@@ -1016,7 +1033,11 @@
     "url": "https://www.songjiang.gov.cn/Template/dynamic/webrobot.html",
     "method": "manda",
     "manda_token": "1vu6oz2",
-    "manda_queries": ["公开招聘", "招聘公告", "招录"],
+    "manda_queries": [
+      "公开招聘",
+      "招聘公告",
+      "招录"
+    ],
     "manda_size": 50,
     "manda_days": 180,
     "title_include": "公开招聘|招录公告|招聘公告|选调|引进人才|(教师|社区工作者|编外|国企|事业单位|社工).{0,8}(公开招聘|招聘)|招聘启事",
@@ -1030,7 +1051,11 @@
     "method": "manda",
     "manda_token": "127fihl",
     "manda_razor": "cnss_razor",
-    "manda_queries": ["公开招聘", "招聘公告", "招录"],
+    "manda_queries": [
+      "公开招聘",
+      "招聘公告",
+      "招录"
+    ],
     "manda_size": 50,
     "manda_days": 180,
     "title_include": "公开招聘|招录公告|招聘公告|选调|引进人才|(教师|社区工作者|编外|国企|事业单位|社工).{0,8}(公开招聘|招聘)|招聘启事",
@@ -1043,7 +1068,11 @@
     "url": "https://www.shpt.gov.cn/ptsearch/",
     "method": "manda",
     "manda_token": "1dzppto",
-    "manda_queries": ["公开招聘", "招聘公告", "招录"],
+    "manda_queries": [
+      "公开招聘",
+      "招聘公告",
+      "招录"
+    ],
     "manda_size": 50,
     "manda_days": 180,
     "title_include": "公开招聘|招录公告|招聘公告|选调|引进人才|(教师|社区工作者|编外|国企|事业单位|社工).{0,8}(公开招聘|招聘)|招聘启事",
@@ -1055,7 +1084,11 @@
     "region": "江苏",
     "url": "https://www.suzhou.gov.cn/search4/s?searchWord={searchWord}&column=%E7%AB%99%E7%BE%A4&siteCode=3205000002&sonSiteCode=3205000056&pageNum=0&uc=0",
     "method": "jsptsearch",
-    "jspt_keywords": ["招聘", "公开招聘", "招录"],
+    "jspt_keywords": [
+      "招聘",
+      "公开招聘",
+      "招录"
+    ],
     "title_include": "公开招聘|招聘公告|招聘启事|招录公告|招聘教师|引进|选调|(教师|卫技|医师|医技|社区工作者|国企|编外).{0,8}(公开招聘|招聘)",
     "title_exclude": "公示|拟录用|拟聘用|拟招|拟录|名单|结果|公告发布|办事指南|如何|怎样|什么|为什么|发布会|招聘会|专场|倒计时|即将|今日|来了|新闻|报道|取消|调整公告|报名情况|普法|课堂|注意事项|无纸化|考试院|政策解读|问答"
   }

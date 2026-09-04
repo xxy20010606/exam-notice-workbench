@@ -6,6 +6,8 @@
 - method="browser" : 用 Playwright 无头浏览器执行 JS（适用于反爬/JS 渲染站点，如国考）
 - method="manda"   : 上海站群站内搜索(POST JSON 到 ss.shanghai.gov.cn/manda-app)。
                     源需含 manda_token + manda_queries；返回带 title/url/date 的 items。
+- method="api"     : 福建统一平台 JSON 数据源(GET newsList, flag=2&isProject=1)，
+                    源需含 api_url(可用 {pageNum} 占位)；返回 title/url/date 的 items。
 """
 import json, os, sqlite3, hashlib, re, time, datetime
 from urllib.parse import urljoin, quote
@@ -183,6 +185,111 @@ def _http_post_json(url, payload, timeout=30, retries=2):
             _socket_mod.getaddrinfo = _orig_gai
             last = e
     raise last
+
+
+def _http_get_json(url, referer=None, timeout=20, retries=2):
+    """GET 返回 JSON(dict)。强制 IPv4 + 代理回退，兼容福建统一平台等 JSON 接口。
+    返回解析后的 dict；失败抛异常。
+    """
+    import urllib.request, ssl, socket as _socket_mod, json as _json
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    proxy = os.environ.get("SCRAPE_PROXY", "").strip()
+    headers = {
+        "User-Agent": DEFAULT_UA,
+        "Accept": "application/json, text/plain, */*",
+        "Accept-Language": "zh-CN,zh;q=0.9",
+    }
+    if referer:
+        headers["Referer"] = referer
+    _orig_gai = _socket_mod.getaddrinfo
+    def _ipv4_only(host, port, family=0, *a, **kw):
+        return _orig_gai(host, port, _socket_mod.AF_INET if family == 0 else family, *a, **kw)
+    last = None
+    for _ in range(retries + 1):
+        try:
+            _socket_mod.getaddrinfo = _ipv4_only
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
+                _socket_mod.getaddrinfo = _orig_gai
+                return _json.loads(r.read().decode("utf-8", errors="ignore"))
+        except Exception as e:
+            _socket_mod.getaddrinfo = _orig_gai
+            last = e
+            time.sleep(1.0)
+    if proxy:
+        try:
+            _socket_mod.getaddrinfo = _ipv4_only
+            opener = urllib.request.build_opener(
+                urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
+            req = urllib.request.Request(url, headers=headers)
+            with opener.open(req, timeout=timeout, context=ctx) as r:
+                _socket_mod.getaddrinfo = _orig_gai
+                return _json.loads(r.read().decode("utf-8", errors="ignore"))
+        except Exception as e:
+            _socket_mod.getaddrinfo = _orig_gai
+            last = e
+    raise last
+
+
+def _fujian_api_items(source):
+    """福建省事业单位公开招聘统一平台（http://220.160.53.33:8903）JSON 数据源。
+
+    平台首页 /home 是 SPA 壳（无公告链接），真正的公告列表由前端 XHR 拉取：
+      GET /ksbm/student/home/newsList?userId=&year=&orderBy=1&pageNum=N&pageSize=100
+            &flag=2&isProject=1
+    flag=2&isProject=1 返回「公开招聘公告」feed（total≈1500，全部近期，含 clean
+    title + 真实公告 URL + noticeTime 日期），覆盖全省 9 市 + 平潭，无需登录、
+    无 GHA 海外 IP 对各地市 gov 子站的封锁问题（数据来自平台自身服务器）。
+
+    源配置:
+      method: "api"
+      api_url:  newsList 请求 URL（内部以 {pageNum} 占位页码）
+      api_pages: 抓取页数（默认 15，pageSize 固定 100）
+      api_days:  只收近 N 天公告（默认 400）
+    返回 items(title/url/date)。
+    """
+    base = source.get("api_url") or source.get("url")
+    pages = int(source.get("api_pages", 15))
+    size = 100
+    referer = source.get("api_referer") or "http://220.160.53.33:8903/home"
+    items, seen = [], set()
+    total_ok = False
+    for p in range(1, pages + 1):
+        url = base.format(pageNum=p) if "{pageNum}" in base else base + \
+              (("&" if "?" in base else "?") + f"pageNum={p}&pageSize={size}")
+        try:
+            out = _http_get_json(url, referer=referer, timeout=20, retries=1)
+        except Exception as e:
+            print(f"[api] {source['name']} 第{p}页请求失败: {e}")
+            break
+        data = out.get("data") or {}
+        rows = data.get("rows") or []
+        if not rows:
+            break
+        total_ok = True
+        for r in rows:
+            title = (r.get("title") or r.get("proTitle") or "").strip()
+            u = (r.get("url") or "").strip()
+            if not title or not u or not u.startswith("http"):
+                continue
+            # noticeTime 形如 2026-09-04T08:30:09.000+08:00
+            date = ""
+            nt = (r.get("noticeTime") or "")
+            m = re.match(r"(\d{4})-(\d{2})-(\d{2})", nt)
+            if m:
+                date = f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+            key = u.split("#")[0]
+            if key in seen:
+                continue
+            seen.add(key)
+            items.append({"title": title[:200], "url": u, "date": date})
+        if len(rows) < size:
+            break
+    if not total_ok:
+        raise RuntimeError("统一平台 newsList 未返回有效 rows")
+    return items
 
 
 def _manda_items(source):
@@ -923,6 +1030,12 @@ def date_backfill():
 def _work(s, limit_per_source=40):
     """单源抓取+解析（线程安全：不碰 DB）。返回 (source, items, error)。"""
     try:
+        if s.get("method") == "api":
+            # 福建统一平台 JSON API 源：抓取 newsList → items，复用 manda 的过滤链
+            # (include/exclude + GLOBAL_NOISE + 规范化标题去重 + 日期窗口)。
+            s2 = dict(s)
+            items = _filter_manda_items(s2, _fujian_api_items(s2))
+            return s2, items[:limit_per_source], None
         if s.get("method") == "manda":
             # 站内搜索 API 源：直接返回 items（title/url/date），不走 HTML 解析
             # 注意：先过滤再去重截断（manda 相关性排序会把近期公告排到靠后，
