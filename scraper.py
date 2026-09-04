@@ -782,11 +782,49 @@ def cleanup_noise():
     ).fetchall():
         conn.execute("DELETE FROM notices WHERE id=?", (rid,))
         n += 1
+    # 同源同规范化标题的历史镜像去重：manda 会把同一公告索引到多个局子站 URL、
+    # 山西/江苏部分站同一公告也有两种 URL 路径、长宁"正式版+宣传版"等，
+    # 在 store() 入库去重上线前已堆积的同标题不同 URL 重复，这里一次性清理。
+    # 每组保留 first_seen 最早那条，其余删除（若被删行有更新的 url/date 则刷新保留行）。
+    # 仅同 source 内合并，不跨源误并。
+    rows = conn.execute(
+        "SELECT id, source, title, url, date, first_seen FROM notices"
+    ).fetchall()
+    groups = {}
+    for rid, rsrc, rtitle, rurl, rdate, rfs in rows:
+        if not rtitle:
+            continue
+        nt = _norm_title(rtitle)
+        groups.setdefault((rsrc, nt), []).append([rid, rurl, rdate, rfs])
+    for (rsrc, _nt), members in groups.items():
+        if len(members) < 2:
+            continue
+        # first_seen 最早为保留对象；时间字符串可直接字典序比较
+        members.sort(key=lambda m: m[3] or "")
+        keep = members[0]
+        for rid, rurl, rdate, _rfs in members[1:]:
+            # 被删行 url 或 date 与保留行不同且非空，则刷新保留行（保留最可点的 url）
+            upd = []
+            if rurl and rurl != keep[1]:
+                keep[1] = rurl
+                upd.append("url")
+            if rdate and rdate != keep[2]:
+                keep[2] = rdate
+                upd.append("date")
+            if upd:
+                if "url" in upd and "date" in upd:
+                    conn.execute("UPDATE notices SET url=?, date=? WHERE id=?", (keep[1], keep[2], keep[0]))
+                elif "url" in upd:
+                    conn.execute("UPDATE notices SET url=? WHERE id=?", (keep[1], keep[0]))
+                else:
+                    conn.execute("UPDATE notices SET date=? WHERE id=?", (keep[2], keep[0]))
+            conn.execute("DELETE FROM notices WHERE id=?", (rid,))
+            n += 1
 
     conn.commit()
     conn.close()
     if n:
-        print(f"[清理] 删除 {n} 条历史噪声记录")
+        print(f"[清理] 删除 {n} 条历史噪声/重复记录")
     return n
 
 
