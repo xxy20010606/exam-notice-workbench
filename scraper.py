@@ -8,7 +8,7 @@
                     源需含 manda_token + manda_queries；返回带 title/url/date 的 items。
 """
 import json, os, sqlite3, hashlib, re, time, datetime
-from urllib.parse import urljoin
+from urllib.parse import urljoin, quote
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -299,6 +299,74 @@ def _filter_manda_items(source, items):
                         continue
                 except Exception:
                     pass
+        out.append(it)
+    return out
+
+
+# ---------------- 江苏站群 search4（jsptsearch） ----------------
+def _jsptsearch_items(source):
+    """江苏站群 search4 站内搜索（GET SSR）。用于人社局子站招聘公告检索。
+    源需含:
+      method: "jsptsearch"
+      jspt_url:  search4 URL 模板(含 {searchWord} 占位, 或直接含 searchWord=xxx)
+      jspt_keywords: 关键词列表(如 ["招聘"])
+    返回 items(title/url/date)。
+    search4 结果页 SSR 渲染, 每条主公告为 <a class="..titleFont permitT.." href=.. title=标题>,
+    日期在同结果块内 <b>YYYY-MM-DD</b>。解析后入库。
+    """
+    base = source.get("jspt_url") or source.get("url")
+    keywords = source.get("jspt_keywords") or ["招聘"]
+    items, seen = [], set()
+    for kw in keywords:
+        url = base.format(searchWord=quote(kw)) if "{searchWord}" in base else base
+        try:
+            html = fetch_http(url, timeout=25)
+        except Exception as e:
+            print(f"[jsptsearch] {source['name']} 关键词[{kw}] 请求失败: {e}")
+            continue
+        pat_a = re.compile(
+            r'<a[^>]+href="(https?://[^"]+)"[^>]*class="[^"]*titleFont[^"]*permitT[^"]*"[^>]*title="([^"]+)"', re.S)
+        matches = list(pat_a.finditer(html))
+        for k, m in enumerate(matches):
+            u, t = m.group(1), m.group(2).strip()
+            if not u or not t:
+                continue
+            key = u.split("#")[0]
+            if key in seen:
+                continue
+            seen.add(key)
+            # 该结果块 = 到下一条标题 a 前，块内取日期 <b>YYYY-MM-DD</b>
+            blk_end = matches[k+1].start() if k+1 < len(matches) else len(html)
+            block = html[m.end():blk_end]
+            dm = re.search(r'<b>\s*(20\d{2}-\d{1,2}-\d{1,2})\s*</b>', block)
+            if not dm:
+                dm = re.search(r'(20\d{2}-\d{1,2}-\d{1,2})', block)
+            date = dm.group(1) if dm else ""
+            items.append({"title": t[:200], "url": u, "date": date})
+    return items
+
+
+def _filter_jsptsearch(source, items):
+    """对 search4 结果应用源的 include/exclude + 全局噪声 + 标题去重。
+    江苏人社局搜索结果常混入 拟录用公示/名单公示/政府新闻, 用 exclude 剔除。
+    """
+    inc = re.compile(source["title_include"]) if source.get("title_include") else None
+    exc = re.compile(source["title_exclude"]) if source.get("title_exclude") else None
+    seen = set()
+    out = []
+    for it in items:
+        t = it.get("title") or ""
+        nt = _norm_title(t)
+        if inc and not inc.search(nt):
+            continue
+        if exc and exc.search(nt):
+            continue
+        if GLOBAL_NOISE.search(nt):
+            continue
+        key = nt[:40]
+        if key in seen:
+            continue
+        seen.add(key)
         out.append(it)
     return out
 
@@ -861,6 +929,11 @@ def _work(s, limit_per_source=40):
             # 若先截断再过滤会丢失排位靠后的近期真公告）
             s2 = dict(s)
             items = _filter_manda_items(s2, _manda_items(s2))
+            return s2, items[:limit_per_source], None
+        if s.get("method") == "jsptsearch":
+            # 江苏站群 search4 GET SSR 源：解析搜索结果公告(title/url/date)
+            s2 = dict(s)
+            items = _filter_jsptsearch(s2, _jsptsearch_items(s2))
             return s2, items[:limit_per_source], None
         html = fetch(s)
         items = parse_source(s, html)[:limit_per_source]

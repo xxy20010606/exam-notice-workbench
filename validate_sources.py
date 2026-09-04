@@ -26,7 +26,8 @@ SOURCES = os.path.join(ROOT, "sources.json")
 
 REGEX_KEY_RE = re.compile(r"(include|exclude|regex|_re|_pattern)$", re.IGNORECASE)
 # api 用于纯 HTTP JSON API 分页源（福建统一平台）；manda 用于上海站群站内搜索(POST JSON)
-VALID_METHODS = {"http", "browser", "api", "manda"}
+# jsptsearch 用于江苏站群 search4 站内搜索(GET SSR, 如苏州市人社局招聘检索)
+VALID_METHODS = {"http", "browser", "api", "manda", "jsptsearch"}
 VALID_WAIT_UNTIL = {"load", "domcontentloaded", "networkidle"}
 VALID_URL_RE = re.compile(r"^https?://[^\s/]+", re.IGNORECASE)
 
