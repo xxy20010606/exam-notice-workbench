@@ -1057,7 +1057,8 @@ def _work(s, limit_per_source=40):
 
 def run_all(limit_per_source=40, max_workers=8,
             skip_fail_threshold=10, retry_after_hours=12,
-            only_region=None, exclude_region=None):
+            only_region=None, exclude_region=None,
+            skip_browser=False):
     """
     自适应跳过失败源：
     - 连续失败 ≥ skip_fail_threshold 次的源，本轮跳过 fetch（不耗超时）
@@ -1116,6 +1117,17 @@ def run_all(limit_per_source=40, max_workers=8,
             })
         else:
             active_sources.append(s)
+
+    # lite 模式（国内自动化无 playwright）：跳过 browser 源，只跑 http/jsptsearch/api 等
+    # 轻量源。被跳过的源标记 skipped，不计失败、不污染 fail_streak。
+    if skip_browser:
+        for s in [x for x in active_sources if x.get("method", "http") == "browser"]:
+            report["sources"].append({
+                "name": s["name"], "category": s.get("category"),
+                "region": s.get("region"), "count": 0, "new": 0,
+                "error": None, "skipped": True, "skip_reason": "lite模式跳过browser源",
+            })
+        active_sources = [x for x in active_sources if x.get("method", "http") != "browser"]
 
     http_sources = [s for s in active_sources if s.get("method", "http") != "browser"]
     browser_sources = [s for s in active_sources if s.get("method", "http") == "browser"]
