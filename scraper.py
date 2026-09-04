@@ -57,6 +57,22 @@ def now_iso():
     return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _norm_title(t):
+    """规范化公告标题，用于「同源标题去重」与 manda 内去重。
+    规则（只去装饰/载体噪声，保留实质信息）：
+      - 去【区教育局】等机构方括号前缀
+      - 去 "就业招聘 | " / "招聘 | " 前缀
+      - 去全半角空白与常见装饰标点（空格/全角空格/·/、/，/，/！/！/→）
+    例：
+      【区教育局】 2026年闵行区第二批教师招聘公告  -> 2026年闵行区第二批教师招聘公告
+      就业招聘 | 2026年奉贤区区属国有企业招聘公告 -> 2026年奉贤区区属国有企业招聘公告
+    """
+    t = re.sub(r"^【[^】]*】", "", t or "")
+    t = re.sub(r"^(就业招聘|招聘)\s*[|｜]\s*", "", t)
+    t = re.sub(r"[\s\u3000·、，,。．.！!！→]", "", t)
+    return t
+
+
 # ---------------- 抓取 ----------------
 def _decode_response(r, encoding):
     """读取 urllib 响应并解码（处理 gzip / 推断 charset）。"""
@@ -184,9 +200,10 @@ def _manda_items(source):
     razor = source.get("manda_razor")
     size = int(source.get("manda_size", 40))
     # 若未指定 razor，先用 ui 接口探测可用搜索频道（取第一个 *_search / *_razor 非 suggest/imgsearch）
+    # ui 探测属可选优化：超时短、不重试，失败则走默认索引，绝不阻塞主体抓取。
     if not razor:
         try:
-            ui = _http_post_json(f"{base}/{token}/ui", {}, timeout=20)
+            ui = _http_post_json(f"{base}/{token}/ui", {}, timeout=8, retries=0)
             for rz in (ui.get("razors") or []):
                 alias = rz.get("alias", "")
                 if alias and alias not in ("suggest", "imgsearch", "service_search", "leader_search", "wsbs", "ask_razor"):
@@ -200,7 +217,9 @@ def _manda_items(source):
         if razor:
             body["razor"] = razor
         try:
-            out = _http_post_json(f"{base}/{token}/search", body, timeout=25)
+            # 超时 12s、仅 1 次重试：GHA 海外 IP 访问 ss.shanghai.gov.cn 偶发慢，
+            # 快速失败跳过该 query 即可，避免 25s×3 空等把整轮 run 从 15min 拖到 30+min。
+            out = _http_post_json(f"{base}/{token}/search", body, timeout=12, retries=1)
         except Exception as e:
             print(f"[manda] {source['name']} query[{q}] 请求失败: {e}")
             continue
@@ -240,15 +259,11 @@ def _filter_manda_items(source, items):
     exc = re.compile(source["title_exclude"]) if source.get("title_exclude") else None
     days = int(source.get("manda_days", 400))
     now = datetime.date.today()
-    def _norm(t):
-        t = re.sub(r"^【[^】]*】", "", t or "")          # 去【区教育局】等前缀
-        t = re.sub(r"^(就业招聘|招聘)\s*[|｜]\s*", "", t)  # 去 "就业招聘 | " 前缀
-        return re.sub(r"\s+", "", t)
     seen = set()
     out = []
     for it in items:
         t = it["title"] or ""
-        nt = _norm(t)
+        nt = _norm_title(t)
         if inc and not inc.search(nt):
             continue
         if exc and exc.search(nt):
@@ -259,7 +274,9 @@ def _filter_manda_items(source, items):
         if key in seen:
             continue
         seen.add(key)
-        # 日期窗口：有明确日期但超过窗口丢弃；无日期保留（等 extract/store 处理）
+        # 日期窗口：有明确日期但超过窗口丢弃；
+        # date 为空的历史公告兜底——从标题年份判断（如"2021年度储备人才招录公告"），
+        # 年份早于窗口下限即剔除，避免 manda 把上古历史灌进库。
         d = it.get("date") or ""
         if re.match(r"^\d{4}-\d{2}-\d{2}$", d):
             try:
@@ -269,6 +286,19 @@ def _filter_manda_items(source, items):
                     continue
             except Exception:
                 pass
+        elif not d:
+            m_year = re.search(r"(20\d{2})(?:年|年度)", nt)
+            if m_year:
+                try:
+                    y = int(m_year.group(1))
+                    # 用该年「年末」兜底估算最晚可能发布日期：若年末距今已超窗口，
+                    # 说明必是历史公告（如"2021年度储备人才"），剔除。
+                    # "2026学年"不会误匹配（"学"在"年"前）；当年公告自然不超窗口。
+                    age = (now - datetime.date(y, 12, 31)).days
+                    if age > days:
+                        continue
+                except Exception:
+                    pass
         out.append(it)
     return out
 
@@ -655,6 +685,15 @@ def store(conn, source, items):
     new = []
     ts = now_iso()
     dropped = 0
+    # 载入该源现有记录的规范化标题索引：规范化标题 -> (id, url)。
+    # 目的：合并「同源同标题、URL 不同」的镜像公告（manda 会同一公告索引到多个局子站 /
+    # 人社局站；山西/江苏部分站同一公告也有两种 URL 路径；长宁"正式版+宣传版"等）。
+    # 仅在同一 source 内合并，避免跨源误并不同渠道公告。
+    title_index = {}
+    for rid, rt, rurl in conn.execute(
+            "SELECT id,title,url FROM notices WHERE source=?", (source["name"],)).fetchall():
+        if rt:
+            title_index.setdefault(_norm_title(rt), []).append([rid, rurl])
     for it in items:
         # 入库即过滤全局噪声，避免 junk 污染 notices.db 与看板
         if GLOBAL_NOISE.search(it["title"] or ""):
@@ -663,14 +702,27 @@ def store(conn, source, items):
         uid = url_id(it["url"])
         cur = conn.execute("SELECT id FROM notices WHERE id=?", (uid,)).fetchone()
         if cur:
+            # 同 URL 已存在 -> 仅刷新（保留原 first_seen）
             conn.execute("UPDATE notices SET last_seen=?, title=?, date=? WHERE id=?",
                          (ts, it["title"], it["date"], uid))
-        else:
-            conn.execute("""INSERT INTO notices(id,source,category,region,title,url,date,first_seen,last_seen)
-                            VALUES(?,?,?,?,?,?,?,?,?)""",
-                         (uid, source["name"], source.get("category", ""), source.get("region", ""),
-                          it["title"], it["url"], it["date"], ts, ts))
-            new.append(it)
+            continue
+        # 同源已有「规范化标题相同」的记录（URL 不同）-> 视为镜像，合并到已有那条
+        nt = _norm_title(it["title"]) if it.get("title") else ""
+        if nt and title_index.get(nt):
+            # 合并到最早记录的 id，用最新抓到的 url/date/title 刷新，避免镜像堆积
+            old_id = title_index[nt][0][0]
+            conn.execute("UPDATE notices SET last_seen=?, url=?, title=?, date=? WHERE id=?",
+                         (ts, it["url"], it["title"], it["date"], old_id))
+            title_index[nt][0][1] = it["url"]   # 记录已刷新的最新 url
+            continue
+        # 真正新增
+        conn.execute("""INSERT INTO notices(id,source,category,region,title,url,date,first_seen,last_seen)
+                        VALUES(?,?,?,?,?,?,?,?,?)""",
+                     (uid, source["name"], source.get("category", ""), source.get("region", ""),
+                      it["title"], it["url"], it["date"], ts, ts))
+        if nt:
+            title_index.setdefault(nt, []).append([uid, it["url"]])
+        new.append(it)
     if dropped:
         print(f"[噪声] {source['name']} 入库时过滤 {dropped} 条 junk")
     conn.commit()
