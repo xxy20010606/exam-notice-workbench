@@ -7,10 +7,12 @@ on:
       - 'sources.json'
       - 'scraper.py'
       - 'cloud_run.py'
+      - 'cloud_run_lite.py'
       - 'build_dashboard*.py'
       - 'service-worker.js'
       - 'requirements.txt'
       - '.github/workflows/scrape.yml'
+      - 'notices.db'
   schedule:
     # 每 6 小时跑一次（分钟取 17 避免整点拥堵）
     - cron: '17 */6 * * *'
