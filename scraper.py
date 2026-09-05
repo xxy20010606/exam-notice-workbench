@@ -713,6 +713,13 @@ def extract_date(text, url):
                 return f"{y}-{mo:02d}-{d:02d}"
             continue
 
+    # 两位年份 YY.MM.DD（如成都人事考试网 "26.09.04"）
+    m = re.search(r"(?<!\d)(\d{2})\.(\d{1,2})\.(\d{1,2})(?!\d)", text or "")
+    if m:
+        y, mo, d = 2000 + int(m.group(1)), int(m.group(2)), int(m.group(3))
+        if 2020 <= y <= 2035 and 1 <= mo <= 12 and 1 <= d <= 31:
+            return f"{y}-{mo:02d}-{d:02d}"
+
     # 兜底：URL 中任意位置出现的 8 位纯数字日期（宽松匹配，误判风险低）
     m = re.search(r"(?<![\d])(20[2-9]\d)(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?![\d])", url)
     if m:
@@ -794,7 +801,7 @@ def parse_source(source, html):
             continue
         # 处理 onclick 拼接的真实链接（如黑龙江公务员考试网 queryDetail('mkxh','tzid')）
         if (not href or href.startswith(("#", "javascript:", "mailto:", "tel:"))) and o_re and o_tpl:
-            onclick = a.get("onclick") or ""
+            onclick = a.get("onclick") or (href if href.startswith("javascript:") else "")
             m = o_re.search(onclick)
             if m:
                 try:

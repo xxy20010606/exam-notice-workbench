@@ -1097,5 +1097,17 @@
     ],
     "title_include": "公开招聘|招聘公告|招录|引进|选调|遴选",
     "title_exclude": "公示|拟录用|拟聘用|名单|关于印发|转发|实施方案|若干规定|政策规定|贯彻实施|违纪违规|公告发布|公示发布|审核备案|办事指南|问答|查询|咨询|成绩"
+  },
+  {
+    "name": "四川成都-事业单位",
+    "category": "事业编",
+    "region": "四川",
+    "url": "https://cdpta.cdrsigc.com/netpage/ortherlist_all.do?pageSize=30&ifall=1&id=989",
+    "method": "http",
+    "title_include": "公开招聘|公开考试招聘|考核招聘|选调|引进人才|引进",
+    "title_exclude": "^\\[|公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|有关事项|平均分|大纲",
+    "note": "成都人事考试网(官方真实域名cdpta.cdrsigc.com,cdpta.com已被劫持勿用)事业单位考试栏目,聚合市级+13区市县统考公告。服务端渲染http直抓。日期为YY.MM.DD格式,extract_date已支持两位年份",
+    "onclick_regex": "showpageinfo\\('(\\d+)'\\s*,\\s*'([^']+)'",
+    "onclick_url_template": "https://cdpta.cdrsigc.com{1}"
   }
 ]
