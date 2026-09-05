@@ -109,9 +109,7 @@
     "row_selector": "tr.ant-table-row",
     "row_title_idx": 0,
     "row_date_idx": 1,
-    "enabled": false,
-    "note": "已禁用:GHA-IP封锁,无可达替代URL(省门户无省考统一栏目)。需代理恢复",
-    "browser_timeout": 12000
+    "note": "2026-09-05重新启用:国内通道已可直连(原GHA-IP封锁禁用已过时);海外侧失败由fail_streak自适应兜底"
   },
   {
     "name": "山西-省考",
@@ -122,8 +120,7 @@
     "column_link_regex": "公务员|gwy|省考|招录",
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
     "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
-    "enabled": false,
-    "note": "已禁用:GHA-IP封锁,无可达替代URL(省门户无省考统一栏目)。需代理恢复"
+    "note": "2026-09-05重新启用:国内通道已可直连(原GHA-IP封锁禁用已过时);海外侧失败由fail_streak自适应兜底"
   },
   {
     "name": "内蒙古-省考",
@@ -147,8 +144,7 @@
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
     "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
     "container": null,
-    "enabled": false,
-    "note": "已禁用:GHA-IP封锁,无可达替代URL(省门户无省考统一栏目)。需代理恢复"
+    "note": "2026-09-05重新启用:国内通道已可直连(原GHA-IP封锁禁用已过时);海外侧失败由fail_streak自适应兜底"
   },
   {
     "name": "吉林-省考",
@@ -159,8 +155,7 @@
     "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
     "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
-    "container": null,
-    "browser_timeout": 12000
+    "container": null
   },
   {
     "name": "黑龙江-省考",
@@ -173,8 +168,7 @@
     "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
     "container": null,
     "onclick_regex": "queryDetail\\(\\s*'(\\d+)'\\s*,\\s*'(\\d+)'\\s*\\)",
-    "onclick_url_template": "https://www.hljsgwy.org.cn/tyzpwb/website/queryDetail.htm?mkxh={0}&tzid={1}",
-    "browser_timeout": 12000
+    "onclick_url_template": "https://www.hljsgwy.org.cn/tyzpwb/website/queryDetail.htm?mkxh={0}&tzid={1}"
   },
   {
     "name": "江苏-省考",
@@ -228,8 +222,7 @@
     "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
     "container": null,
     "browser_wait_until": "domcontentloaded",
-    "browser_wait": 8000,
-    "browser_timeout": 12000
+    "browser_wait": 8000
   },
   {
     "name": "山东-省考",
@@ -242,8 +235,7 @@
     "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
     "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
-    "container": null,
-    "browser_timeout": 12000
+    "container": null
   },
   {
     "name": "河南-省考",
@@ -327,8 +319,7 @@
     "method": "browser",
     "column_link_regex": "公务员|gwy|省考|招录",
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
-    "browser_timeout": 12000
+    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
   },
   {
     "name": "贵州-省考",
@@ -367,8 +358,7 @@
     "page_urls": [
       "https://hrss.xizang.gov.cn/xwzx/tzgg/index_2.html",
       "https://hrss.xizang.gov.cn/xwzx/tzgg/index_3.html"
-    ],
-    "browser_timeout": 12000
+    ]
   },
   {
     "name": "陕西-省考",

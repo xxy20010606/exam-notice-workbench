@@ -1091,6 +1091,15 @@ def run_all(limit_per_source=40, max_workers=8,
     fail_info = {r[0]: {"streak": r[1] or 0, "last_attempt_at": r[2] or ""} for r in rows}
     now_dt = datetime.datetime.now()
 
+    # 清理孤儿状态行（已删除/改名源的状态残留），避免健康检查误报"长期未尝试"
+    _names = {s["name"] for s in sources}
+    _orphans = [r[0] for r in conn.execute("SELECT name FROM sources_status").fetchall() if r[0] not in _names]
+    for _n in _orphans:
+        conn.execute("DELETE FROM sources_status WHERE name=?", (_n,))
+    if _orphans:
+        conn.commit()
+        print(f"[状态] 清理孤儿状态行 {len(_orphans)} 个: {_orphans}")
+
     def _should_skip(name):
         st = fail_info.get(name)
         if not st or st["streak"] < skip_fail_threshold:
