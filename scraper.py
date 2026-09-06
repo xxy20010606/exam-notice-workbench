@@ -30,10 +30,20 @@ GLOBAL_EXCLUDE = (r"首页|网站地图|联系我们|无障碍|English|EN$|登�
 # 防止采购/中标/询价/导航文字/泛化栏目名等 junk 进入 notices.db 与看板。
 GLOBAL_NOISE = re.compile(
     r"采购|中标|询价|成交|招标|竞价|政府采购|单一来源|资格预审.*采购|磋商|比价|验收|合同公告|选聘|审计"
+    r"|拟录用|拟聘用"          # 录用结果公示（非招聘公告）
+    r"|招聘会"                 # 招聘会预告/排期（非招聘公告）
     r"|^/\s"                  # 导航栏文字（以 / 开头）
     r"|^事业单位公开招聘$"     # 泛化栏目名（非具体公告）
     r"|^公开招聘$"            # 泛化栏目名
     r"|公开招聘服务平台"       # 统一平台导航名（非真实公告）
+)
+
+# 招聘关键词白名单：标题必须命中其一才入库（store() 第二道闸）。
+# 拦住政务门户/人社局首页混入的行政通知、送达催告、目录发布、政策文件等
+# （如「关于向李佳送达《依法支付工伤保险待遇催告通知书》的公告」）。
+# 与 daily_digest.RECRUIT_KEYWORDS 同源，另加「招募」（三支一扶等）。
+RECRUIT_WHITELIST = re.compile(
+    r"公务员|省考|选调|遴选|事业|招聘|招考|招录|公考|引进|招募"
 )
 
 # 日期提取正则（按优先级排序）：
@@ -790,6 +800,32 @@ def parse_source(source, html):
         title = (a.get("title") or a.get_text(strip=True) or "")
         if not title:
             continue
+        # SPA 自定义组件属性兜底：Vue 组件（如山东 <basic-line title=... time=...>）渲染文本
+        # 会被拼成「日+年月+标题+描述」黏串，且祖先文本混入页面当前日期，导致标题污染、
+        # 日期错成抓取当日。向上找自定义元素（标签名含 -），优先用其 title / time 属性。
+        comp_title, comp_time = "", ""
+        anc = a
+        for _ in range(5):
+            anc = anc.parent
+            if anc is None or not getattr(anc, "name", None):
+                break
+            if "-" in anc.name:
+                comp_title = (anc.get("title") or "").strip()
+                comp_time = (anc.get("time") or "").strip()
+                break
+        if comp_title:
+            title = comp_title
+        # 黏连日期前缀剥离：SPA 渲染文本可能以「日+年月」开头（如 11202605 2026年度...），
+        # 剥离前缀并恢复真实日期（11+202605 → 2026-05-11）
+        glued_date = ""
+        gm = re.match(r"^(\d{1,2})(20\d{2})(0[1-9]|1[0-2])(?=20\d{2})", title)
+        if gm and len(title) > 12:
+            _dd, _yy, _mo = int(gm.group(1)), int(gm.group(2)), int(gm.group(3))
+            if 1 <= _dd <= 31:
+                glued_date = f"{_yy}-{_mo:02d}-{_dd:02d}"
+                title = title[gm.end():]
+        if not title:
+            continue
         if inc and not inc.search(title):
             continue
         if (exc_src and exc_src.search(title)) or exc_glob.search(title):
@@ -814,11 +850,14 @@ def parse_source(source, html):
         if absurl in seen:
             continue
         seen.add(absurl)
-        # 日期提取：从多层上下文搜索（SPA 源的日期常在兄弟/远祖元素里）
+        # 日期提取优先级：组件 time 属性 > 黏连前缀恢复 > 多层上下文搜索
+        # （SPA 源的日期常在兄弟/远祖元素里；祖先文本可能混入页面当前日期，
+        #   所以组件属性/黏连前缀命中时不再走祖先扩展，避免拿到抓取当日）
         parent = a.find_parent(["li", "div", "tr", "td", "p"]) or a
         ptext = parent.get_text(" ", strip=True) if parent else title
-        # 如果父元素文本没提取到日期，扩大搜索：兄弟元素 + 祖先 + 近邻 date 类节点
-        if not extract_date(ptext, absurl):
+        row_date = (extract_date(comp_time, absurl) if comp_time else "") or glued_date
+        # 组件属性/黏连前缀都没有日期、且父元素文本也没提取到时，扩大搜索：
+        if not row_date and not extract_date(ptext, absurl):
             candidates = []
             # 兄弟元素（前3个后3个）
             for sib in list(parent.previous_siblings)[-3:] + list(parent.next_siblings)[:3]:
@@ -837,7 +876,9 @@ def parse_source(source, html):
                 if d:
                     ptext = ptext + " " + cand  # 追加到 ptext 让 extract_date 能匹配
                     break
-        items.append({"title": title[:200], "url": absurl, "date": extract_date(ptext, absurl)})
+        if not row_date:
+            row_date = extract_date(ptext, absurl)
+        items.append({"title": title[:200], "url": absurl, "date": row_date})
     return items
 
 
@@ -881,6 +922,11 @@ def store(conn, source, items):
         if GLOBAL_NOISE.search(it["title"] or ""):
             dropped += 1
             continue
+        # 白名单第二道闸：标题必须含招聘/考试专属词，拦住政务门户混入的
+        # 行政通知/送达催告/目录发布等（与 daily_digest 口径一致）
+        if not RECRUIT_WHITELIST.search(it["title"] or ""):
+            dropped += 1
+            continue
         uid = url_id(it["url"])
         cur = conn.execute("SELECT id FROM notices WHERE id=?", (uid,)).fetchone()
         if cur:
@@ -920,7 +966,10 @@ def cleanup_noise():
     """
     conn = init_db()
     like_patterns = ["%采购%", "%中标%", "%询价%", "%成交%", "%招标%", "%竞价%",
-                     "%政府采购%", "%单一来源%", "/%"]
+                     "%政府采购%", "%单一来源%", "/%",
+                     # 2026-09-06 扩充：录用结果公示/招聘会预告/选聘（与 GLOBAL_NOISE 对齐，
+                     # 清理加入黑名单前已入库的历史行）
+                     "%拟录用%", "%拟聘用%", "%招聘会%", "%选聘%"]
     exact_patterns = ["事业单位公开招聘", "公开招聘"]
     n = 0
     for p in like_patterns:
@@ -929,6 +978,15 @@ def cleanup_noise():
             n += 1
     for p in exact_patterns:
         for (rid,) in conn.execute("SELECT id FROM notices WHERE title = ?", (p,)).fetchall():
+            conn.execute("DELETE FROM notices WHERE id=?", (rid,))
+            n += 1
+    # 全局招聘关键词白名单清理：政务门户/人社局首页混入的行政通知、送达催告、
+    # 目录发布、政策文件等（标题不含任何招聘/考试专属词）一次性清扫，
+    # 与 store() 的 RECRUIT_WHITELIST 同口径。region=上海沿用其自身白名单规则。
+    for (rid, title, region) in conn.execute("SELECT id,title,region FROM notices").fetchall():
+        if region == "上海":
+            continue
+        if title and not RECRUIT_WHITELIST.search(title):
             conn.execute("DELETE FROM notices WHERE id=?", (rid,))
             n += 1
     # 上海源反向白名单：政府门户公告/通知栏目混杂大量市政/行政/采购文，
