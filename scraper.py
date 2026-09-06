@@ -1125,13 +1125,15 @@ def _work(s, limit_per_source=40):
 def run_all(limit_per_source=40, max_workers=8,
             skip_fail_threshold=10, retry_after_hours=12,
             only_region=None, exclude_region=None,
-            skip_browser=False):
+            skip_browser=False, force_http_retry=False):
     """
     自适应跳过失败源：
     - 连续失败 ≥ skip_fail_threshold 次的源，本轮跳过 fetch（不耗超时）
     - 距 last_attempt_at ≥ retry_after_hours 小时后强制重试一次
     - 重试成功 → fail_streak 归零；仍失败 → fail_streak+1，重新进入跳过窗口
     目的：云端 IP 对部分中国 gov 站点系统性不可达，跳过这些源可省 1-2min。
+    - force_http_retry=True（国内通道用）：非 browser 源无视 fail_streak 每轮都试，
+      修复海外失败把国内可达源顶进 skip 窗口的跨通道污染。
 
     区域过滤（混合架构用）：
     - only_region:   只抓取 region 包含该关键字的源（自托管 Runner 只跑浙江）
@@ -1184,6 +1186,12 @@ def run_all(limit_per_source=40, max_workers=8,
     active_sources, skipped_sources = [], []
     for s in sources:
         skip, reason = _should_skip(s["name"])
+        # 跨通道 fail_streak 污染修复（2026-09-06）：fail_streak 由海外/国内共享，
+        # GHA 海外 IP 被站方封锁会把 http 源 streak 顶到阈值 → 国内通道跟着 skip，
+        # 变成「国内明明可达却从不抓」。国内通道（force_http_retry=True）对非 browser
+        # 源不 skip（http 类单发 0.3-3s 代价可忽略），成功即清零；browser 源仍走自适应窗口。
+        if skip and force_http_retry and s.get("method", "http") != "browser":
+            skip = False
         if skip:
             skipped_sources.append((s, reason))
             report["sources"].append({

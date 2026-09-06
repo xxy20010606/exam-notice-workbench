@@ -32,7 +32,10 @@ def main():
     skip_browser = not _playwright_available()
     print(f"[lite] playwright {'可用，browser 源纳入国内抓取' if not skip_browser else '不可用，跳过 browser 源'}")
     try:
-        report = scraper.run_all(skip_browser=skip_browser)
+        # force_http_retry=True：非 browser 源无视 fail_streak 每轮都试——
+        # fail_streak 海外/国内共享，GHA 海外 IP 被封锁会把国内可达的 http 源
+        # 顶进 skip 窗口（山西/辽宁 streak=45 事故），国内通道不跟海外一起 skip
+        report = scraper.run_all(skip_browser=skip_browser, force_http_retry=True)
     except Exception as _e:
         print(f"[warn] run_all 异常（仍继续 cleanup/回填）: {_e}")
         report = {"new": [], "run_at": datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "sources": []}
