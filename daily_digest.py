@@ -44,12 +44,15 @@ RECRUIT_KEYWORDS = re.compile(
 
 
 def fetch_source_health():
-    """读取 sources_status，返回今日「抓取失败 / 异常」的源。
+    """读取 sources_status，返回「连续多轮抓取失败」的源（真漏公告风险）。
 
-    判定口径（贴合用户需求）：
-      · 抓取异常（网络不可达 / 超时 / 403 等）→ 提示
-      · 抓取成功但结果为 0（今日该源确实无新公告）→ 不提示
-    因此只筛选 fail_streak>0 或 last_error 非空；last_count=0 一律视为正常空源。
+    判定口径（双通道架构，2026-09-08 调整）：
+      · fail_streak >= 2（连续失败 2 轮以上）→ 提示：两通道都抓不到，确实可能漏公告
+      · fail_streak <= 1 一律不提示：
+          - 抓取成功但结果为 0 → 正常空源
+          - 海外单轮失败（streak=1）→ 国内通道每轮强制重试全部 http 源
+            （force_http_retry），成功即清零，公告由国内兜底，不漏，不告警。
+            双通道交替时 streak 恒在 0/1 震荡，只有国内也失败才涨到 2+。
     """
     if not os.path.exists(DB):
         return []
@@ -57,7 +60,7 @@ def fetch_source_health():
     try:
         rows = conn.execute(
             "SELECT name, fail_streak, last_error FROM sources_status "
-            "WHERE fail_streak > 0 OR (last_error IS NOT NULL AND last_error != '')"
+            "WHERE fail_streak >= 2"
         ).fetchall()
     except sqlite3.OperationalError:
         # 表尚未创建（如云端首次抓取前）：跳过健康提醒，不影响日报发送
@@ -69,7 +72,7 @@ def fetch_source_health():
         name = r[0] or ""
         fail_streak = r[1] or 0
         last_error = (r[2] or "")
-        reason = (last_error[:120] or f"连续失败 {fail_streak} 次")
+        reason = (last_error[:120] or f"连续失败 {fail_streak} 轮")
         out.append({"name": name, "kind": "error", "reason": reason})
     return out
 
@@ -78,8 +81,8 @@ def format_health(health):
     """返回 (text_lines, md_lines)，供邮件/微信正文追加源健康提醒。"""
     if not health:
         return [], []
-    text = ["【源健康提醒】以下源今日抓取失败/异常，可能漏收公告："]
-    md = ["**源健康提醒**：以下源今日抓取失败/异常，可能漏收公告："]
+    text = ["【源健康提醒】以下源已连续 2 轮以上抓取失败（海外/国内通道均未成功），可能漏收公告："]
+    md = ["**源健康提醒**：以下源已连续 2 轮以上抓取失败（海外/国内通道均未成功），可能漏收公告："]
     for h in health:
         text.append(f"  · {h['name']}：{h['reason']}")
         md.append(f"- {h['name']}：{h['reason']}")
