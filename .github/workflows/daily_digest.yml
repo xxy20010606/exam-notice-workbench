@@ -1,11 +1,24 @@
 name: 每日公告汇总邮件
 
-# 独立于抓取流程：北京时间每天 19:00 汇总当天新增，发一封带日期的邮件。
-# 云端 ubuntu 运行，不依赖本地 Runner / 用户开机，保证每天都能发。
+# 北京时间每天 19:00 整点发送当天新增汇总（邮件 + 微信）。
+#
+# 为什么不用 schedule cron：GitHub 定时任务在整点高峰排队严重，
+# 实测 cron 0 11 * * *（北京 19:00）实际触发 21:47 ~ 次日 01:57（晚 3~5 小时）。
+# 改为链式触发：「公考事考公告抓取」每轮完成后启动本 workflow——
+#   · 北京 17:00 前触发 → 跳过（每天 4 轮抓取只保留邮件窗口那次）
+#   · 北京 17:00-19:00 触发 → 等待到 19:00 整点发送
+#   · 北京 19:00 后触发 → 立即发送（如 18:15 补抓轮 19:0x 完成，数据最新）
+# 链式触发的排队是分钟级，加上整点对齐，实际发送 19:00±几分钟。
 on:
-  schedule:
-    - cron: '0 11 * * *'      # UTC 11:00 = 北京时间 19:00
-  workflow_dispatch: {}        # 允许手动触发测试
+  workflow_run:
+    workflows: ["公考事考公告抓取"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch: {}        # 允许手动触发测试（手动触发不做窗口判断，直接发送）
+
+concurrency:
+  group: daily-digest
+  cancel-in-progress: true     # 窗口内被多轮抓取重复触发时，只保留最后一个实例，防重复发送
 
 permissions:
   contents: read
@@ -14,15 +27,45 @@ jobs:
   daily-digest:
     runs-on: ubuntu-latest
     steps:
+      - name: 窗口判断与等待（对齐北京时间 19:00 整点）
+        id: win
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "手动触发：跳过窗口判断，直接发送"
+            echo "run=1" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          python3 - <<'PYEOF'
+          import datetime, os, time
+          bj = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
+          hm = bj.hour * 60 + bj.minute
+          go = hm >= 17 * 60
+          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
+              f.write(f"run={'1' if go else '0'}\n")
+          if not go:
+              print(f"北京时间 {bj:%H:%M}，未到邮件窗口（17:00），跳过")
+          else:
+              target = bj.replace(hour=19, minute=0, second=0, microsecond=0)
+              if bj < target:
+                  secs = int((target - bj).total_seconds())
+                  print(f"北京时间 {bj:%H:%M}，等待 {secs}s 至 19:00 整点发送")
+                  time.sleep(secs)
+              else:
+                  print(f"北京时间 {bj:%H:%M}，已过 19:00，立即发送")
+          PYEOF
+
       - name: 检出仓库（含最新 notices.db）
+        if: steps.win.outputs.run == '1'
         uses: actions/checkout@v5
 
       - name: 配置 Python
+        if: steps.win.outputs.run == '1'
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
       - name: 发送每日汇总（邮件 + 微信）
+        if: steps.win.outputs.run == '1'
         env:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
           RECIPIENT: ${{ secrets.RECIPIENT }}
