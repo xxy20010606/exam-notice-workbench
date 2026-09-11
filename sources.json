@@ -132,12 +132,13 @@
     "name": "吉林-省考",
     "category": "省考",
     "region": "吉林",
-    "url": "https://www.jlgwyks.cn/column/1",
-    "method": "browser",
+    "url": "http://www.jlgwyks.cn/",
+    "method": "http",
     "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
     "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
-    "container": null
+    "container": null,
+    "href_include": "news\\.aspx"
   },
   {
     "name": "黑龙江-省考",
