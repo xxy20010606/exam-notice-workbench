@@ -1,58 +1,75 @@
 name: 每日公告汇总邮件
 
-# 北京时间每天 19:00 整点发送当天新增汇总（邮件 + 微信）。
+# 北京时间每天 19:00 整点发送当天新增汇总（邮件 + 微信），每天恰好一封。
 #
 # 为什么不用 schedule cron：GitHub 定时任务在整点高峰排队严重，
 # 实测 cron 0 11 * * *（北京 19:00）实际触发 21:47 ~ 次日 01:57（晚 3~5 小时）。
-# 改为链式触发：「公考事考公告抓取」每轮完成后启动本 workflow——
-#   · 北京 17:00 前触发 → 跳过（每天 4 轮抓取只保留邮件窗口那次）
-#   · 北京 17:00-19:00 触发 → 等待到 19:00 整点发送
-#   · 北京 19:00 后触发 → 立即发送（如 18:15 补抓轮 19:0x 完成，数据最新）
-# 链式触发的排队是分钟级，加上整点对齐，实际发送 19:00±几分钟。
+# 改为链式触发：「公考事考公告抓取」每轮完成后启动本 workflow。
+#
+# 但海外抓取轮自身也被 GHA 排队漂移（实测完成于 16:14 / 16:57 / 22:01 / 23:55 不定），
+# 所以不能只靠"窗口内触发"，改为「宽窗口等待 + 当天已发标记」：
+#   · 北京 < 14:00 触发 → 跳过（凌晨/上午轮，等下午轮）
+#   · 14:00-19:00 触发 → 等到 19:00 整点发送（最长等待 5 小时，安全）
+#   · ≥ 19:00 触发 → 立即发送（兜底：下午轮全被漂移出窗口时，当天仍有一封）
+#   · 当天已发过（远程 tag digest-YYYY-MM-DD 存在）→ 跳过，杜绝 22:00/23:55 重复发送
+#   · concurrency 保证同组只有一个实例在跑；发送成功后打 tag 作为"已发"凭据
 on:
   workflow_run:
     workflows: ["公考事考公告抓取"]
     types: [completed]
     branches: [main]
-  workflow_dispatch: {}        # 允许手动触发测试（手动触发不做窗口判断，直接发送）
+  workflow_dispatch: {}        # 手动触发测试（不做时间/tag 判断，直接发送）
 
 concurrency:
   group: daily-digest
-  cancel-in-progress: true     # 窗口内被多轮抓取重复触发时，只保留最后一个实例，防重复发送
+  cancel-in-progress: true     # 窗口内被多轮抓取重复触发时，只保留最后一个实例
 
 permissions:
-  contents: read
+  contents: write              # 发送成功后 push digest-YYYY-MM-DD tag 作当天已发标记
 
 jobs:
   daily-digest:
     runs-on: ubuntu-latest
     steps:
-      - name: 窗口判断与等待（对齐北京时间 19:00 整点）
+      - name: 判断是否发送（时间窗口 → 等待 → 当天已发检查）
         id: win
         run: |
+          TODAY=$(TZ=Asia/Shanghai date +%F)
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "手动触发：跳过窗口判断，直接发送"
+            echo "手动触发：直接发送"
             echo "run=1" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          python3 - <<'PYEOF'
-          import datetime, os, time
+          GO=$(python3 - <<'PYEOF'
+          import datetime
           bj = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
-          hm = bj.hour * 60 + bj.minute
-          go = hm >= 17 * 60
-          with open(os.environ["GITHUB_OUTPUT"], "a") as f:
-              f.write(f"run={'1' if go else '0'}\n")
-          if not go:
-              print(f"北京时间 {bj:%H:%M}，未到邮件窗口（17:00），跳过")
-          else:
-              target = bj.replace(hour=19, minute=0, second=0, microsecond=0)
-              if bj < target:
-                  secs = int((target - bj).total_seconds())
-                  print(f"北京时间 {bj:%H:%M}，等待 {secs}s 至 19:00 整点发送")
-                  time.sleep(secs)
-              else:
-                  print(f"北京时间 {bj:%H:%M}，已过 19:00，立即发送")
+          print(1 if bj.hour * 60 + bj.minute >= 14 * 60 else 0)
           PYEOF
+          )
+          if [ "$GO" = "0" ]; then
+            echo "北京时间早于 14:00，等下午/晚间轮触发，跳过"
+            echo "run=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          python3 - <<'PYEOF'
+          import datetime, time
+          bj = datetime.datetime.utcnow() + datetime.timedelta(hours=8)
+          target = bj.replace(hour=19, minute=0, second=0, microsecond=0)
+          if bj < target:
+              secs = int((target - bj).total_seconds())
+              print(f"北京时间 {bj:%H:%M}，等待 {secs}s 至 19:00 整点发送")
+              time.sleep(secs)
+          else:
+              print(f"北京时间 {bj:%H:%M}，已过 19:00；等 60s 让刚发送的实例先推出 tag")
+              time.sleep(60)
+          PYEOF
+          # 等待结束后再查「当天已发」标记：19:00 那封的 tag 此时已推出，避免重复发送
+          if git ls-remote --tags "https://github.com/${{ github.repository }}.git" "refs/tags/digest-$TODAY" | grep -q .; then
+            echo "今天（$TODAY）已发送过（tag 存在），跳过，防重复"
+            echo "run=0" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "run=1" >> "$GITHUB_OUTPUT"
 
       - name: 检出仓库（含最新 notices.db）
         if: steps.win.outputs.run == '1'
@@ -65,6 +82,7 @@ jobs:
           python-version: '3.11'
 
       - name: 发送每日汇总（邮件 + 微信）
+        id: send
         if: steps.win.outputs.run == '1'
         env:
           SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
@@ -72,3 +90,10 @@ jobs:
           PAGES_URL: ${{ secrets.PAGES_URL }}
           SERVERCHAN_KEY: ${{ secrets.SERVERCHAN_KEY }}
         run: python daily_digest.py
+
+      - name: 标记当天已发送（push tag）
+        if: steps.win.outputs.run == '1' && steps.send.outcome == 'success'
+        run: |
+          TAG="digest-$(TZ=Asia/Shanghai date +%F)"
+          git tag "$TAG" 2>/dev/null || true
+          git push origin "refs/tags/$TAG" || echo "tag 推送失败（不影响邮件，但可能导致重复发送）"
