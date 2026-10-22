@@ -78,13 +78,24 @@ def days_between(d1, d2):
         return None
 
 
-def load_categories():
+def load_sources_meta():
+    """返回 {name: {"category":..., "enabled": bool}}。
+
+    enabled=False 的源是**主动禁用**的（历史遗留/被其他源替代），
+    它们本来就不该抓，不能被判定为「长期失联」——那是我自己的误报。
+    """
     try:
         with open(SOURCES, encoding="utf-8") as f:
             data = json.load(f)
-        return {s.get("name"): (s.get("category") or "") for s in data}
+        return {s.get("name"): {"category": s.get("category") or "",
+                                "enabled": s.get("enabled", True) is not False}
+                for s in data}
     except Exception:
         return {}
+
+
+def load_categories():
+    return {k: v["category"] for k, v in load_sources_meta().items()}
 
 
 def load_state():
@@ -147,6 +158,8 @@ def diagnose(data, cats):
     issues = []
     hist = data["hist"]
     seen = set()
+    meta = load_sources_meta()
+    disabled = {k for k, v in meta.items() if not v["enabled"]}
 
     # ⓪ 端到端新鲜度：全库最近 24h 零新增 → 抓取链路整体停摆。
     # 排在所有检查最前面，因为它是唯一不受 sources_status 互相覆盖影响的硬指标。
@@ -160,6 +173,8 @@ def diagnose(data, cats):
     for name, last_run, last_count, last_error, fail_streak in data["status"]:
         name = name or ""
         seen.add(name)
+        if name in disabled:
+            continue          # 主动禁用的源不参与体检（不算失联）
         last_count = last_count or 0
         fail_streak = fail_streak or 0
         last_error = (last_error or "").strip()
@@ -218,8 +233,10 @@ def diagnose(data, cats):
                     "detail": f"最新公告 {h['latest_date'][:10]}，已 {stale} 天（阈值 {limit}）",
                 })
 
-    # 配置里有、但状态表里没有记录的源
+    # 配置里有、但状态表里没有记录的源（跳过主动禁用的）
     for name in cats:
+        if name in disabled:
+            continue
         if name not in seen:
             h = hist.get(name, {"hist": 0, "latest_date": ""})
             if h["hist"] > 0:
