@@ -78,16 +78,70 @@ def fetch_source_health():
 
 
 def format_health(health):
-    """返回 (text_lines, md_lines)，供邮件/微信正文追加源健康提醒。"""
-    if not health:
-        return [], []
-    text = ["【源健康提醒】以下源已连续 2 轮以上抓取失败（海外/国内通道均未成功），可能漏收公告："]
-    md = ["**源健康提醒**：以下源已连续 2 轮以上抓取失败（海外/国内通道均未成功），可能漏收公告："]
-    for h in health:
-        text.append(f"  · {h['name']}：{h['reason']}")
-        md.append(f"- {h['name']}：{h['reason']}")
-    text.append("")
-    md.append("")
+    """返回 (text_lines, md_lines)，供邮件/微信正文追加源健康信息。
+
+    2026-10 增强：除原有「抓取失败」外，再追加
+      · 核心源 KPI（解析条数 + 最新公告日期）—— 判断「福建事业单位不漏」是否还成立
+      · 静默失败 CRITICAL（解析 0 条但无报错 / 长期失联 / 全库停摆）
+    原因：parse_source 返回的是列表页上全部公告，不是「今日新增」，
+      last_count=0 基本等于解析器失效。旧口径只报 last_error，会把「请求成功但
+      解析出 0 条」的源当成正常，导致静默漏收。
+    排序：KPI 置顶（最关键）→ 静默失败 → 抓取失败（各截断 8 条）。
+    """
+    MAX_LINES = 8
+    text, md = [], []
+
+    try:
+        import health_check as hc
+        data = hc.collect(hc.DB)
+        issues = hc.diagnose(data, hc.load_categories())
+        kpi = hc.golden_status(data)
+        # 只挑「静默类」重症；显性抓取失败下面单独一段，避免同一源重复出现
+        SILENT_CODES = {"stalled", "silent_zero", "long_dead",
+                        "golden_count", "golden_stale"}
+        crit = [i for i in issues
+                if i["level"] == "CRITICAL" and i["code"] in SILENT_CODES]
+
+        if kpi:
+            text.append("【核心源 KPI】")
+            md.append("**核心源 KPI**")
+            for k in kpi:
+                sd = f"{k['stale_days']} 天前" if k["stale_days"] is not None else "无日期"
+                line = f"{k['name']}：解析 {k['parsed']} 条，最新 {k['latest']}（{sd}）"
+                text.append(f"  · {line}")
+                md.append(f"- {line}")
+            text.append("")
+            md.append("")
+
+        if crit:
+            text.append(f"【静默失败告警】{len(crit)} 项（看着正常，其实没抓到东西）：")
+            md.append(f"**静默失败告警**（{len(crit)} 项）")
+            for i in crit[:MAX_LINES]:
+                text.append(f"  · {i['source']}：{i['detail']}")
+                md.append(f"- {i['source']}：{i['detail']}")
+            if len(crit) > MAX_LINES:
+                text.append(f"  · …另有 {len(crit) - MAX_LINES} 项")
+                md.append(f"- …另有 {len(crit) - MAX_LINES} 项")
+            text.append("")
+            md.append("")
+    except Exception as e:
+        # 健康信息是增强项，任何异常都不能拖垮日报
+        print(f"[health] 增强健康信息失败（不影响日报发送）: {e}")
+
+    if health:
+        text.append(f"【抓取失败】{len(health)} 个源（可能漏收公告）：")
+        md.append(f"**抓取失败**（{len(health)} 个源）")
+        for h in health[:MAX_LINES]:
+            # 报错常含多行（Playwright Call log），压平否则破坏 markdown 列表
+            reason = " ".join(str(h["reason"]).split())[:130]
+            text.append(f"  · {h['name']}：{reason}")
+            md.append(f"- {h['name']}：{reason}")
+        if len(health) > MAX_LINES:
+            text.append(f"  · …另有 {len(health) - MAX_LINES} 个源")
+            md.append(f"- …另有 {len(health) - MAX_LINES} 个源")
+        text.append("")
+        md.append("")
+
     return text, md
 
 

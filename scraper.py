@@ -1125,7 +1125,8 @@ def _work(s, limit_per_source=40):
 def run_all(limit_per_source=40, max_workers=8,
             skip_fail_threshold=10, retry_after_hours=12,
             only_region=None, exclude_region=None,
-            skip_browser=False, force_http_retry=False):
+            skip_browser=False, force_http_retry=False,
+            write_status=True):
     """
     自适应跳过失败源：
     - 连续失败 ≥ skip_fail_threshold 次的源，本轮跳过 fetch（不耗超时）
@@ -1237,19 +1238,21 @@ def run_all(limit_per_source=40, max_workers=8,
         if err:
             old = fail_info.get(s["name"], {}).get("streak", 0)
             new_streak = old + 1
-            conn.execute("""INSERT OR REPLACE INTO sources_status
-                            (name,last_run,last_count,last_error,fail_streak,last_attempt_at)
-                            VALUES(?,?,?,?,?,?)""",
-                         (s["name"], now_str, 0, err[:300], new_streak, now_str))
+            if write_status:
+                conn.execute("""INSERT OR REPLACE INTO sources_status
+                                (name,last_run,last_count,last_error,fail_streak,last_attempt_at)
+                                VALUES(?,?,?,?,?,?)""",
+                             (s["name"], now_str, 0, err[:300], new_streak, now_str))
             report["sources"].append({"name": s["name"], "category": s.get("category"),
                                        "region": s.get("region"), "count": 0, "new": 0,
                                        "error": err[:200]})
         else:
             new = store(conn, s, items)
-            conn.execute("""INSERT OR REPLACE INTO sources_status
-                            (name,last_run,last_count,last_error,fail_streak,last_attempt_at)
-                            VALUES(?,?,?,?,?,?)""",
-                         (s["name"], now_str, len(items), "", 0, now_str))
+            if write_status:
+                conn.execute("""INSERT OR REPLACE INTO sources_status
+                                (name,last_run,last_count,last_error,fail_streak,last_attempt_at)
+                                VALUES(?,?,?,?,?,?)""",
+                             (s["name"], now_str, len(items), "", 0, now_str))
             report["sources"].append({"name": s["name"], "category": s.get("category"),
                                        "region": s.get("region"), "count": len(items),
                                        "new": len(new), "error": None})
@@ -1258,9 +1261,10 @@ def run_all(limit_per_source=40, max_workers=8,
                                        "region": s.get("region"), **n})
 
     # 更新被跳过源的 last_run（让 UI 显示"上次跳过时间"）；fail_streak/last_attempt_at 不变
-    for s, _reason in skipped_sources:
-        conn.execute("""UPDATE sources_status SET last_run=? WHERE name=?""",
-                     (now_str, s["name"]))
+    if write_status:
+        for s, _reason in skipped_sources:
+            conn.execute("""UPDATE sources_status SET last_run=? WHERE name=?""",
+                         (now_str, s["name"]))
 
     conn.commit()
     conn.close()
@@ -1272,5 +1276,10 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="公考事考公告抓取")
     ap.add_argument("--only-region", help="只抓取 region 包含该关键字的源（如 浙江）")
     ap.add_argument("--exclude-region", help="跳过 region 包含该关键字的源（如 浙江）")
+    ap.add_argument("--no-status", action="store_true",
+                    help="只入库公告，不写 sources_status（海外 IP 轨道用，避免覆盖国内通道健康度）")
     args = ap.parse_args()
-    print(json.dumps(run_all(only_region=args.only_region, exclude_region=args.exclude_region), ensure_ascii=False, indent=2))
+    print(json.dumps(run_all(only_region=args.only_region,
+                             exclude_region=args.exclude_region,
+                             write_status=not args.no_status),
+                     ensure_ascii=False, indent=2))

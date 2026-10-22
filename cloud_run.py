@@ -56,11 +56,15 @@ def main():
     ap = argparse.ArgumentParser(description="云端编排入口")
     ap.add_argument("--only-region", help="只抓取 region 包含该关键字的源（如 浙江）")
     ap.add_argument("--exclude-region", help="跳过 region 包含该关键字的源（如 浙江）")
+    ap.add_argument("--no-status", action="store_true",
+                    help="只入库公告，不写 sources_status（GitHub Actions 海外 IP 轨道专用）")
     args = ap.parse_args()
     # 各步骤独立 try-catch：单步异常不致命，确保数据质量改动（清噪声/回填）无论抓取到否都能落库，
     # 避免「抓取偶发失败 → 整个 job 崩 → .has_change 不写 → 改动被锁死」的死循环。
     try:
-        report = scraper.run_all(only_region=args.only_region, exclude_region=args.exclude_region)
+        report = scraper.run_all(only_region=args.only_region,
+                                 exclude_region=args.exclude_region,
+                                 write_status=not args.no_status)
     except Exception as _e:
         print(f"[warn] run_all 异常（仍继续 cleanup/回填）: {_e}")
         report = {"new": [], "run_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), "sources": []}

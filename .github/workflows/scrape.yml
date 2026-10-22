@@ -87,7 +87,17 @@ jobs:
           # 未配置该 Secret 时留空 → 纯直连（当前行为，不影响任何现有源）
           # 配置后：抓取先直连，被封的 gov.cn 源直连失败会自动回退走此代理
           SCRAPE_PROXY: ${{ secrets.SCRAPE_PROXY }}
-        run: python cloud_run.py
+        # --no-status：本轨是海外 IP，抓国内 gov.cn 会系统性 403/不可达。
+        # 若写 sources_status，会把 WorkBuddy 国内通道刚测好的健康度覆盖成 0，
+        # 造成健康哨兵大量假阳性。公告照常入库，只是不污染健康度。
+        run: python cloud_run.py --no-status
+
+      - name: 健康体检（静默失败哨兵）
+        env:
+          SERVERCHAN_KEY: ${{ secrets.SERVERCHAN_KEY }}
+        # 只有「全库停摆 / 黄金源失效」这类致命项才推手机（--push-mode critical），
+        # 其余问题随 19:00 日报汇总，避免每 6 小时刷屏。|| true 保证不阻断部署。
+        run: python health_check.py --push --push-mode critical || true
 
       - name: 提交更新
         run: |
