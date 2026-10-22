@@ -1160,13 +1160,18 @@ def run_all(limit_per_source=40, max_workers=8,
     now_dt = datetime.datetime.now()
 
     # 清理孤儿状态行（已删除/改名源的状态残留），避免健康检查误报"长期未尝试"
-    _names = {s["name"] for s in sources}
-    _orphans = [r[0] for r in conn.execute("SELECT name FROM sources_status").fetchall() if r[0] not in _names]
-    for _n in _orphans:
-        conn.execute("DELETE FROM sources_status WHERE name=?", (_n,))
-    if _orphans:
-        conn.commit()
-        print(f"[状态] 清理孤儿状态行 {len(_orphans)} 个: {_orphans}")
+    # 仅在全量运行时执行：only_region/exclude_region 会把 sources 缩成子集，
+    # 若按子集比对，未参与本轮的其他源会被误判为「孤儿」而删掉状态行
+    # （2026-10-22 踩坑：--only-region 福建 一次跑完，其余 90 个源状态全被清空，
+    #   健康检查随后把它们全报成 not_run，历史 fail_streak 也一并丢失）。
+    if not only_region and not exclude_region:
+        _names = {s["name"] for s in sources}
+        _orphans = [r[0] for r in conn.execute("SELECT name FROM sources_status").fetchall() if r[0] not in _names]
+        for _n in _orphans:
+            conn.execute("DELETE FROM sources_status WHERE name=?", (_n,))
+        if _orphans:
+            conn.commit()
+            print(f"[状态] 清理孤儿状态行 {len(_orphans)} 个: {_orphans}")
 
     def _should_skip(name):
         st = fail_info.get(name)
