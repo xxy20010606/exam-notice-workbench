@@ -886,12 +886,24 @@ def fetch(source):
 
 
 # ---------------- 解析 ----------------
-def extract_date(text, url):
+def _same_page(a, b):
+    """判断两个 URL 是否指向同一页面（忽略协议、case、末尾斜杠、锚点）。"""
+    def norm(u):
+        u = (u or "").strip().split("#")[0]
+        u = re.sub(r"^https?://", "", u, flags=re.I).rstrip("/")
+        return u.lower()
+    a, b = norm(a), norm(b)
+    return bool(a) and a == b
+
+
+def extract_date(text, url, hint=""):
     """从 URL 或文本中提取公告日期，返回 YYYY-MM-DD 或空串。
 
     覆盖格式：
       URL:  /2026-08-14/ | /2026/0814/ | t20260814_ | _20260814.htm
       文本: 2026-08-14 | 2026年8月14日 | 2026.08.14 | 20260814
+
+    hint：标题文本，仅在「MM/DD 无年份」兜底路径下用于校正年份。
     """
     text = re.sub(r"\s+", "", text or "")  # 归一化（如嘉兴日期 span 内 "2026- 08- 13" 带空格）
 
@@ -924,6 +936,37 @@ def extract_date(text, url):
     m = re.search(r"(?<![\d])(20[2-9]\d)(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?![\d])", url)
     if m:
         return f"{m.group(1)}-{m.group(2)}-{m.group(3)}"
+
+    # 最后兜底：MM/DD 或 MM-DD 无年份（政府站常见，如淮安列表 <div class="time">08/18</div>）。
+    # 年份需推断：默认取今年；若推算出的日期比今天晚 30 天以上，说明是去年的条目
+    # （跨年时列表顶部仍显示 12/25），年份减 1。30 天余量覆盖「未来几天才发布」的正常情况。
+    # 仅在短文本上启用：日期字段本身很短，长文本（整块导航/列表拼接）里出现 "1/2"
+    # 这类数字片段的概率高，容易被误读成 1 月 2 日。
+    # 年份校正：标题常自带年份（「2025年淮安市…公开招聘」），比 MM/DD 推断更准。
+    # 只在标题年份早于推断年份（差距 ≤2 年）时覆盖；反方向不覆盖——12 月发布的
+    # 「2026年招聘」公告，标题年份本就晚于发布年，拿来改会把日期推到未来。
+    if text and len(text) <= 120:
+        m = re.search(r"(?<!\d)(\d{1,2})[/](\d{1,2})(?!\d)", text)
+        if m:
+            mo, d = int(m.group(1)), int(m.group(2))
+            if 1 <= mo <= 12 and 1 <= d <= 31:
+                today = datetime.date.today()
+                year = today.year
+                hm = re.search(r"(20\d{2})\s*年", hint or "")
+                if hm:
+                    hy = int(hm.group(1))
+                    if 0 < year - hy <= 2:
+                        year = hy
+                try:
+                    cand = datetime.date(year, mo, d)
+                except ValueError:
+                    return ""
+                if year == today.year and (cand - today).days > 30:
+                    try:
+                        cand = datetime.date(year - 1, mo, d)
+                    except ValueError:
+                        return ""
+                return cand.strftime("%Y-%m-%d")
 
     return ""
 
@@ -1016,6 +1059,10 @@ def parse_source(source, html):
                 title = title[gm.end():]
         if not title:
             continue
+        # 列表项目符号剥离：部分站标题前带圆点（如淮安「· 2025年…公开招聘」）
+        title = re.sub(r"^[·•∙‧⋅●○›»]+\s*", "", title).strip()
+        if not title:
+            continue
         if inc and not inc.search(title):
             continue
         if (exc_src and exc_src.search(title)) or exc_glob.search(title):
@@ -1037,6 +1084,10 @@ def parse_source(source, html):
         if not href or href.startswith(("javascript:", "mailto:", "tel:")):
             continue
         absurl = urljoin(base, href).split("#")[0]
+        # 自链接过滤：href 直接指回栏目列表页本身（如连云港「事业单位招聘」导航项），
+        # 那不是公告，只是栏目名。比对时忽略协议/末尾斜杠差异。
+        if _same_page(absurl, source.get("url", "")):
+            continue
         if absurl in seen:
             continue
         seen.add(absurl)
@@ -1045,9 +1096,9 @@ def parse_source(source, html):
         #   所以组件属性/黏连前缀命中时不再走祖先扩展，避免拿到抓取当日）
         parent = a.find_parent(["li", "div", "tr", "td", "p"]) or a
         ptext = parent.get_text(" ", strip=True) if parent else title
-        row_date = (extract_date(comp_time, absurl) if comp_time else "") or glued_date
+        row_date = (extract_date(comp_time, absurl, title) if comp_time else "") or glued_date
         # 组件属性/黏连前缀都没有日期、且父元素文本也没提取到时，扩大搜索：
-        if not row_date and not extract_date(ptext, absurl):
+        if not row_date and not extract_date(ptext, absurl, title):
             candidates = []
             # 兄弟元素（前3个后3个）
             for sib in list(parent.previous_siblings)[-3:] + list(parent.next_siblings)[:3]:
@@ -1062,12 +1113,12 @@ def parse_source(source, html):
                 candidates.append(el.get_text(" ", strip=True)[:200])
             # 用第一个能提取到日期的候选文本
             for cand in candidates:
-                d = extract_date(cand, absurl)
+                d = extract_date(cand, absurl, title)
                 if d:
                     ptext = ptext + " " + cand  # 追加到 ptext 让 extract_date 能匹配
                     break
         if not row_date:
-            row_date = extract_date(ptext, absurl)
+            row_date = extract_date(ptext, absurl, title)
         items.append({"title": title[:200], "url": absurl, "date": row_date})
     return items
 
