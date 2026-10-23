@@ -603,6 +603,35 @@
     "container": "div.page-content"
   },
   {
+    "name": "浙江宁波-事业单位(人才网招考)",
+    "category": "事业编",
+    "region": "浙江",
+    "url": "https://www.nbrc.com.cn/news/career.html?typeflag=institution",
+    "method": "jsonapi",
+    "api_url": "https://www.nbrc.com.cn/baseApp/app/wcm/getInstitutionJob",
+    "api_body": {
+      "pageSize": "{size}",
+      "pageNumber": "{page}"
+    },
+    "api_size": 100,
+    "api_pages": 10,
+    "api_signer": "nbrc",
+    "api_sign_key": "bb5259528637fe5466a8d77128dd01c2",
+    "api_headers": {
+      "Referer": "https://www.nbrc.com.cn/news/career.html?typeflag=institution",
+      "Origin": "https://www.nbrc.com.cn"
+    },
+    "api_list_path": "data.list",
+    "api_title_key": "doctitle",
+    "api_date_key": "docpubtime",
+    "api_url_template": "https://www.nbrc.com.cn/news/careerdetail.html?typeflag=institution&newsid={docid}",
+    "title_include": "事业单位|机关|编外|招聘|招考|招录|选聘|选调|遴选|公开招聘|专职工作者|聘用制|司法雇员|警务辅助",
+    "title_exclude": "拟录|拟聘|公示|成绩|体检|考察|名单|面试|笔试|资格|复审|审核|结果|附加分|递补|核减|取消|延期|准考证|报名|通知|国企|国有企业|国资|公司|集团|劳务|派遣|外包|知企|食堂|保洁|保安|驾驶|厨师|后勤|门卫|物业",
+    "manda_days": 200,
+    "limit": 300,
+    "alert_zero": false
+  },
+  {
     "name": "江苏-省属事业单位",
     "category": "事业编",
     "region": "江苏",

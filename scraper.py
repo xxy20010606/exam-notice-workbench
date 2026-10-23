@@ -8,6 +8,8 @@
                     源需含 manda_token + manda_queries；返回带 title/url/date 的 items。
 - method="api"     : 福建统一平台 JSON 数据源(GET newsList, flag=2&isProject=1)，
                     源需含 api_url(可用 {pageNum} 占位)；返回 title/url/date 的 items。
+- method="jsonapi" : 通用后台 JSON 接口(POST 表单 + 可选签名头)，适用于列表页是
+                    SPA 壳、数据靠 XHR 拉取的站（如宁波人才网 网上招考 10500+ 条）。
 """
 import json, os, sqlite3, hashlib, re, time, datetime
 from urllib.parse import urljoin, quote
@@ -302,6 +304,167 @@ def _fujian_api_items(source):
             break
     if not total_ok:
         raise RuntimeError("统一平台 newsList 未返回有效 rows")
+    return items
+
+
+def _http_post_form(url, data, headers=None, timeout=25, retries=1):
+    """POST application/x-www-form-urlencoded，返回解析后的 JSON dict。
+
+    与 _http_post_json 的区别：body 是表单编码而非 JSON（不少政府/人才网
+    后台接口只认 form），且允许调用方注入自定义头（部分站点带签名头才返回数据）。
+    """
+    import urllib.parse, urllib.request, ssl, socket as _socket_mod, json as _json
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    body = urllib.parse.urlencode(data).encode("utf-8")
+    hdr = {
+        "User-Agent": DEFAULT_UA,
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "Accept": "application/json, text/javascript, */*; q=0.01",
+        "X-Requested-With": "XMLHttpRequest",
+    }
+    if headers:
+        hdr.update({k: v for k, v in headers.items() if v is not None})
+    proxy = os.environ.get("SCRAPE_PROXY", "").strip()
+    _orig_gai = _socket_mod.getaddrinfo
+    def _ipv4_only(host, port, family=0, *a, **kw):
+        return _orig_gai(host, port, _socket_mod.AF_INET if family == 0 else family, *a, **kw)
+    last = None
+    for _ in range(retries + 1):
+        try:
+            _socket_mod.getaddrinfo = _ipv4_only
+            req = urllib.request.Request(url, data=body, headers=hdr, method="POST")
+            with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
+                _socket_mod.getaddrinfo = _orig_gai
+                return _json.loads(r.read().decode("utf-8", errors="ignore"))
+        except Exception as e:
+            _socket_mod.getaddrinfo = _orig_gai
+            last = e
+            time.sleep(1.0)
+    if proxy:
+        try:
+            _socket_mod.getaddrinfo = _ipv4_only
+            opener = urllib.request.build_opener(
+                urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
+            req = urllib.request.Request(url, data=body, headers=hdr, method="POST")
+            with opener.open(req, timeout=timeout, context=ctx) as r:
+                _socket_mod.getaddrinfo = _orig_gai
+                return _json.loads(r.read().decode("utf-8", errors="ignore"))
+        except Exception:
+            _socket_mod.getaddrinfo = _orig_gai
+    raise last
+
+
+def _nbrc_sign(key):
+    """宁波人才网(nbrc.com.cn) XHR 签名头。
+
+    站点前端 function.js 里 setData/request 统一注入：
+        nbrcbefore = Date.now()            # 毫秒时间戳
+        nbrcafter  = md5(key + md5(str(nbrcbefore)))
+        keyid      = key
+    缺这几个头接口返回 200 但 data.list 为空（静默失败，极易误判为「无数据」）。
+    """
+    d = str(int(time.time() * 1000))
+    inner = hashlib.md5(d.encode()).hexdigest()
+    after = hashlib.md5((key + inner).encode()).hexdigest()
+    return {"jsonType": "jsonType", "nbrcbefore": d, "nbrcafter": after,
+            "keyid": key, "pwdreset": "0", "nbrctoken": ""}
+
+
+def _dig(obj, path):
+    """按点号路径取嵌套字段，如 "data.list"。缺失返回 None。"""
+    cur = obj
+    for seg in (path or "").split("."):
+        if not seg:
+            continue
+        if isinstance(cur, dict):
+            cur = cur.get(seg)
+        elif isinstance(cur, list) and seg.isdigit():
+            cur = cur[int(seg)] if int(seg) < len(cur) else None
+        else:
+            return None
+    return cur
+
+
+def _jsonapi_items(source):
+    """通用后台 JSON 接口抓取（分页 POST 表单 + 自定义签名头）。
+
+    典型场景：列表页是 SPA 壳，数据由前端 XHR 拉取，接口需要站点自定义签名头
+    （如宁波人才网 nbrc）。配置项：
+      method:            "jsonapi"
+      api_url:           接口地址
+      api_body:          表单字段 dict，{page} / {size} 占位
+      api_pages:         抓取页数（默认 10）
+      api_size:          每页条数（默认 100）
+      api_signer:        签名方案名，目前支持 "nbrc"（需 api_sign_key）
+      api_sign_key:      签名密钥
+      api_headers:       额外固定请求头 dict（可选）
+      api_list_path:     列表所在点号路径，如 "data.list"
+      api_title_key:     标题字段名
+      api_date_key:      日期字段名（可含时间，取前 10 位）
+      api_url_key:       直接给 URL 的字段名（与 api_url_template 二选一）
+      api_url_template:  URL 模板，可用列表项任意字段 {field}
+      api_max_id_key:    可选，用该字段做去重键（默认用解析出的 URL）
+    返回 items(title/url/date)。
+    """
+    url = source["api_url"]
+    pages = int(source.get("api_pages", 10))
+    size = int(source.get("api_size", 100))
+    body_tpl = source.get("api_body") or {"pageSize": "{size}", "pageNumber": "{page}"}
+    list_path = source.get("api_list_path", "data.list")
+    tkey = source.get("api_title_key", "title")
+    dkey = source.get("api_date_key", "date")
+    ukey = source.get("api_url_key")
+    utpl = source.get("api_url_template")
+    extra_hdr = source.get("api_headers") or {}
+
+    items, seen = [], set()
+    got_any = False
+    for p in range(1, pages + 1):
+        hdr = dict(extra_hdr)
+        signer = source.get("api_signer")
+        if signer == "nbrc":
+            hdr.update(_nbrc_sign(source.get("api_sign_key", "")))
+        body = {}
+        for k, v in body_tpl.items():
+            if isinstance(v, str):
+                v = v.replace("{page}", str(p)).replace("{size}", str(size))
+            body[k] = v
+        try:
+            out = _http_post_form(url, body, headers=hdr, timeout=25, retries=1)
+        except Exception as e:
+            print(f"[jsonapi] {source['name']} 第{p}页请求失败: {e}")
+            break
+        rows = _dig(out, list_path) or []
+        if not rows:
+            break
+        got_any = True
+        for r in rows:
+            title = (r.get(tkey) or "").strip()
+            if not title:
+                continue
+            if utpl:
+                try:
+                    u = utpl.format(**r)
+                except Exception:
+                    u = ""
+            else:
+                u = (r.get(ukey or "url") or "").strip()
+            if not u or not u.startswith("http"):
+                continue
+            raw_date = str(r.get(dkey) or "")
+            m = re.match(r"(\d{4})-(\d{1,2})-(\d{1,2})", raw_date)
+            date = f"{m.group(1)}-{int(m.group(2)):02d}-{int(m.group(3)):02d}" if m else ""
+            key = u.split("#")[0]
+            if key in seen:
+                continue
+            seen.add(key)
+            items.append({"title": title[:200], "url": u, "date": date})
+        if len(rows) < size:
+            break
+    if not got_any:
+        raise RuntimeError("JSON 接口未返回有效列表（检查签名头/接口路径）")
     return items
 
 
@@ -1129,6 +1292,12 @@ def _work(s, limit_per_source=40):
             # (include/exclude + GLOBAL_NOISE + 规范化标题去重 + 日期窗口)。
             s2 = dict(s)
             items = _filter_manda_items(s2, _fujian_api_items(s2))
+            return s2, items[:limit_per_source], None
+        if s.get("method") == "jsonapi":
+            # 通用后台 JSON 接口源（SPA 列表页 + XHR 分页）：抓取命中 include/exclude
+            # 后再截断，避免相关性/时间序靠前的无关条目把近期真公告挤掉。
+            s2 = dict(s)
+            items = _filter_manda_items(s2, _jsonapi_items(s2))
             return s2, items[:limit_per_source], None
         if s.get("method") == "manda":
             # 站内搜索 API 源：直接返回 items（title/url/date），不走 HTML 解析

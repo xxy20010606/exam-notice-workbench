@@ -36,3 +36,6 @@ health_state.json
 # 抓取轮次变更标记（运行产物，由 .has_change / .new_count 判断是否推送）
 .has_change
 .new_count
+
+# 本地探测脚本（临时，不入仓）
+_probe/
