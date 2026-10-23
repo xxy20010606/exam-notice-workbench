@@ -13,6 +13,11 @@
 
 本脚本的判据（与旧口径互补，不替代）：
   ① 解析归零  : 该源历史上有公告记录，但当前 last_count=0        → CRITICAL
+     但必须区分两种「0 条」（2026-10-23 修正）：
+       · last_raw=0   → 列表页一条候选都读不到 = 解析器/URL 真失效 → CRITICAL
+       · last_raw>0   → 读到了 N 条但被过滤干净（栏目当前全是拟聘公示/
+                        采购公告）= 内容空窗，不是故障 → WARN(window_empty)
+     修正前只看 last_count，把南通/苏州/泰州/镇江这类内容空窗全误报成解析器失效。
   ② 从未成功  : 历史 0 条 + last_count=0 + 无报错                → WARN（配置错/URL 失效）
   ③ 抓取报错  : last_error 非空 或 fail_streak>0                 → WARN/CRITICAL
   ④ 数据陈旧  : 该源最新公告日期距今超过阈值                      → WARN
@@ -56,7 +61,7 @@ STALE_LIMIT = {"事业编": 45, "省考": 200, "国考": 320}
 CODE_ORDER = {
     "stalled": 0, "golden_count": 1, "golden_stale": 2,
     "silent_zero": 3, "long_dead": 4, "fetch_error": 5,
-    "stale": 6, "nodate": 7, "never_ok": 8, "not_run": 9,
+    "stale": 6, "nodate": 7, "window_empty": 8, "never_ok": 9, "not_run": 10,
 }
 
 # 报错源升级为 CRITICAL 的连续失败次数
@@ -150,10 +155,16 @@ def collect(db_path):
             ).fetchall()
         except sqlite3.OperationalError:
             status = []
+        # last_raw = 过滤前原始候选数。老库没有这一列 → 全部给 None，退回旧判据。
+        try:
+            raws = {r[0]: r[1] for r in conn.execute(
+                "SELECT name,last_raw FROM sources_status").fetchall()}
+        except sqlite3.OperationalError:
+            raws = {}
     finally:
         conn.close()
     return {"total": total, "nodate": nodate, "hist": hist, "status": status,
-            "recent_24h": recent_24h, "last_ingest": last_ingest}
+            "raws": raws, "recent_24h": recent_24h, "last_ingest": last_ingest}
 
 
 def diagnose(data, cats):
@@ -210,20 +221,38 @@ def diagnose(data, cats):
             })
             continue
 
-        # ① 解析归零（静默失败，核心目标）
+        # ① 解析归零。必须区分两种「0 条」：
+        #    raw=0  → 列表页一条候选都读不到 = 解析器/URL 真失效（CRITICAL）
+        #    raw>0  → 读到了 N 条，但当前栏目全是拟聘公示/采购公告，被 include/exclude
+        #             全挡掉 = 内容空窗（WARN）。这类不是故障，2026-10-23 实测南通/苏州/
+        #             泰州/镇江都属于这一类，之前全被误报成「解析器疑似失效」。
+        raw = data.get("raws", {}).get(name)
         if last_count == 0 and h["hist"] >= HISTORY_PROOF:
-            issues.append({
-                "level": "CRITICAL", "code": "silent_zero", "source": name,
-                "detail": f"历史有 {h['hist']} 条，本轮解析 0 条且无报错 → 解析器疑似失效",
-            })
+            if raw is not None and raw > 0:
+                issues.append({
+                    "level": "WARN", "code": "window_empty", "source": name,
+                    "detail": (f"本轮读到 {raw} 条候选，但全被过滤（栏目当前只有拟聘公示/"
+                               f"采购公告等）→ 内容空窗，非解析器故障"),
+                })
+            else:
+                issues.append({
+                    "level": "CRITICAL", "code": "silent_zero", "source": name,
+                    "detail": f"历史有 {h['hist']} 条，本轮解析 0 条且无报错 → 解析器疑似失效",
+                })
             continue
 
         # ② 从未成功过
         if last_count == 0 and h["hist"] == 0:
-            issues.append({
-                "level": "WARN", "code": "never_ok", "source": name,
-                "detail": "从未解析出任何公告（URL/选择器可能配置错误）",
-            })
+            if raw is not None and raw > 0:
+                issues.append({
+                    "level": "WARN", "code": "window_empty", "source": name,
+                    "detail": f"读到 {raw} 条候选但全被过滤，从未入库过真公告",
+                })
+            else:
+                issues.append({
+                    "level": "WARN", "code": "never_ok", "source": name,
+                    "detail": "从未解析出任何公告（URL/选择器可能配置错误）",
+                })
             continue
 
         # ④ 数据陈旧

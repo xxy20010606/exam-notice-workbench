@@ -51,6 +51,20 @@ RECRUIT_WHITELIST = re.compile(
     r"公务员|省考|选调|遴选|事业|招聘|招考|招录|公考|引进|招募"
 )
 
+
+def whitelist_exempt():
+    """需要在白名单上放行的源名集合（sources.json 里配 "skip_whitelist": true）。
+
+    场景：部分站点服务端就把列表标题截断到十几个字（典型淮安
+    「2026年淮安市第一人民医院公开…」），关键词「招聘/公告」正好被截掉，
+    白名单会把这些真公告全判成 junk 删掉。这类源在 sources.json 显式声明豁免。
+    """
+    try:
+        with open(SOURCES, encoding="utf-8") as f:
+            return {s.get("name") for s in json.load(f) if s.get("skip_whitelist")}
+    except Exception:
+        return set()
+
 # 日期提取正则（按优先级排序）：
 #   1) URL_DATE_RE: 从 URL 路径提取（覆盖中国政务站常见格式）
 #      匹配 /2026-08-14/ 、 /2026/0814/ 、 t20260814_ 、 _20260814. 等
@@ -971,7 +985,16 @@ def extract_date(text, url, hint=""):
     return ""
 
 
-def parse_source(source, html):
+def parse_source(source, html, stats=None):
+    """解析列表页，返回命中 include/exclude 的条目。
+
+    stats：可选 dict，会被填入原始候选数（未经 include/exclude 过滤）。
+    用途：健康检查要区分「解析器失效」（列表页一条候选都读不到）和
+    「内容空窗」（读到了 N 条，但当前栏目全是拟聘公示/采购公告，被过滤成 0）。
+    只看过滤后的条数分不开这两种，会把内容空窗误报成解析器坏掉。
+    """
+    if stats is not None:
+        stats.setdefault("raw", 0)
     soup = BeautifulSoup(html, "html.parser")
     base = source.get("base") or source["url"]
     scope = soup
@@ -1001,6 +1024,8 @@ def parse_source(source, html):
             title = tds[t_idx].get_text(" ", strip=True)
             if not title:
                 continue
+            if stats is not None:
+                stats["raw"] += 1
             if inc and not inc.search(title):
                 continue
             # row_table 模式只套用该源的 include/exclude，不套 GLOBAL_EXCLUDE：
@@ -1063,6 +1088,8 @@ def parse_source(source, html):
         title = re.sub(r"^[·•∙‧⋅●○›»]+\s*", "", title).strip()
         if not title:
             continue
+        if stats is not None:
+            stats["raw"] += 1
         if inc and not inc.search(title):
             continue
         if (exc_src and exc_src.search(title)) or exc_glob.search(title):
@@ -1137,6 +1164,9 @@ def init_db():
         conn.execute("ALTER TABLE sources_status ADD COLUMN fail_streak INT DEFAULT 0")
     if "last_attempt_at" not in cols:
         conn.execute("ALTER TABLE sources_status ADD COLUMN last_attempt_at TEXT")
+    # last_raw = 过滤前的原始候选条数，供 health_check 区分「解析器失效」与「内容空窗」
+    if "last_raw" not in cols:
+        conn.execute("ALTER TABLE sources_status ADD COLUMN last_raw INT")
     conn.commit()
     return conn
 
@@ -1158,6 +1188,8 @@ def store(conn, source, items):
             "SELECT id,title,url FROM notices WHERE source=?", (source["name"],)).fetchall():
         if rt:
             title_index.setdefault(_norm_title(rt), []).append([rid, rurl])
+    # 标题被站点截断的源（如淮安）豁免白名单，否则「…公开…」这类真公告会被当 junk
+    exempt = source.get("name") in whitelist_exempt()
     for it in items:
         # 入库即过滤全局噪声，避免 junk 污染 notices.db 与看板
         if GLOBAL_NOISE.search(it["title"] or ""):
@@ -1165,7 +1197,7 @@ def store(conn, source, items):
             continue
         # 白名单第二道闸：标题必须含招聘/考试专属词，拦住政务门户混入的
         # 行政通知/送达催告/目录发布等（与 daily_digest 口径一致）
-        if not RECRUIT_WHITELIST.search(it["title"] or ""):
+        if not exempt and not RECRUIT_WHITELIST.search(it["title"] or ""):
             dropped += 1
             continue
         uid = url_id(it["url"])
@@ -1224,8 +1256,10 @@ def cleanup_noise():
     # 全局招聘关键词白名单清理：政务门户/人社局首页混入的行政通知、送达催告、
     # 目录发布、政策文件等（标题不含任何招聘/考试专属词）一次性清扫，
     # 与 store() 的 RECRUIT_WHITELIST 同口径。region=上海沿用其自身白名单规则。
-    for (rid, title, region) in conn.execute("SELECT id,title,region FROM notices").fetchall():
-        if region == "上海":
+    _exempt_src = whitelist_exempt()
+    for (rid, title, region, src) in conn.execute(
+            "SELECT id,title,region,source FROM notices").fetchall():
+        if region == "上海" or src in _exempt_src:
             continue
         if title and not RECRUIT_WHITELIST.search(title):
             conn.execute("DELETE FROM notices WHERE id=?", (rid,))
@@ -1334,7 +1368,12 @@ def date_backfill():
 
 # ---------------- 主流程 ----------------
 def _work(s, limit_per_source=40):
-    """单源抓取+解析（线程安全：不碰 DB）。返回 (source, items, error)。"""
+    """单源抓取+解析（线程安全：不碰 DB）。返回 (source, items, error, raw)。
+
+    raw = 过滤前的原始候选条数。健康检查用它区分：
+      raw=0            → 列表页一条候选都读不到，解析器/URL 真失效（CRITICAL）
+      raw>0 但 items=0 → 读到了，但当前栏目全是拟聘公示/采购公告（内容空窗，WARN）
+    """
     try:
         # 每源 limit 覆盖：sources.json 里配 "limit": N 可单独调大该源入库条数
         limit_per_source = s.get("limit", limit_per_source)
@@ -1342,31 +1381,36 @@ def _work(s, limit_per_source=40):
             # 福建统一平台 JSON API 源：抓取 newsList → items，复用 manda 的过滤链
             # (include/exclude + GLOBAL_NOISE + 规范化标题去重 + 日期窗口)。
             s2 = dict(s)
-            items = _filter_manda_items(s2, _fujian_api_items(s2))
-            return s2, items[:limit_per_source], None
+            raw = _fujian_api_items(s2)
+            items = _filter_manda_items(s2, raw)
+            return s2, items[:limit_per_source], None, len(raw)
         if s.get("method") == "jsonapi":
             # 通用后台 JSON 接口源（SPA 列表页 + XHR 分页）：抓取命中 include/exclude
             # 后再截断，避免相关性/时间序靠前的无关条目把近期真公告挤掉。
             s2 = dict(s)
-            items = _filter_manda_items(s2, _jsonapi_items(s2))
-            return s2, items[:limit_per_source], None
+            raw = _jsonapi_items(s2)
+            items = _filter_manda_items(s2, raw)
+            return s2, items[:limit_per_source], None, len(raw)
         if s.get("method") == "manda":
             # 站内搜索 API 源：直接返回 items（title/url/date），不走 HTML 解析
             # 注意：先过滤再去重截断（manda 相关性排序会把近期公告排到靠后，
             # 若先截断再过滤会丢失排位靠后的近期真公告）
             s2 = dict(s)
-            items = _filter_manda_items(s2, _manda_items(s2))
-            return s2, items[:limit_per_source], None
+            raw = _manda_items(s2)
+            items = _filter_manda_items(s2, raw)
+            return s2, items[:limit_per_source], None, len(raw)
         if s.get("method") == "jsptsearch":
             # 江苏站群 search4 GET SSR 源：解析搜索结果公告(title/url/date)
             s2 = dict(s)
-            items = _filter_jsptsearch(s2, _jsptsearch_items(s2))
-            return s2, items[:limit_per_source], None
+            raw = _jsptsearch_items(s2)
+            items = _filter_jsptsearch(s2, raw)
+            return s2, items[:limit_per_source], None, len(raw)
         html = fetch(s)
-        items = parse_source(s, html)[:limit_per_source]
-        return s, items, None
+        stats = {}
+        items = parse_source(s, html, stats)[:limit_per_source]
+        return s, items, None, stats.get("raw", 0)
     except Exception as e:
-        return s, [], str(e)
+        return s, [], str(e), 0
 
 
 def run_all(limit_per_source=40, max_workers=8,
@@ -1475,26 +1519,26 @@ def run_all(limit_per_source=40, max_workers=8,
         futures = {ex.submit(_work, s, limit_per_source): s["name"] for s in http_sources}
         for fut in as_completed(futures):
             name = futures[fut]
-            s, items, err = fut.result()
-            results[name] = (s, items, err)
+            s, items, err, raw = fut.result()
+            results[name] = (s, items, err, raw)
 
     # 浏览器源（反爬、共享单例 browser）顺序抓取，避免并发冲突
     for s in browser_sources:
-        s2, items, err = _work(s, limit_per_source)
-        results[s2["name"]] = (s2, items, err)
+        s2, items, err, raw = _work(s, limit_per_source)
+        results[s2["name"]] = (s2, items, err, raw)
 
     # 主线程顺序写库（SQLite 线程安全）
     now_str = now_iso()
     for s in active_sources:
-        s2, items, err = results[s["name"]]
+        s2, items, err, raw = results[s["name"]]
         if err:
             old = fail_info.get(s["name"], {}).get("streak", 0)
             new_streak = old + 1
             if write_status:
                 conn.execute("""INSERT OR REPLACE INTO sources_status
-                                (name,last_run,last_count,last_error,fail_streak,last_attempt_at)
-                                VALUES(?,?,?,?,?,?)""",
-                             (s["name"], now_str, 0, err[:300], new_streak, now_str))
+                                (name,last_run,last_count,last_error,fail_streak,last_attempt_at,last_raw)
+                                VALUES(?,?,?,?,?,?,?)""",
+                             (s["name"], now_str, 0, err[:300], new_streak, now_str, raw))
             report["sources"].append({"name": s["name"], "category": s.get("category"),
                                        "region": s.get("region"), "count": 0, "new": 0,
                                        "error": err[:200]})
@@ -1502,12 +1546,12 @@ def run_all(limit_per_source=40, max_workers=8,
             new = store(conn, s, items)
             if write_status:
                 conn.execute("""INSERT OR REPLACE INTO sources_status
-                                (name,last_run,last_count,last_error,fail_streak,last_attempt_at)
-                                VALUES(?,?,?,?,?,?)""",
-                             (s["name"], now_str, len(items), "", 0, now_str))
+                                (name,last_run,last_count,last_error,fail_streak,last_attempt_at,last_raw)
+                                VALUES(?,?,?,?,?,?,?)""",
+                             (s["name"], now_str, len(items), "", 0, now_str, raw))
             report["sources"].append({"name": s["name"], "category": s.get("category"),
                                        "region": s.get("region"), "count": len(items),
-                                       "new": len(new), "error": None})
+                                       "new": len(new), "raw": raw, "error": None})
             for n in new:
                 report["new"].append({"source": s["name"], "category": s.get("category"),
                                        "region": s.get("region"), **n})
