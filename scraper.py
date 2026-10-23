@@ -35,6 +35,9 @@ GLOBAL_NOISE = re.compile(
     r"|^/\s"                  # 导航栏文字（以 / 开头）
     r"|^事业单位公开招聘$"     # 泛化栏目名（非具体公告）
     r"|^公开招聘$"            # 泛化栏目名
+    r"|^招聘公告$"            # 泛化栏目名（上海 rsj 多页合并后每页都有一个「招聘公告」栏目名）
+    r"|^公告公示$"            # 泛化栏目名
+    r"|^通知公告$"            # 泛化栏目名
     r"|公开招聘服务平台"       # 统一平台导航名（非真实公告）
 )
 
@@ -692,6 +695,30 @@ def fetch(source):
             html = html + "\n" + ph
         except Exception:
             pass
+    # 分页模板（page_url_template + max_pages）：分页由 JS 动态生成、首页无静态链接，
+    # 且页数很多的站。典型：上海 rsj.sh.gov.cn 招聘公告 550 页，翻页回调是
+    # location.href='index_'+i+'.html'，页面上拿不到 <a href="index_2.html">。
+    # 从第 2 页起按模板抓，任意一页请求失败即停（页数耗尽或越界自然终止），
+    # 避免为不存在的页空耗，也避免 follow_pages 那种「找不到静态链接就永远抓第 1 页」。
+    tpl = source.get("page_url_template")
+    if tpl:
+        max_pages = int(source.get("max_pages", 10))
+        got_pages = 1
+        for p in range(2, max_pages + 1):
+            purl = tpl.replace("{page}", str(p))
+            try:
+                ph = _raw_fetch(purl, method, encoding=encoding,
+                                browser_wait=browser_wait,
+                                browser_wait_until=browser_wait_until,
+                                browser_timeout=browser_timeout,
+                                http_timeout=http_timeout,
+                                block_external=block_external)
+            except Exception:
+                break
+            html = html + "\n" + ph
+            got_pages += 1
+        if got_pages > 1:
+            print(f"[分页] {source.get('name','')} 按模板抓取 {got_pages} 页")
     return html
 
 
