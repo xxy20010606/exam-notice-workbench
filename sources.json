@@ -833,10 +833,11 @@
     "region": "上海",
     "url": "https://www.jinshan.gov.cn/ywdt-tzgg/index.html",
     "method": "http",
-    "enabled": false,
-    "note": "2026-10-24 停用：/ywdt-tzgg/ 是「要闻动态-通知公告」综合栏，17 条候选招聘零命中，全是拟聘职称公示/听证告知书/行政复议送达。金山站也不在 mayabot 站群搜索体系（无 manda token，首页无搜索组件），暂无可用的招聘入口。",
-    "title_include": "招聘|招考|招录|引进|遴选|选调",
-    "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|未达开考|开考比例|达不到开考|取消开考|岗位未达开考|开考比例|达不到开考|取消开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$"
+    "note": "2026-10-24 重新启用。此前判断「该栏目招聘零命中」是抽样不足——金山的招聘公告确实发在「要闻动态-通知公告」这个综合栏里，只是被行政复议/听证/送达/拟聘职称公示淹没（12 页 177 条里仅 12 条含招聘字样，真事业编类 8 条）。分页是 pagination.min.js，totalPage=12，callBack 拼 index_{i}.html，是干净的静态模板，纯 http 即可，无需浏览器。include 刻意不含「遴选」：该栏目里 4 条「遴选」全是遴选企业/基金托管机构/食堂供餐单位，不是人事遴选，含进来全是噪声。",
+    "title_include": "招聘|招考|招录|选调|引进|储备人才",
+    "title_exclude": "公示|拟聘|笔试|面试|成绩|名单|体检|资格|复审|考察|递补|准考证|报名|须知|温馨提示|核减|取消|预告|国有企业|供餐|消费券|基金管理|托管银行|征求意见|听证|送达|行政复议|催告|采购|招标|刻章",
+    "page_url_template": "https://www.jinshan.gov.cn/ywdt-tzgg/index_{page}.html",
+    "max_pages": 12
   },
   {
     "name": "上海-奉贤区-事业单位",
@@ -1257,5 +1258,18 @@
     "note": "成都人事考试网(官方真实域名cdpta.cdrsigc.com,cdpta.com已被劫持勿用)事业单位考试栏目,聚合市级+13区市县统考公告。服务端渲染http直抓。日期为YY.MM.DD格式,extract_date已支持两位年份。2026-10-24 栏目 id 由 989 改为 990：989 当前 30 条全是拟聘公示（历史 0 条入库的真因），990 才是招聘公告栏（实测 0→15 条）。",
     "onclick_regex": "showpageinfo\\('(\\d+)'\\s*,\\s*'([^']+)'",
     "onclick_url_template": "https://cdpta.cdrsigc.com{1}"
+  },
+  {
+    "name": "浙江舟山-事业单位",
+    "category": "事业编",
+    "region": "浙江",
+    "url": "http://zsrls.zhoushan.gov.cn/col/col1229335114/index.html",
+    "method": "browser",
+    "browser_wait": 6000,
+    "browser_click_pages": 6,
+    "page_wait": 4000,
+    "title_include": "招聘|招考|招录|选调|遴选|选聘|引进",
+    "title_exclude": "公示|拟聘|拟录|笔试|面试|资格|复审|体检|考察|成绩|名单|递补|准考证|报名|须知|温馨提示|核减|取消|岗位调整|有关事宜|说明|预告",
+    "note": "2026-10-24 新增（补浙江唯一空白地市）。注意域名：hrss.zhoushan.gov.cn 是**不存在**的域名（NXDOMAIN），真实地址是 zsrls.zhoushan.gov.cn（从 www.zhoushan.gov.cn 首页「市人力资源和社会保障局」链接取得）。招聘栏目 = /col/col1229335114/index.html，标题正是「事业单位招聘」。http 直取只有框架、0 条，必须 browser。该栏目 809 条 / 54 页，且以拟聘公示为主，第 1 页 30 条里只有 2 条真公告，故配 browser_click_pages=6 往后翻。分页按钮是纯图标 <a class=default_pgNext title=下页 href=#>，inner_text 为空——只按文本找永远匹配不到，已给 _find_next 补 title/class 兜底。"
   }
 ]

@@ -960,6 +960,27 @@ def fetch_browser_pages(url, pages=5, timeout=90000, wait=3000, wait_until="domc
                     pass
             if el is not None:
                 return el
+        # title 属性匹配：不少站的分页按钮是**纯图标、inner_text 为空**，
+        # 只在 title 里写「下页/下一页」（典型：舟山 default_pgNext，<a title="下页"></a>）。
+        # 只按文本找会永远匹配不到，翻页静默失效。
+        for kw in ("下页", "下一页", "后页", "下一頁", "Next", "next page"):
+            try:
+                el = p.query_selector(
+                    f'a[title="{kw}"], button[title="{kw}"], a[title*="{kw}"]')
+                if el is not None:
+                    return el
+            except Exception:
+                pass
+        # class 兜底：分页插件常用 pgNext / nextPage / next 等类名
+        for sel in ("a.default_pgNext", "a.default_pgForward", "a.pgNext",
+                    "a.nextPage", "li.next > a", "a[class*='pgNext']",
+                    "a[class*='nextPage']"):
+            try:
+                el = p.query_selector(sel)
+                if el is not None:
+                    return el
+            except Exception:
+                pass
         # 退化为「当前页 +1」的页码
         try:
             for el in p.query_selector_all("a"):
