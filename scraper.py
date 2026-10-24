@@ -120,7 +120,18 @@ def _decode_response(r, encoding):
     return raw.decode(cs, errors="ignore")
 
 
-def fetch_http(url, timeout=30, retries=2, encoding=None):
+def fetch_http(url, timeout=30, retries=2, encoding=None, ip_family=None):
+    """GET 一个页面，返回解码后的 HTML。
+
+    ip_family：IP 协议族，默认 "ipv4"（历史行为，全部现有源不变）。
+      · "ipv4"：强制 IPv4。GitHub Actions ubuntu 默认优先 IPv6，而国内 gov.cn
+        多为仅 IPv4 可达，所以长期以来必须强制 IPv4。
+      · "ipv6"：优先 IPv6，全部失败后**再兜底试一次 IPv4**。
+        个别政府站的可达性会随时间翻转——典型：福州 www.fuzhou.gov.cn
+        2026-10 起 IPv4 完全不通（TCP 443 能连上但 25s 收不到一个字节），
+        IPv6 却 0.77s 返回 200/149KB。对这种站强制 IPv4 等于永久超时。
+      · "auto"：不改写 getaddrinfo，交给系统决定。
+    """
     import urllib.request, ssl, socket as _socket_mod
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
@@ -138,37 +149,49 @@ def fetch_http(url, timeout=30, retries=2, encoding=None):
         "Accept-Language": "zh-CN,zh;q=0.9",
         "Referer": url,
     }
-    # 强制 IPv4：GitHub Actions ubuntu 默认优先 IPv6，国内 gov.cn 仅 IPv4 可达
-    # 通过临时 monkey-patch socket.getaddrinfo 实现（仅影响本函数内 urllib 调用）
+    # 通过临时 monkey-patch socket.getaddrinfo 指定协议族（仅影响本函数内 urllib 调用）
     _orig_gai = _socket_mod.getaddrinfo
-    def _ipv4_only(host, port, family=0, *a, **kw):
-        return _orig_gai(host, port, _socket_mod.AF_INET if family == 0 else family, *a, **kw)
+
+    def _mk(fam_const):
+        def _only(host, port, family=0, *a, **kw):
+            return _orig_gai(host, port, fam_const if family == 0 else family, *a, **kw)
+        return _only
+
+    _P = {"ipv4": _mk(_socket_mod.AF_INET), "ipv6": _mk(_socket_mod.AF_INET6), "auto": None}
+    fam = (ip_family or "ipv4").strip().lower()
+    if fam not in _P:
+        fam = "ipv4"
+    patch = _P[fam]
 
     last = None
-    for _ in range(retries + 1):
-        try:
-            _socket_mod.getaddrinfo = _ipv4_only
-            req = urllib.request.Request(url, headers=headers)
-            with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
+    # 首族按 retries 重试；仅 "ipv6" 会在全败后追加一次 ipv4 兜底。
+    # 反向不追加（ipv4 失败不试 ipv6），保证既有源行为零变化。
+    fams = [patch] + ([_P["ipv4"]] if fam == "ipv6" else [])
+    for pi, pf in enumerate(fams):
+        for _ in range((retries + 1) if pi == 0 else 1):
+            try:
+                _socket_mod.getaddrinfo = pf or _orig_gai
+                req = urllib.request.Request(url, headers=headers)
+                with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
+                    return _decode_response(r, encoding)
+            except Exception as e:
+                last = e
+                time.sleep(1.5)
+            finally:
                 _socket_mod.getaddrinfo = _orig_gai
-                return _decode_response(r, encoding)
-        except Exception as e:
-            _socket_mod.getaddrinfo = _orig_gai
-            last = e
-            time.sleep(1.5)
-    # 第二轮：直连全失败且配置了代理 → 回退走国内代理（同样强制 IPv4）
+    # 第二轮：直连全失败且配置了代理 → 回退走国内代理（代理是 IPv4 出口）
     if proxy:
         try:
-            _socket_mod.getaddrinfo = _ipv4_only
+            _socket_mod.getaddrinfo = _P["ipv4"]
             opener = urllib.request.build_opener(
                 urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
             req = urllib.request.Request(url, headers=headers)
             with opener.open(req, timeout=timeout, context=ctx) as r:
-                _socket_mod.getaddrinfo = _orig_gai
                 return _decode_response(r, encoding)
         except Exception as e:
-            _socket_mod.getaddrinfo = _orig_gai
             last = e
+        finally:
+            _socket_mod.getaddrinfo = _orig_gai
     raise last
 
 
@@ -1063,7 +1086,7 @@ def fetch_browser_pages(url, pages=5, timeout=90000, wait=3000, wait_until="domc
     return "\n".join(out)
 
 
-def _raw_fetch(url, method, encoding=None, browser_wait=3000, browser_wait_until="domcontentloaded", browser_timeout=90000, http_timeout=15, block_external=False):
+def _raw_fetch(url, method, encoding=None, browser_wait=3000, browser_wait_until="domcontentloaded", browser_timeout=90000, http_timeout=15, block_external=False, ip_family=None):
     if method == "browser":
         try:
             return fetch_browser(url, timeout=browser_timeout, wait=browser_wait, wait_until=browser_wait_until, block_external=block_external)
@@ -1072,7 +1095,7 @@ def _raw_fetch(url, method, encoding=None, browser_wait=3000, browser_wait_until
             if "playwright" in msg.lower() or "no module" in msg.lower():
                 raise RuntimeError("Playwright 未安装，无法抓取浏览器型源（" + url + "）")
             raise
-    return fetch_http(url, encoding=encoding, timeout=http_timeout)
+    return fetch_http(url, encoding=encoding, timeout=http_timeout, ip_family=ip_family)
 
 
 def fetch(source):
@@ -1084,10 +1107,11 @@ def fetch(source):
     browser_timeout = source.get("browser_timeout", 90000)
     http_timeout = source.get("http_timeout", 15)
     block_external = source.get("block_external", False)
+    ip_family = source.get("ip_family")
     html = _raw_fetch(source["url"], method, encoding=encoding,
                       browser_wait=browser_wait, browser_wait_until=browser_wait_until,
                       browser_timeout=browser_timeout, http_timeout=http_timeout,
-                      block_external=block_external)
+                      block_external=block_external, ip_family=ip_family)
     clr = source.get("column_link_regex")
     if clr:
         soup = BeautifulSoup(html, "html.parser")
@@ -1098,7 +1122,7 @@ def fetch(source):
             if t and pat.search(t) and href and not href.startswith(("#", "javascript:")):
                 col_url = urljoin(source["url"], href)
                 try:
-                    col = _raw_fetch(col_url, method, encoding=encoding, browser_wait=browser_wait, block_external=block_external)
+                    col = _raw_fetch(col_url, method, encoding=encoding, browser_wait=browser_wait, block_external=block_external, ip_family=ip_family)
                     html = html + "\n" + col   # 合并首页与专栏，避免错过任一处公告
                 except Exception:
                     pass
@@ -1122,7 +1146,7 @@ def fetch(source):
                 try:
                     ph = _raw_fetch(purl, method, encoding=encoding,
                                    browser_wait=browser_wait, browser_wait_until=browser_wait_until,
-                                   block_external=block_external)
+                                   block_external=block_external, ip_family=ip_family)
                     html = html + "\n" + ph
                 except Exception:
                     pass
@@ -1130,7 +1154,8 @@ def fetch(source):
     for purl in source.get("page_urls", []):
         try:
             ph = _raw_fetch(purl, method, encoding=encoding,
-                           browser_wait=browser_wait, browser_wait_until=browser_wait_until)
+                           browser_wait=browser_wait, browser_wait_until=browser_wait_until,
+                           ip_family=ip_family)
             html = html + "\n" + ph
         except Exception:
             pass
@@ -1151,7 +1176,8 @@ def fetch(source):
                                 browser_wait_until=browser_wait_until,
                                 browser_timeout=browser_timeout,
                                 http_timeout=http_timeout,
-                                block_external=block_external)
+                                block_external=block_external,
+                                ip_family=ip_family)
             except Exception:
                 break
             html = html + "\n" + ph
