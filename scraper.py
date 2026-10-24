@@ -1073,6 +1073,13 @@ def parse_source(source, html, stats=None):
     """
     if stats is not None:
         stats.setdefault("raw", 0)
+    # CDATA 剥离：部分政务站（典型江苏省人社厅 col92917/col92919）把列表项用
+    # <record><![CDATA[ <li><a href=...> ... ]]></record> 包起来，html.parser 会
+    # 把 CDATA 整段当文本节点，里面的 <a> 一个都解析不出来，表现为「页面肉眼看得见
+    # 职位表、解析器只读到导航文字」。CDATA 在 HTML 里本就不合法，直接剥掉壳子
+    # 保留内部标签，对正常站点无副作用。
+    if "<![CDATA[" in html:
+        html = html.replace("<![CDATA[", "").replace("]]>", "")
     soup = BeautifulSoup(html, "html.parser")
     base = source.get("base") or source["url"]
     scope = soup
@@ -1164,6 +1171,13 @@ def parse_source(source, html, stats=None):
             continue
         # 列表项目符号剥离：部分站标题前带圆点（如淮安「· 2025年…公开招聘」）
         title = re.sub(r"^[·•∙‧⋅●○›»]+\s*", "", title).strip()
+        # 尾部日期剥离：列表页常把日期放在 <i> 里（江苏人社厅
+        # 「…省级机关职位表</span><i>2025-10-31</i>」），get_text 会把它拼进标题。
+        # 日期已单独存入 date 字段，标题里重复既难看又影响标题去重。
+        # 只剥结尾精确的 YYYY-MM-DD 且剥完不能为空，避免误伤标题正文里的日期。
+        _t2 = re.sub(r"\s*\d{4}-\d{2}-\d{2}\s*$", "", title).strip()
+        if _t2:
+            title = _t2
         if not title:
             continue
         if stats is not None:
@@ -1494,8 +1508,41 @@ def _work(s, limit_per_source=40):
             return s2, items[:limit_per_source], None, len(raw)
         html = fetch(s)
         stats = {}
-        items = parse_source(s, html, stats)[:limit_per_source]
-        return s, items, None, stats.get("raw", 0)
+        items = parse_source(s, html, stats)
+        # extra_urls：同一专题的信息常分散在多个栏目。典型是江苏省考——
+        # col92917「招考公告」只放公告+大纲两条，职位表在 col92919「岗位信息」，
+        # 各种简章/专业目录/技能测试大纲在 col92920「相关文件」。只抓第一个栏目
+        # 就永远只有 2~3 条。配 extra_urls 后依次抓取、把候选并进来，共用本源的
+        # include/exclude，最后按 url+title 去重（同一公告可能同时挂在多个栏目）。
+        extra = s.get("extra_urls") or []
+        if extra:
+            for eu in extra:
+                # 支持两种写法：纯字符串（沿用本源 method）或
+                # {"url": ..., "method": "browser"}（该子栏目是 JS 动态加载时必须指定）
+                if isinstance(eu, dict):
+                    eu_url, eu_method = eu.get("url"), eu.get("method")
+                else:
+                    eu_url, eu_method = eu, None
+                if not eu_url:
+                    continue
+                try:
+                    s_eu = dict(s)
+                    s_eu["url"] = eu_url
+                    if eu_method:
+                        s_eu["method"] = eu_method
+                    s_eu.pop("extra_urls", None)
+                    items.extend(parse_source(s_eu, fetch(s_eu), stats))
+                except Exception as e:
+                    print(f"[extra_urls] {s['name']} 子栏目失败 {eu_url[:60]}: {str(e)[:60]}")
+            seen_k, uniq = set(), []
+            for it in items:
+                k = ((it.get("url") or "") + "|" + (it.get("title") or ""))
+                if k in seen_k:
+                    continue
+                seen_k.add(k)
+                uniq.append(it)
+            items = uniq
+        return s, items[:limit_per_source], None, stats.get("raw", 0)
     except Exception as e:
         return s, [], str(e), 0
 

@@ -174,20 +174,26 @@
     "category": "省考",
     "region": "江苏",
     "url": "http://jshrss.jiangsu.gov.cn/col/col92917/index.html",
+    "extra_urls": [
+      {
+        "url": "http://jshrss.jiangsu.gov.cn/col/col92919/index.html",
+        "method": "browser"
+      },
+      "http://jshrss.jiangsu.gov.cn/col/col92920/index.html"
+    ],
     "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
-    "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "title_include": "考试录用|公务员招录|公务员招考|录用公务员|简章|大纲|职位表|专业参考目录",
+    "title_exclude": "资格|职称|执业|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考|体检|回避|奖励|处分|申诉|试用期|刑法|解释|复函|办法|规定"
   },
   {
     "name": "浙江-省考",
     "category": "省考",
     "region": "浙江",
-    "url": "http://www.zjks.com/",
-    "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
-    "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
+    "url": "http://www.zjks.com/col/col1229635561/index.html",
+    "method": "browser",
+    "browser_wait": 6000,
+    "title_include": "考试录用|公务员招录|公务员招考|录用公务员|公开遴选|公开选调|特警",
+    "title_exclude": "职称|执业|三支一扶|温.?提醒|政策解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考|网站|声明|备案|ICP|实施|办法|规定|违规|违纪|意识形态",
     "http_timeout": 30
   },
   {
@@ -211,11 +217,10 @@
     "name": "福建-省考",
     "category": "省考",
     "region": "福建",
-    "url": "https://gwykl.fujian.gov.cn/",
+    "url": "https://gwykl.fujian.gov.cn/portal/news",
     "method": "http",
-    "column_link_regex": "公务员|gwy|省考|招录",
-    "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
-    "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考"
+    "title_include": "考试录用|公务员招录|公务员招考|招考公告|公开遴选公务员|专业指导目录",
+    "title_exclude": "资格|职称|执业|三支一扶|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考|公示|拟录|名单|体检|考察|递补|面试|分数线|违纪|违规|处理决定|报名推荐表|照片处理|笔试有关事项|动态"
   },
   {
     "name": "江西-省考",
@@ -702,7 +707,10 @@
     "name": "江苏南通-事业单位",
     "category": "事业编",
     "region": "江苏",
-    "url": "https://rsj.nantong.gov.cn/ntsrsj/sydwzp/sydwzp.html",
+    "url": "https://rsj.nantong.gov.cn/ntsrsj/ntszsydwzk/ntszsydwzk.html",
+    "extra_urls": [
+      "https://rsj.nantong.gov.cn/ntsrsj/xsqsydwzk/xsqsydwzk.html"
+    ],
     "method": "browser",
     "title_include": "招聘|招考|招录|引进|遴选|选调|公告|公示|简章|通知|方案",
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|未达开考|开考比例|达不到开考|取消开考|岗位未达开考|开考比例|达不到开考|取消开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$|^(市直属事业单位招录|县、市（区）事业单位招录|事业单位招录)$",
