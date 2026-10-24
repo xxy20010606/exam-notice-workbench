@@ -106,6 +106,31 @@
     "container": null
   },
   {
+    "name": "河北-省考",
+    "category": "省考",
+    "region": "河北",
+    "url": "https://www.hebpta.com.cn/notice?id=303",
+    "method": "jsonapi",
+    "api_method": "get",
+    "api_url": "https://www.hebpta.com.cn:8090/door/homeArticleList",
+    "api_body": {
+      "pageNum": "{page}",
+      "pageSize": "{size}",
+      "belongSectionId": "303"
+    },
+    "api_pages": 1,
+    "api_size": 200,
+    "api_list_path": "data.records",
+    "api_title_key": "title",
+    "api_date_key": "publishedDate",
+    "api_url_key": "jumpLink",
+    "api_url_template": "https://www.hebpta.com.cn/article?id=303&artId={id}",
+    "manda_days": 500,
+    "title_include": "公告",
+    "title_exclude": "核减|准考证|成绩|打印入口|报名入口|查询|测评|咨询电话|联系地址|政策法规|集锦|体检|体能|证件审核|通告|标准",
+    "note": "原源已删（孤儿记录），本次靠逆向 SPA 接口恢复。hebpta.com.cn 首页是 Vue SPA（project-loading 空壳，http 只回 2.6KB），列表数据在 https://www.hebpta.com.cn:8090/door/homeArticleList?pageNum=1&pageSize=200&belongSectionId=303，返回 JSON 且 data.records 是列表、data.total=38（一页拿完，无需翻页）。栏目 id 来自 /door/homeSection 的栏目树：293 通知公告(521条) / 303 公务员考试(38) / 304 事业单位考试(38) / 344 社会招聘信息专栏(8)。URL 规则：jumpType=2 时 jumpLink 是完整外链；jumpType=null 时 jumpLink 为 null，站内详情页须拼 /article?id={栏目}&artId={id}。"
+  },
+  {
     "name": "山西-省考",
     "category": "省考",
     "region": "山西",
@@ -1294,6 +1319,31 @@
     "page_wait": 4000,
     "title_include": "招聘|招考|招录|选调|遴选|选聘|引进",
     "title_exclude": "公示|拟聘|拟录|笔试|面试|资格|复审|体检|考察|成绩|名单|递补|准考证|报名|须知|温馨提示|核减|取消|岗位调整|有关事宜|说明|预告",
-    "note": "2026-10-24 新增（补浙江唯一空白地市）。注意域名：hrss.zhoushan.gov.cn 是**不存在**的域名（NXDOMAIN），真实地址是 zsrls.zhoushan.gov.cn（从 www.zhoushan.gov.cn 首页「市人力资源和社会保障局」链接取得）。招聘栏目 = /col/col1229335114/index.html，标题正是「事业单位招聘」。http 直取只有框架、0 条，必须 browser。该栏目 809 条 / 54 页，且以拟聘公示为主，第 1 页 30 条里只有 2 条真公告，故配 browser_click_pages=6 往后翻。分页按钮是纯图标 <a class=default_pgNext title=下页 href=#>，inner_text 为空——只按文本找永远匹配不到，已给 _find_next 补 title/class 兜底。"
+    "note": "2026-10-24 新增（补浙江唯一空白地市）。注意域名：hrss.zhoushan.gov.cn 是**不存在**的域名（NXDOMAIN），真实地址是 zsrls.zhoushan.gov.cn（从 www.zhoushan.gov.cn 首页「市人力资源和社会保障局」链接取得）。招聘栏目 = /col/col1229335114/index.html，标题正是「事业单位招聘」。http 直取只有框架、0 条，必须 browser。该栏目 809 条 / 54 页，且以拟聘公示为主，第 1 页 30 条里只有 2 条真公告，故配 browser_click_pages=6 往后翻。分页按钮是纯图标 <a class=default_pgNext title=下页 href=#>，inner_text 为空——只按文本找不到，已给 _find_next 补 title/class 兜底。"
+  },
+  {
+    "name": "河北-省直事业单位",
+    "category": "事业编",
+    "region": "河北",
+    "url": "https://www.hebpta.com.cn/notice?id=304",
+    "method": "jsonapi",
+    "api_method": "get",
+    "api_url": "https://www.hebpta.com.cn:8090/door/homeArticleList",
+    "api_body": {
+      "pageNum": "{page}",
+      "pageSize": "{size}",
+      "belongSectionId": "304"
+    },
+    "api_pages": 1,
+    "api_size": 200,
+    "api_list_path": "data.records",
+    "api_title_key": "title",
+    "api_date_key": "publishedDate",
+    "api_url_key": "jumpLink",
+    "api_url_template": "https://www.hebpta.com.cn/article?id=304&artId={id}",
+    "manda_days": 500,
+    "title_include": "招聘",
+    "title_exclude": "准考证|报名入口|成绩|打印入口|查询|技师|三支一扶|调剂|大纲|一览表|拟聘|名单|重启|推迟|笔试安排|实际操作|答辩",
+    "note": "2026-10-24 新增。河北此前只有省考孤儿源、无事业编源。数据源同「河北-省考」，belongSectionId=304「事业单位考试」栏目，total=38 一页拿完。含历年省直事业单位统一招聘公告（2026下半年 08-20、2026上半年 02-05、2025、2024、2023、2022）与石家庄海关事业编公告。该栏目大量条目是「准考证打印入口/报名入口/成绩查询」入口类，靠 title_exclude 滤。"
   }
 ]

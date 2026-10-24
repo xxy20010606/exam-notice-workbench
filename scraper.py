@@ -471,13 +471,17 @@ def _jsonapi_items(source):
             title = (r.get(tkey) or "").strip()
             if not title:
                 continue
-            if utpl:
+            # URL 取法：api_url_key 优先（很多站的列表项自带 jumpLink，有的是完整外链，
+            # **有的是 null**——站内文章只给 id，外链才给 jumpLink）。此时回退到
+            # api_url_template 用 id 拼站内详情页，否则这类条目会被整体丢弃。
+            # 典型：河北省人事考试网 jumpType=2 给外链、jumpType=null 只给 id，
+            # 站内详情页是 /article?id={栏目}&artId={id}。
+            u = (r.get(ukey or "url") or "").strip() if ukey else ""
+            if not u.startswith("http") and utpl:
                 try:
                     u = utpl.format(**r)
                 except Exception:
                     u = ""
-            else:
-                u = (r.get(ukey or "url") or "").strip()
             if not u or not u.startswith("http"):
                 continue
             raw_date = str(r.get(dkey) or "")
