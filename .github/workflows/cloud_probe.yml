@@ -1,0 +1,48 @@
+name: 云端可达性探针（手动）
+
+# 目的：回答「电脑不开机时，云端到底能抓到几个源」。
+# 本地跑全绿只是因为走了国内 IP；云端是海外 IP，国内 gov.cn 的封锁程度必须实测。
+#
+# 只在手动点击时运行，跑完只输出报告 —— **不提交任何文件**（权限只给 read），
+# 也不写 sources_status，不会污染健康度。
+on:
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v5
+
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: 还原 Playwright 浏览器缓存
+        id: pwcache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: 安装 Playwright Chromium（缓存未命中时）
+        if: steps.pwcache.outputs.cache-hit != 'true'
+        run: python -m playwright install chromium
+
+      - name: 跑探针（全量源 / 不写状态 / 不提交）
+        env:
+          SCRAPE_PROXY: ${{ secrets.SCRAPE_PROXY }}
+        run: python probe_cloud.py
