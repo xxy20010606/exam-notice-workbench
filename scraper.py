@@ -36,6 +36,7 @@ GLOBAL_NOISE = re.compile(
     r"|招聘会"                 # 招聘会预告/排期（非招聘公告）
     r"|^/\s"                  # 导航栏文字（以 / 开头）
     r"|^事业单位公开招聘$"     # 泛化栏目名（非具体公告）
+    r"|^事业单位招聘$"         # 泛化栏目名（连云港 sydwzp.html 列表页自身被当成公告）
     r"|^公开招聘$"            # 泛化栏目名
     r"|^招聘公告$"            # 泛化栏目名（上海 rsj 多页合并后每页都有一个「招聘公告」栏目名）
     r"|^公告公示$"            # 泛化栏目名
@@ -1366,14 +1367,48 @@ def parse_source(source, html, stats=None):
         if absurl in seen:
             continue
         seen.add(absurl)
-        # 日期提取优先级：组件 time 属性 > 黏连前缀恢复 > 多层上下文搜索
+        # 日期提取优先级：组件 time 属性 > 黏连前缀恢复 > 邻接节点文本 > 父容器全文
         # （SPA 源的日期常在兄弟/远祖元素里；祖先文本可能混入页面当前日期，
         #   所以组件属性/黏连前缀命中时不再走祖先扩展，避免拿到抓取当日）
         parent = a.find_parent(["li", "div", "tr", "td", "p"]) or a
-        ptext = parent.get_text(" ", strip=True) if parent else title
         row_date = (extract_date(comp_time, absurl, title) if comp_time else "") or glued_date
-        # 组件属性/黏连前缀都没有日期、且父元素文本也没提取到时，扩大搜索：
-        if not row_date and not extract_date(ptext, absurl, title):
+        # 邻接节点文本：紧贴 <a> 的兄弟节点，**遇到下一个 <a> 就停**（本条目边界）。
+        # 政务站常用「<a>标题</a><span class="bt_time">日期</span><br>」平铺，
+        # 根本没有 <li> 包裹，find_parent 会一路找到整个列表容器；容器全文里第一个
+        # 日期是最新那条的，于是整页所有条目被赋成同一天。
+        # 丽水实测：列表页该行明明写着 2026-09-03（详情页正文也是 09-03），
+        # 却全被算成 2026-10-23，看板日期分组因此整组错位。
+        if not row_date:
+            parts = []
+            for sib in a.next_siblings:
+                if getattr(sib, "name", None) == "a":
+                    break
+                try:
+                    parts.append(sib.get_text(" ", strip=True)
+                                 if hasattr(sib, "get_text") else str(sib))
+                except Exception:
+                    pass
+                if len(parts) >= 4:
+                    break
+            for sib in list(a.previous_siblings)[-3:]:
+                if getattr(sib, "name", None) == "a":
+                    break
+                try:
+                    parts.append(sib.get_text(" ", strip=True)
+                                 if hasattr(sib, "get_text") else str(sib))
+                except Exception:
+                    pass
+            row_date = extract_date(" ".join(p for p in parts if p).strip(), absurl, title)
+        ptext = parent.get_text(" ", strip=True) if parent else title
+        # 父容器全文兜底：仅当该容器"只装着这一个条目"时才可信。
+        # 容器里出现 2 个以上 <a>（相邻条目、分页、面包屑都在里面）说明它是列表
+        # 容器而非条目容器，全文里的首个日期属于别人，不能用。
+        if not row_date:
+            _na = len(parent.find_all("a")) if hasattr(parent, "find_all") else 0
+            if _na <= 2:
+                row_date = extract_date(ptext, absurl, title)
+        # 仍未拿到日期时，扩大搜索：
+        if not row_date:
             candidates = []
             # 兄弟元素（前3个后3个）
             for sib in list(parent.previous_siblings)[-3:] + list(parent.next_siblings)[:3]:
@@ -1386,14 +1421,15 @@ def parse_source(source, html, stats=None):
             # 近邻含 date/time 类名的元素
             for el in parent.find_all(class_=re.compile(r'date|time|publish', re.I), recursive=False):
                 candidates.append(el.get_text(" ", strip=True)[:200])
-            # 用第一个能提取到日期的候选文本
+            # 用第一个能提取到日期的候选文本。
+            # 注意：这里必须把 d 直接赋给 row_date。旧写法是「把 cand 追加到 ptext 尾部，
+            # 最后再 extract_date(ptext) 从头扫一遍」——可 ptext 开头本来就带着那个错误
+            # 日期，重扫必然又命中它，候选项等于白找。
             for cand in candidates:
                 d = extract_date(cand, absurl, title)
                 if d:
-                    ptext = ptext + " " + cand  # 追加到 ptext 让 extract_date 能匹配
+                    row_date = d
                     break
-        if not row_date:
-            row_date = extract_date(ptext, absurl, title)
         items.append({"title": title[:200], "url": absurl, "date": row_date})
     return items
 
