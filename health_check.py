@@ -20,9 +20,14 @@
      修正前只看 last_count，把南通/苏州/泰州/镇江这类内容空窗全误报成解析器失效。
   ② 从未成功  : 历史 0 条 + last_count=0 + 无报错                → WARN（配置错/URL 失效）
   ③ 抓取报错  : last_error 非空 或 fail_streak>0                 → WARN/CRITICAL
-  ④ 数据陈旧  : 该源最新公告日期距今超过阈值                      → WARN
+  ④ 数据陈旧  : 该源最新公告日期距今超过阈值                      → WARN（正常波动）
   ⑤ 黄金源熔断: 福建统一平台产出低于基线 / 最新日期过旧            → CRITICAL
   ⑥ 日期缺失  : date 为空的公告占比过高（影响排序与推送）          → WARN
+
+WARN 分两层（BENIGN_WARN）：
+  「正常波动」= stale + window_empty —— 源本身是好的，只是当地这一刻没发招聘公告；
+  「需要一看」= fetch_error / never_ok / not_run / nodate —— 可能是配置或代码问题。
+  分层前 41 项 WARN 糊成一团，30 项正常波动把真问题淹掉，结果整段被忽略。
 
 用法：
   python health_check.py                  # 打印体检报告
@@ -61,8 +66,17 @@ STALE_LIMIT = {"事业编": 45, "省考": 200, "国考": 320}
 CODE_ORDER = {
     "stalled": 0, "golden_count": 1, "golden_stale": 2,
     "silent_zero": 3, "long_dead": 4, "fetch_error": 5,
-    "stale": 6, "nodate": 7, "window_empty": 8, "never_ok": 9, "not_run": 10,
+    "stale": 6, "nodate": 7, "window_never": 8,
+    "window_empty": 9, "never_ok": 10, "not_run": 11,
 }
+
+# WARN 分两层（2026-10-24）：这两类「正常波动」不该和人去修的问题混在一起。
+#   stale        = 源能正常解析、条数正常，只是该栏目最新公告日期较旧
+#                  → 当地确实没发新公告，属于业务现实，不是故障
+#   window_empty = 读到了 N 条候选但全被过滤（当前栏目全是拟聘公示/采购公告）
+#                  → 栏目这一刻没有招聘公告，下轮自然恢复
+# 其余 WARN（fetch_error / never_ok / not_run / nodate）都需要人看一眼。
+BENIGN_WARN = {"stale", "window_empty"}
 
 # 报错源升级为 CRITICAL 的连续失败次数
 ERR_CRIT_STREAK = 5
@@ -244,9 +258,12 @@ def diagnose(data, cats):
         # ② 从未成功过
         if last_count == 0 and h["hist"] == 0:
             if raw is not None and raw > 0:
+                # 能读到候选却一条真公告都没入库过 = title_include/exclude 配得太严，
+                # 不是「当地没发」。必须和 window_empty 分开，否则永远修不出来。
                 issues.append({
-                    "level": "WARN", "code": "window_empty", "source": name,
-                    "detail": f"读到 {raw} 条候选但全被过滤，从未入库过真公告",
+                    "level": "WARN", "code": "window_never", "source": name,
+                    "detail": (f"读到 {raw} 条候选但从未入库过任何真公告"
+                               f"→ include/exclude 可能太严，需人工核一次"),
                 })
             else:
                 issues.append({
@@ -303,14 +320,31 @@ def diagnose(data, cats):
     return issues
 
 
+def split_warn(issues):
+    """把 WARN 拆成 (需要看一眼, 正常波动)。CRITICAL 不参与。
+
+    分层的意义：41 项 WARN 糊在一起时，30 项「当地就是没发新公告」会把
+    真正要看的那 5~10 项淹掉，日报读起来全是噪音，于是被整体忽略。
+    """
+    need, benign = [], []
+    for i in issues:
+        if i["level"] != "WARN":
+            continue
+        (benign if i["code"] in BENIGN_WARN else need).append(i)
+    return need, benign
+
+
 def summarize(issues, data):
     crit = [i for i in issues if i["level"] == "CRITICAL"]
     warn = [i for i in issues if i["level"] == "WARN"]
+    need, benign = split_warn(issues)
     return {
         "total_notices": data["total"],
         "nodate": data["nodate"],
         "critical": len(crit),
         "warn": len(warn),
+        "warn_need": len(need),
+        "warn_benign": len(benign),
         "ok_sources": max(0, len(data["status"]) - len({i["source"] for i in issues})),
     }
 
@@ -320,7 +354,8 @@ def render_text(issues, summ, kpi=None):
     L.append("=" * 56)
     L.append(f"抓取健康体检  {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     L.append(f"公告总数 {summ['total_notices']} | date缺失 {summ['nodate']} | "
-             f"CRITICAL {summ['critical']} | WARN {summ['warn']}")
+             f"CRITICAL {summ['critical']} | WARN {summ['warn']}"
+             f"（需留意 {summ.get('warn_need', 0)} / 正常波动 {summ.get('warn_benign', 0)}）")
     L.append("=" * 56)
     if kpi:
         L.append("\n核心源 KPI")
@@ -328,14 +363,20 @@ def render_text(issues, summ, kpi=None):
             sd = f"{k['stale_days']} 天前" if k["stale_days"] is not None else "无日期"
             L.append(f"  · {k['name']}")
             L.append(f"    解析 {k['parsed']} 条 | 最新 {k['latest']}（{sd}）")
-    if not issues:
+    crit = [i for i in issues if i["level"] == "CRITICAL"]
+    need, benign = split_warn(issues)
+    if not (crit or need or benign):
         L.append("\n全部正常。")
         return "\n".join(L)
-    for level in ("CRITICAL", "WARN"):
-        group = [i for i in issues if i["level"] == level]
+    blocks = [
+        ("CRITICAL · 必须处理", crit),
+        ("WARN · 需要看一眼", need),
+        ("正常波动 · 当地暂无新公告，不用管", benign),
+    ]
+    for title, group in blocks:
         if not group:
             continue
-        L.append(f"\n[{level}] {len(group)} 项")
+        L.append(f"\n[{title}] {len(group)} 项")
         for i in group:
             L.append(f"  · {i['source']}")
             L.append(f"    {i['detail']}")
@@ -361,10 +402,10 @@ def golden_status(data):
 
 
 def render_markdown(issues, summ, kpi=None):
-    """给 Server酱 / 日报正文用的精简版，只列 CRITICAL 与汇总。"""
+    """给 Server酱 / 日报正文用的精简版：必须处理 → 需要留意 → 正常波动只给名单。"""
     crit = [i for i in issues if i["level"] == "CRITICAL"]
-    warn = [i for i in issues if i["level"] == "WARN"]
-    L = [f"**CRITICAL {len(crit)} 项 / WARN {len(warn)} 项**",
+    need, benign = split_warn(issues)
+    L = [f"**CRITICAL {len(crit)} / 需留意 {len(need)} / 正常波动 {len(benign)}**",
          f"公告总数 {summ['total_notices']}，date 缺失 {summ['nodate']}", ""]
     if kpi:
         L.append("**核心源状态**")
@@ -377,12 +418,18 @@ def render_markdown(issues, summ, kpi=None):
         for i in crit:
             L.append(f"- {i['source']}：{i['detail']}")
         L.append("")
-    if warn:
-        L.append(f"**留意（{len(warn)} 项）：**")
-        for i in warn[:12]:
+    if need:
+        L.append(f"**需要留意（{len(need)} 项）：**")
+        for i in need[:12]:
             L.append(f"- {i['source']}：{i['detail']}")
-        if len(warn) > 12:
-            L.append(f"- …另有 {len(warn) - 12} 项")
+        if len(need) > 12:
+            L.append(f"- …另有 {len(need) - 12} 项")
+        L.append("")
+    if benign:
+        # 只列名字，不列 detail：这批是「当地真没发新公告」，写理由反而更吵
+        names = [i["source"] for i in benign]
+        head = "、".join(names[:12]) + ("…" if len(names) > 12 else "")
+        L.append(f"**正常波动 {len(benign)} 项**（当地暂无新公告，不用管）：{head}")
     return "\n".join(L)
 
 

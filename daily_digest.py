@@ -124,6 +124,27 @@ def format_health(health):
                 md.append(f"- …另有 {len(crit) - MAX_LINES} 项")
             text.append("")
             md.append("")
+
+        # WARN 只报「需要留意」那一层（配置错/从未成功等）。stale / window_empty
+        # 属于「当地这一刻真没发招聘公告」，写进日报只会让人误以为出事了。
+        need, benign = hc.split_warn(issues)
+        if need:
+            text.append(f"【需要留意】{len(need)} 项（不影响今日收录）：")
+            md.append(f"**需要留意**（{len(need)} 项）")
+            for i in need[:MAX_LINES]:
+                text.append(f"  · {i['source']}：{i['detail']}")
+                md.append(f"- {i['source']}：{i['detail']}")
+            if len(need) > MAX_LINES:
+                text.append(f"  · …另有 {len(need) - MAX_LINES} 项")
+                md.append(f"- …另有 {len(need) - MAX_LINES} 项")
+            text.append("")
+            md.append("")
+        if benign:
+            # 只给一行汇总，不展开：这批源的「问题」就是当地没发公告
+            text.append(f"【正常波动】{len(benign)} 个源当地暂无新公告，无需处理")
+            md.append(f"**正常波动**：{len(benign)} 个源当地暂无新公告，无需处理")
+            text.append("")
+            md.append("")
     except Exception as e:
         # 健康信息是增强项，任何异常都不能拖垮日报
         print(f"[health] 增强健康信息失败（不影响日报发送）: {e}")
@@ -154,7 +175,7 @@ def beijing_today():
 def fetch_today_notices(today):
     conn = sqlite3.connect(DB)
     rows = conn.execute(
-        "SELECT category, region, title, url, date FROM notices "
+        "SELECT category, region, title, url, date, first_seen FROM notices "
         "WHERE date=? OR first_seen LIKE ?",
         (today, today + "%"),
     ).fetchall()
@@ -162,7 +183,8 @@ def fetch_today_notices(today):
     out = []
     for r in rows:
         out.append({"category": r[0] or "", "region": r[1] or "",
-                    "title": r[2] or "", "url": r[3] or "", "date": r[4] or ""})
+                    "title": r[2] or "", "url": r[3] or "", "date": r[4] or "",
+                    "first_seen": r[5] or ""})
     # 按 (title, url) 去重（date 与 first_seen 同时命中会重复）
     seen, uniq = set(), []
     for it in out:
@@ -172,6 +194,49 @@ def fetch_today_notices(today):
         seen.add(key)
         uniq.append(it)
     return uniq
+
+
+NO_DATE = "日期未知"
+WEEKDAY = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
+
+
+def notice_day(it):
+    """取公告的「发布日期」：优先 date，缺失时退回入库时间 first_seen 的日期部分。
+
+    日报按这个分组 —— 用户要看的是「公告什么时候发的」，不是「我们哪天抓到的」。
+    列表页往往一堆历史公告是今天才被抓到，混在一起看不出节奏。
+    """
+    d = (it.get("date") or "")[:10]
+    if d:
+        return d
+    fs = (it.get("first_seen") or "")[:10]
+    return fs
+
+
+def group_by_date(notices):
+    """按发布日期分组，返回 (日期倒序列表, {日期: [条目]})。
+
+    同一天内按「地区 → 标题」排序，仍然按地方聚拢，读起来不散。
+    完全没有日期的条目单独落最后一组，不塞进任何一天。
+    """
+    by_date = {}
+    for it in notices:
+        d = notice_day(it) or NO_DATE
+        by_date.setdefault(d, []).append(it)
+    for k in by_date:
+        by_date[k].sort(key=lambda x: (x["region"] or "其他", x["title"]))
+    dates = sorted((d for d in by_date if d != NO_DATE), reverse=True)
+    if NO_DATE in by_date:
+        dates.append(NO_DATE)
+    return dates, by_date
+
+
+def day_label(d):
+    """2026-09-07 → 「2026-09-07 周一」；未知日期原样返回。"""
+    try:
+        return f"{d} {WEEKDAY[datetime.strptime(d, '%Y-%m-%d').weekday()]}"
+    except Exception:
+        return d
 
 
 def send_email(recipient, subject, body):
@@ -240,24 +305,25 @@ def send_wechat(title, desp):
         return False
 
 
-def build_wechat_markdown(today, notices, by_region, pages, health_md=None):
-    """微信正文（Markdown），条数过多时只列前 WX_MAX_ITEMS 条。"""
+def build_wechat_markdown(today, notices, dates, by_date, pages, health_md=None):
+    """微信正文（Markdown）：按公告发布日期分段，条数过多时只列前 WX_MAX_ITEMS 条。"""
     lines = [f"**{today} 新增 {len(notices)} 条**", ""]
     shown = 0
     truncated = False
-    for region in sorted(by_region):
+    for d in dates:
         if shown >= WX_MAX_ITEMS:
             truncated = True
             break
-        lines.append(f"**{region}**")
-        for it in by_region[region]:
+        lines.append(f"**{day_label(d)}**（{len(by_date[d])} 条）")
+        for it in by_date[d]:
             if shown >= WX_MAX_ITEMS:
                 truncated = True
                 break
+            tag = f"[{it['region']}] " if it.get("region") else ""
             if it["url"]:
-                lines.append(f"- [{it['title']}]({it['url']})")
+                lines.append(f"- {tag}[{it['title']}]({it['url']})")
             else:
-                lines.append(f"- {it['title']}")
+                lines.append(f"- {tag}{it['title']}")
             shown += 1
         lines.append("")
     if truncated:
@@ -333,18 +399,15 @@ def main():
         send_wechat(f"公考事考日报 {today}（无有效招聘）", wx)
         return
 
-    # 按地区分组，地区内按标题排序
-    by_region = {}
-    for it in notices:
-        by_region.setdefault(it["region"] or "其他", []).append(it)
-    for k in by_region:
-        by_region[k].sort(key=lambda x: x["title"])
+    # 按公告发布日期分组（不是按地区）：先看「哪天发的」，再看「哪个地方」
+    dates, by_date = group_by_date(notices)
 
-    lines = [f"{today} 公考/事考公告日报", f"今日新增 {len(notices)} 条：", ""]
-    for region in sorted(by_region):
-        lines.append(f"【{region}】")
-        for it in by_region[region]:
-            lines.append(f"  · [{it['category']}] {it['title']}")
+    lines = [f"{today} 公考/事考公告日报", f"今日新增 {len(notices)} 条，按发布日期分组：", ""]
+    for d in dates:
+        lines.append(f"【{day_label(d)}】{len(by_date[d])} 条")
+        for it in by_date[d]:
+            tag = f"{it['region'] or '其他'}·{it['category']}".strip("·")
+            lines.append(f"  · [{tag}] {it['title']}")
             if it["url"]:
                 lines.append(f"    {it['url']}")
         lines.append("")
@@ -356,7 +419,7 @@ def main():
     send_email(recipient, f"公考事考公告日报 {today}（新增 {len(notices)} 条）", "\n".join(lines))
     send_wechat(
         f"公考事考日报 {today}｜新增 {len(notices)} 条",
-        build_wechat_markdown(today, notices, by_region, pages, hmd),
+        build_wechat_markdown(today, notices, dates, by_date, pages, hmd),
     )
 
 
