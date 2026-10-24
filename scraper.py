@@ -12,6 +12,7 @@
                     SPA 壳、数据靠 XHR 拉取的站（如宁波人才网 网上招考 10500+ 条）。
 """
 import json, os, sqlite3, hashlib, re, time, datetime, threading
+import urllib.parse
 from urllib.parse import urljoin, quote
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -415,7 +416,9 @@ def _jsonapi_items(source):
       api_signer:        签名方案名，目前支持 "nbrc"（需 api_sign_key）
       api_sign_key:      签名密钥
       api_headers:       额外固定请求头 dict（可选）
-      api_list_path:     列表所在点号路径，如 "data.list"
+      api_method:        "post"（默认，表单）或 "get"（参数拼到 query string）。
+                         政府网 xxgk 检索接口（如南京 igs/front/search/publish）是 GET。
+      api_list_path:     列表所在点号路径，如 "data.list"；顶层数组直接写字段名，如 "rows"
       api_title_key:     标题字段名
       api_date_key:      日期字段名（可含时间，取前 10 位）
       api_url_key:       直接给 URL 的字段名（与 api_url_template 二选一）
@@ -427,6 +430,7 @@ def _jsonapi_items(source):
     pages = int(source.get("api_pages", 10))
     size = int(source.get("api_size", 100))
     body_tpl = source.get("api_body") or {"pageSize": "{size}", "pageNumber": "{page}"}
+    api_method = (source.get("api_method") or "post").lower()
     list_path = source.get("api_list_path", "data.list")
     tkey = source.get("api_title_key", "title")
     dkey = source.get("api_date_key", "date")
@@ -447,7 +451,15 @@ def _jsonapi_items(source):
                 v = v.replace("{page}", str(p)).replace("{size}", str(size))
             body[k] = v
         try:
-            out = _http_post_form(url, body, headers=hdr, timeout=25, retries=1)
+            if api_method == "get":
+                # GET 型接口：参数拼 query string。政府网 xxgk 检索（南京人社局等）
+                # 就是 GET，且认得 filter[KEY] 这种带方括号的参数名（urlencode 成
+                # %5B%5D 服务端也能解析）。用 fetch_http 而非 _http_post_form，
+                # 顺带复用它的 UA / 代理 / 重试逻辑。
+                qurl = url + ("&" if "?" in url else "?") + urllib.parse.urlencode(body)
+                out = json.loads(fetch_http(qurl, timeout=25))
+            else:
+                out = _http_post_form(url, body, headers=hdr, timeout=25, retries=1)
         except Exception as e:
             print(f"[jsonapi] {source['name']} 第{p}页请求失败: {e}")
             break
@@ -913,17 +925,22 @@ def fetch_browser_pages(url, pages=5, timeout=90000, wait=3000, wait_until="domc
     （fetch）已经抓过第 1 页了。
     """
     def _fingerprint(p):
-        texts = []
+        # 指纹必须覆盖**全量**链接，不能只取前 N 个。
+        # 政务站前二三十个链接几乎全是站点全局导航（网站无障碍 / 要闻动态 / 公示公告…），
+        # 翻页时导航一字不变；若只取前 30 个，指纹恒定 → 判成"没翻动"直接 break。
+        # 江苏人社厅实测：点击确实跳到了 pageNum=2，但因指纹恒等被当作到底，
+        # 翻页静默返回 0 页，且不报错——比报错更难查。
         try:
-            for a in p.query_selector_all("a"):
-                t = (a.inner_text() or "").strip()
-                if t:
-                    texts.append(t[:40])
-                if len(texts) >= 30:
-                    break
+            data = p.evaluate(
+                "() => Array.from(document.querySelectorAll('a'))"
+                ".map(e => (e.textContent || '').trim() + '|' + (e.getAttribute('href') || ''))"
+                ".join('\\n')"
+            )
         except Exception:
-            pass
-        return tuple(texts)
+            return ""
+        if not data:
+            return ""
+        return "%d:%d" % (len(data), hash(data))
 
     def _find_next(p, cur):
         if next_selector:
@@ -1008,14 +1025,18 @@ def fetch_browser_pages(url, pages=5, timeout=90000, wait=3000, wait_until="domc
         for i in range(1, max(1, int(pages))):
             el = _find_next(page, i)
             if not el:
+                print(f"[翻页] 第 {i + 1} 页未找到翻页控件，停止")
                 break
             try:
                 el.click()
-            except Exception:
+            except Exception as e:
+                print(f"[翻页] 第 {i + 1} 页点击失败：{str(e)[:90]}")
                 break
             page.wait_for_timeout(dwell)
             fp = _fingerprint(page)
             if fp and fp == prev:
+                # 打印出来：静默 break 会让「未找到控件」和「点了没反应」看起来一样
+                print(f"[翻页] 第 {i + 1} 页点击后内容未变，停止")
                 break          # 内容没变：到底了，或点击没触发加载
             prev = fp
             got += 1
