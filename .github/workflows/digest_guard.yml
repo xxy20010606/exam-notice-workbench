@@ -1,0 +1,54 @@
+name: 日报缺席哨兵
+
+# 独立定时，**故意不用 workflow_run 链式触发**。
+# 日报是靠 workflow_run 挂在抓取 workflow 后面的，这条链的致命弱点是：
+# 抓取哪天集体失败 → 日报永远触发不了 → 而没有任何人知道。
+# 哨兵如果也挂 workflow_run，就成了"日报不跑我也不跑"，等于没做。
+on:
+  schedule:
+    # UTC 12:00 = 北京 20:00。日报最晚 19:00 发出，留 1 小时给慢队列。
+    # GitHub 的 schedule 会排队延迟，脚本内部已处理"跨天延迟"（见 target_date）。
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+    inputs:
+      date:
+        description: '要检查的日期（YYYY-MM-DD，留空=自动推算）'
+        required: false
+        default: ''
+
+permissions:
+  contents: write   # 需要 push guard-alert tag 做幂等标记
+  actions: read     # 需要读 workflow run 记录做诊断
+
+concurrency:
+  group: digest-guard
+  cancel-in-progress: false   # 哨兵不能被后来的覆盖掉
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: git 身份（push tag 用）
+        run: |
+          git config user.name  "digest-guard"
+          git config user.email "digest-guard@users.noreply.github.com"
+
+      - name: 检查日报是否发出
+        env:
+          SERVERCHAN_KEY: ${{ secrets.SERVERCHAN_KEY }}
+          # 邮件兜底：Server酱 key 过期时哨兵还得能喊出来
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          RECIPIENT: ${{ secrets.RECIPIENT }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ARGS=""
+          if [ -n "${{ github.event.inputs.date }}" ]; then
+            ARGS="--date ${{ github.event.inputs.date }}"
+          fi
+          python digest_guard.py $ARGS

@@ -15,7 +15,7 @@
 默认每天发送：有新增发汇总，无新增发「今日暂无新增」提示。
 覆盖 sources.json 中全部地区（国考 / 各省省考 / 浙江11市事业编 / 福建·江苏·上海等事业编）。
 """
-import os, re, json, sqlite3, smtplib, ssl
+import os, re, sys, json, sqlite3, smtplib, ssl
 import urllib.request, urllib.parse
 from email.message import EmailMessage
 from datetime import datetime, timezone, timedelta
@@ -239,11 +239,43 @@ def day_label(d):
         return d
 
 
+# 本轮发送失败的通道（由 _rec 收集，由 _finish 判定退出码）
+_SEND_FAILURES = []
+
+
+def _rec(channel, result):
+    """登记一次发送结果。None=未配置（跳过，不算故障），False=真失败。"""
+    if result is False:
+        _SEND_FAILURES.append(channel)
+    return result
+
+
+def _finish():
+    """main() 收尾：任一通道真失败 → 退出码 1。
+
+    这是「日报缺席哨兵」能起作用的前提。
+    daily_digest.yml 只在 send 这步 success 时才 push digest tag；
+    如果脚本明明推送失败却照样退出 0，tag 还是会被打上，
+    哨兵查 tag 时就会以为日报正常发出 → 永远不报警。
+    那就是"监控本身在撒谎"，比没有监控更糟。
+    """
+    if _SEND_FAILURES:
+        print("[日报] 发送失败通道：%s → 退出码 1（不打 tag，交给哨兵报警）"
+              % "、".join(_SEND_FAILURES), file=sys.stderr)
+        return 1
+    return 0
+
+
 def send_email(recipient, subject, body):
+    """发送邮件。返回值三态：
+      True  = 真发出去了
+      False = 配了凭据但发送失败  ← 这个必须让调用方感知
+      None  = 未配置凭据，主动跳过（本地调试常见，不算故障）
+    """
     pwd = os.environ.get("SMTP_PASSWORD")
     if not pwd:
         print("[邮件] 未设置 SMTP_PASSWORD，跳过发送")
-        return False
+        return None
     msg = EmailMessage()
     msg["Subject"] = subject
     msg["From"] = SENDER
@@ -267,11 +299,13 @@ def send_wechat(title, desp):
     Server酱³（SendKey 形如 sctp1234t****）：POST https://<uid>.push.ft07.com/send/<key>.send
     旧版 Turbo（SendKey 形如 SCT****）：      POST https://sctapi.ftqq.com/<key>.send
     desp 支持 Markdown。
+
+    返回值三态同 send_email：True 成功 / False 失败 / None 未配置跳过。
     """
     key = (os.environ.get("SERVERCHAN_KEY", "") or "").strip()
     if not key:
         print("[微信] 未设置 SERVERCHAN_KEY，跳过推送")
-        return False
+        return None
 
     m = re.match(r"^sctp(\d+)t", key)
     if m:                                   # Server酱³
@@ -299,6 +333,15 @@ def send_wechat(title, desp):
             print("[微信] 已推送")
             return True
         print(f"[微信] 推送返回异常：{raw[:200]}")
+        return False
+    except urllib.error.HTTPError as e:
+        # 把响应体读出来。只打 "HTTP Error 400" 根本看不出是 key 失效还是格式错误——
+        # 实测 Server酱 会返回 {"code":40001,"info":"错误的Key"}，这才是有用信息。
+        try:
+            detail = e.read().decode("utf-8", "ignore")[:300]
+        except Exception:
+            detail = ""
+        print(f"[微信] 推送失败：HTTP {e.code} {detail}")
         return False
     except Exception as e:
         print(f"[微信] 推送失败：{e}")
@@ -337,6 +380,7 @@ def build_wechat_markdown(today, notices, dates, by_date, pages, health_md=None)
 
 
 def main():
+    _SEND_FAILURES.clear()
     today = beijing_today()
     notices = fetch_today_notices(today)
     recipient = (os.environ.get("RECIPIENT", SENDER) or SENDER).strip() or SENDER
@@ -351,14 +395,14 @@ def main():
             body += f"\n查看完整看板：{pages}"
         if htext:
             body += "\n" + "\n".join(htext)
-        send_email(recipient, f"公考事考公告日报 {today}（无新增）", body)
+        _rec("邮件", send_email(recipient, f"公考事考公告日报 {today}（无新增）", body))
         wx = f"**{today}**\n\n今日暂无新增公告。\n"
         if pages:
             wx += f"\n[查看完整看板]({pages})"
         if hmd:
             wx += "\n" + "\n".join(hmd)
-        send_wechat(f"公考事考日报 {today}（无新增）", wx)
-        return
+        _rec("微信", send_wechat(f"公考事考日报 {today}（无新增）", wx))
+        return _finish()
 
     # 全局噪声过滤：剔除采购/中标/询价等非招聘公告
     real = []
@@ -390,14 +434,14 @@ def main():
             body += f"\n查看完整看板：{pages}"
         if htext:
             body += "\n" + "\n".join(htext)
-        send_email(recipient, f"公考事考日报 {today}（无有效招聘）", body)
+        _rec("邮件", send_email(recipient, f"公考事考日报 {today}（无有效招聘）", body))
         wx = f"**{today}**\n\n今日新增 {len(noise)} 条，但均为采购/中标等非招聘信息，已过滤。\n"
         if pages:
             wx += f"\n[查看完整看板]({pages})"
         if hmd:
             wx += "\n" + "\n".join(hmd)
-        send_wechat(f"公考事考日报 {today}（无有效招聘）", wx)
-        return
+        _rec("微信", send_wechat(f"公考事考日报 {today}（无有效招聘）", wx))
+        return _finish()
 
     # 按公告发布日期分组（不是按地区）：先看「哪天发的」，再看「哪个地方」
     dates, by_date = group_by_date(notices)
@@ -416,12 +460,13 @@ def main():
     if pages:
         lines.append(f"查看完整看板：{pages}")
 
-    send_email(recipient, f"公考事考公告日报 {today}（新增 {len(notices)} 条）", "\n".join(lines))
-    send_wechat(
+    _rec("邮件", send_email(recipient, f"公考事考公告日报 {today}（新增 {len(notices)} 条）", "\n".join(lines)))
+    _rec("微信", send_wechat(
         f"公考事考日报 {today}｜新增 {len(notices)} 条",
         build_wechat_markdown(today, notices, dates, by_date, pages, hmd),
-    )
+    ))
+    return _finish()
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
