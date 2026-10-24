@@ -482,6 +482,84 @@ def _jsonapi_items(source):
     return items
 
 
+def _gwy_column_items(source):
+    """上海市公务员局（shacs.gov.cn）专栏接口抓取。
+
+    为什么不能用 HTML 解析：该站是纯 SPA，导航和列表全是 JS 路由，渲染后所有
+    <a> 的 href 都是空字符串（实测首页 33 个 <a>，href 全为 null），所以
+    parse_source 永远拿到 0 条候选 —— 这是「raw=0 型静默失败」的典型。
+
+    真实数据走两个 JSON 接口（固定两步，不能合并）：
+      1) gwy-column-section.json?listChild=true
+         → result.child[]，每个是「上海市20XX年度…专题」，含 id / name / sort
+      2) child-section-and-news.json?sectionId={id}
+         → result.secNews[].list[]，每个是公告 {id,title,postDate,sectionId}
+    详情页：https://shacs.gov.cn/recruits/{sectionId}/article/{newsId}
+
+    专题按 sort 倒序取最近的几个（sort 是「20260908」这种日期数字），这样每年
+    新专题上线后自动纳入，不需要改配置。辅警/文员/学员等非公务员考试专题排除。
+    """
+    base = source.get("gwy_base") or "https://shacs.gov.cn"
+    referer = base + "/recruits"
+    sec_api = source.get("gwy_section_api") or (base + "/gwyj/api/gwy-column-section.json?listChild=true")
+    news_api = source.get("gwy_news_api") or (
+        base + "/gwyj/api/child-section-and-news.json?sectionId={section}&pageSize=2000")
+    s_inc = re.compile(source["gwy_section_include"]) if source.get("gwy_section_include") else None
+    s_exc = re.compile(source["gwy_section_exclude"]) if source.get("gwy_section_exclude") else None
+    max_sec = int(source.get("gwy_max_sections", 4))
+
+    node = _http_get_json(sec_api, referer=referer, timeout=25)
+    child = _dig(node, "result.child") or []
+    if not child:
+        raise RuntimeError("专栏接口未返回专题列表（result.child 为空）")
+
+    picked = []
+    for s in child:
+        name = (s.get("name") or "").strip()
+        if not name:
+            continue
+        if s_inc and not s_inc.search(name):
+            continue
+        if s_exc and s_exc.search(name):
+            continue
+        picked.append(s)
+    picked.sort(key=lambda x: -(x.get("sort") or 0))
+    picked = picked[:max_sec]
+    if not picked:
+        raise RuntimeError("专题列表里没有命中 gwy_section_include 的专题")
+
+    items, seen = [], set()
+    for s in picked:
+        sid = s.get("id")
+        try:
+            nd = _http_get_json(news_api.replace("{section}", str(sid)), referer=referer, timeout=25)
+        except Exception as e:
+            print(f"[gwycolumn] 专题 {s.get('name')} 公告接口失败: {str(e)[:60]}")
+            continue
+        groups = _dig(nd, "result.secNews") or []
+        for g in groups:
+            for it in (g.get("list") or []):
+                title = (it.get("title") or "").strip()
+                if not title:
+                    continue
+                nid = it.get("id")
+                if nid is None:
+                    continue
+                # 详情路由用「专题 id」(sid)，不是公告自己的 sectionId——后者是
+                # 「公告」这种子栏目（如 435），拿去拼路由会 404。真实链接形如
+                # /recruits/434/article/1351?n=公告
+                u = f"{base}/recruits/{sid}/article/{nid}"
+                sec_name = (g.get("sectionInfo") or {}).get("name") or ""
+                if sec_name:
+                    u += "?n=" + quote(sec_name)
+                if u in seen:
+                    continue
+                seen.add(u)
+                items.append({"title": title[:200], "url": u,
+                              "date": extract_date(str(it.get("postDate") or ""), u)})
+    return items
+
+
 def _manda_items(source):
     """上海站群 manda 站内搜索抓取。
     源需含：
@@ -1266,7 +1344,10 @@ def cleanup_noise():
             n += 1
     # 上海源反向白名单：政府门户公告/通知栏目混杂大量市政/行政/采购文，
     # 仅保留含招聘专属词的条目，其余（磋商/验收/决算/任免/规划/闭馆等）一律清理。
-    RECRUIT_KEEP = re.compile(r"招聘|招考|招录|引进|遴选|选调|竞聘|交流|招聘会|人员招录")
+    # 2026-10-24 补「公务员|考试录用」：上海市局的公告标题是「上海市2026年度考试录用
+    # 公务员公告」，不含「招聘/招考/招录」，被这条反向白名单整批误删（上海-省考 27→17）。
+    RECRUIT_KEEP = re.compile(
+        r"招聘|招考|招录|引进|遴选|选调|竞聘|交流|招聘会|人员招录|公务员|考试录用")
     for (rid, title) in conn.execute("SELECT id,title FROM notices WHERE region='上海'").fetchall():
         if title and not RECRUIT_KEEP.search(title):
             conn.execute("DELETE FROM notices WHERE id=?", (rid,))
@@ -1404,6 +1485,12 @@ def _work(s, limit_per_source=40):
             s2 = dict(s)
             raw = _jsptsearch_items(s2)
             items = _filter_jsptsearch(s2, raw)
+            return s2, items[:limit_per_source], None, len(raw)
+        if s.get("method") == "gwycolumn":
+            # 上海公务员局专栏（SPA，页面无 href）：专题接口 + 专题公告接口两步
+            s2 = dict(s)
+            raw = _gwy_column_items(s2)
+            items = _filter_manda_items(s2, raw)
             return s2, items[:limit_per_source], None, len(raw)
         html = fetch(s)
         stats = {}
