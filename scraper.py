@@ -11,7 +11,7 @@
 - method="jsonapi" : 通用后台 JSON 接口(POST 表单 + 可选签名头)，适用于列表页是
                     SPA 壳、数据靠 XHR 拉取的站（如宁波人才网 网上招考 10500+ 条）。
 """
-import json, os, sqlite3, hashlib, re, time, datetime
+import json, os, sqlite3, hashlib, re, time, datetime, threading
 from urllib.parse import urljoin, quote
 from bs4 import BeautifulSoup
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -747,11 +747,24 @@ def _filter_jsptsearch(source, items):
 
 
 _browser = None
+_browser_tid = None
 
 
 def _get_browser():
-    global _browser
-    if _browser is None:
+    """取（懒加载的）共享浏览器；**按线程隔离**。
+
+    为什么必须按线程：Playwright 的 sync API 对象绑定在创建它的线程上，跨线程调用
+    会直接抛 `cannot switch to a different thread (which happens to have exited)`。
+    而 run_all 的执行顺序是「http 源先进线程池并发 → browser 源再在主线程串行」，
+    只要有任意一个 method=http 的源在它的 extra_urls 里带了 {"method":"browser"}
+    的子栏目（典型：江苏-省考 col92919 职位表），线程池里的 worker 就会先把
+    _browser 创建出来。worker 退出后主线程拿到这个已死线程的 browser 对象，
+    后面**所有** browser 源集体报错、count 全 0——症状极具迷惑性：像站点全挂了，
+    实际是浏览器单例绑错了线程。
+    """
+    global _browser, _browser_tid
+    tid = threading.get_ident()
+    if _browser is None or _browser_tid != tid:
         from playwright.sync_api import sync_playwright
         p = sync_playwright().start()
         # Chromium 网络参数：强制IPv4、忽略SSL、规避反爬检测
@@ -766,6 +779,7 @@ def _get_browser():
         if not os.environ.get("SCRAPE_PROXY", "").strip():
             args.append("--no-proxy-server")
         _browser = p.chromium.launch(headless=True, args=args)
+        _browser_tid = tid
     return _browser
 
 
@@ -878,6 +892,129 @@ def fetch_browser(url, timeout=90000, wait=3000, wait_until="domcontentloaded", 
     raise last
 
 
+NEXT_PAGE_TEXTS = ("下一页", "下页", "后一页", "Next", "next", "»", "›", ">")
+
+
+def fetch_browser_pages(url, pages=5, timeout=90000, wait=3000, wait_until="domcontentloaded",
+                        next_selector=None, page_wait=None, block_external=False):
+    """在同一个浏览器上下文里逐页翻页，返回第 2~N 页合并后的 HTML（不含第 1 页）。
+
+    解决「分页控件拿不到可请求 URL」的站：href 为空、href="javascript:;"、或压根
+    没有 href 只有 JS 事件监听。这类站 page_url_template（需要 URL 规律）和
+    follow_pages（需要静态 <a href>）都无能为力。
+    典型：徐州 hrss.xz.gov.cn（页码 href 为空，第 2~8 页藏着 50+ 条真招聘公告，
+    第 1 页却全是拟聘公示）、泰州 rsj.taizhou.gov.cn（href="javascript:;"，
+    列表由 CMS 接口重建）。
+
+    做法：加载第 1 页 → 定位「下一页」或「当前页+1」控件 → 点击 → 等渲染 →
+    抓 page.content()；每轮用「前 30 个链接文本」做指纹，指纹没变即认定到底或
+    点击无效，立即停，避免空转到上限。返回内容不含第 1 页，因为调用方
+    （fetch）已经抓过第 1 页了。
+    """
+    def _fingerprint(p):
+        texts = []
+        try:
+            for a in p.query_selector_all("a"):
+                t = (a.inner_text() or "").strip()
+                if t:
+                    texts.append(t[:40])
+                if len(texts) >= 30:
+                    break
+        except Exception:
+            pass
+        return tuple(texts)
+
+    def _find_next(p, cur):
+        if next_selector:
+            try:
+                el = p.query_selector(next_selector)
+                if el:
+                    return el
+            except Exception:
+                pass
+        # 文本控件优先（下一页/下页/>），这类控件比页码稳，不受当前页码影响。
+        # 关键：必须点最内层可点击元素。政务站的分页常写成 <li><a>&gt;</a></li>，
+        # 若匹配到外层 li 再 click，DOM 事件不会冒泡到 a 的监听器，点击等于没点。
+        for txt in NEXT_PAGE_TEXTS:
+            el = None
+            try:
+                for e in p.query_selector_all("a,button"):
+                    if (e.inner_text() or "").strip() == txt:
+                        el = e
+                        break
+            except Exception:
+                pass
+            if el is None:
+                try:
+                    for e in p.query_selector_all("li,span,i,div"):
+                        if (e.inner_text() or "").strip() == txt:
+                            inner = None
+                            try:
+                                inner = e.query_selector("a") or e.query_selector("button")
+                            except Exception:
+                                pass
+                            el = inner or e
+                            break
+                except Exception:
+                    pass
+            if el is not None:
+                return el
+        # 退化为「当前页 +1」的页码
+        try:
+            for el in p.query_selector_all("a"):
+                if (el.inner_text() or "").strip() == str(cur + 1):
+                    return el
+        except Exception:
+            pass
+        return None
+
+    out = []
+    got = 0
+    browser = _get_browser()
+    ctx = _new_context(browser)
+    page = ctx.new_page()
+    try:
+        try:
+            ctx.route("**/*", _make_route_handler(block_external=block_external, base_url=url))
+        except Exception:
+            pass
+        page.goto(url, timeout=timeout, wait_until=wait_until)
+        page.wait_for_timeout(wait)
+        cur_url = page.url
+        prev = _fingerprint(page)
+        dwell = page_wait or wait
+        for i in range(1, max(1, int(pages))):
+            el = _find_next(page, i)
+            if not el:
+                break
+            try:
+                el.click()
+            except Exception:
+                break
+            page.wait_for_timeout(dwell)
+            fp = _fingerprint(page)
+            if fp and fp == prev:
+                break          # 内容没变：到底了，或点击没触发加载
+            prev = fp
+            got += 1
+            out.append(page.content())
+            if page.url != cur_url:
+                # 点击触发整页跳转，新页面的列表可能仍在 JS 渲染，再等一轮
+                cur_url = page.url
+                page.wait_for_timeout(dwell)
+        if got:
+            print(f"[翻页] {url[:60]} 点击翻页 {got} 页")
+    finally:
+        try:
+            page.close()
+        except Exception:
+            pass
+        try:
+            ctx.close()
+        except Exception:
+            pass
+    return "\n".join(out)
+
 
 def _raw_fetch(url, method, encoding=None, browser_wait=3000, browser_wait_until="domcontentloaded", browser_timeout=90000, http_timeout=15, block_external=False):
     if method == "browser":
@@ -974,6 +1111,25 @@ def fetch(source):
             got_pages += 1
         if got_pages > 1:
             print(f"[分页] {source.get('name','')} 按模板抓取 {got_pages} 页")
+    # 点击翻页（browser_click_pages）：分页控件 href 为空 / href="javascript:;" / 纯 JS
+    # 事件监听，页面上拿不到任何可请求的分页 URL。上面两套机制（follow_pages 靠静态
+    # <a href>、page_url_template 靠 URL 规律）都覆盖不到。典型：徐州（页码 href 为空的
+    # JS 跳转，真公告全在第 2~8 页）、泰州（href="javascript:;"，列表由 CMS 接口重建）。
+    # 会在同一浏览器上下文里连点 N 页，返回第 2~N 页的内容（第 1 页上面已抓）。
+    bcp = source.get("browser_click_pages")
+    if bcp:
+        try:
+            more = fetch_browser_pages(
+                source["url"], pages=int(bcp), timeout=browser_timeout, wait=browser_wait,
+                wait_until=browser_wait_until,
+                next_selector=source.get("next_page_selector"),
+                page_wait=source.get("page_wait"),
+                block_external=block_external,
+            )
+            if more:
+                html = html + "\n" + more
+        except Exception as e:
+            print(f"[翻页] {source.get('name','')} 点击翻页失败: {str(e)[:80]}")
     return html
 
 
