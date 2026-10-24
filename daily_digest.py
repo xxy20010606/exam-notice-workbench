@@ -250,18 +250,36 @@ def _rec(channel, result):
     return result
 
 
+def _wx_warn(result):
+    """微信失败的提示，拼进邮件正文。
+
+    为什么不把"微信失败"算成致命：digest tag 同时承担两个职责——
+    「日报已送达」的凭据（哨兵查它）和「今天发过了」的防重复标记。
+    如果微信一挂就不打 tag，19:00 之后的 22:00、04:00 两轮抓取会各自重发一遍邮件，
+    用户反而被重复邮件轰炸。邮件才是主渠道（微信是补充），
+    所以：邮件成功就算送达、照常打 tag，微信的问题写进邮件正文让用户知道。
+    """
+    if result is False:
+        return ("\n\n---\n⚠️ 本次微信推送失败（内容本身没问题，看这封邮件即可）。"
+                "常见原因：Server酱 SendKey 过期，去 sct.ftqq.com 重新生成后更新仓库 Secrets。")
+    return ""
+
+
 def _finish():
-    """main() 收尾：任一通道真失败 → 退出码 1。
+    """main() 收尾：**主渠道（邮件）**失败 → 退出码 1，不打 tag，交给哨兵报警。
 
     这是「日报缺席哨兵」能起作用的前提。
     daily_digest.yml 只在 send 这步 success 时才 push digest tag；
-    如果脚本明明推送失败却照样退出 0，tag 还是会被打上，
+    如果脚本明明邮件发不出去却照样退出 0，tag 还是会被打上，
     哨兵查 tag 时就会以为日报正常发出 → 永远不报警。
     那就是"监控本身在撒谎"，比没有监控更糟。
+
+    微信失败不在此列（理由见 _wx_warn）：它不该阻断打 tag，否则会重复发邮件。
     """
-    if _SEND_FAILURES:
-        print("[日报] 发送失败通道：%s → 退出码 1（不打 tag，交给哨兵报警）"
-              % "、".join(_SEND_FAILURES), file=sys.stderr)
+    fatal = [c for c in _SEND_FAILURES if c != "微信"]
+    if fatal:
+        print("[日报] 主渠道发送失败：%s → 退出码 1（不打 tag，交给哨兵报警）"
+              % "、".join(fatal), file=sys.stderr)
         return 1
     return 0
 
@@ -395,13 +413,15 @@ def main():
             body += f"\n查看完整看板：{pages}"
         if htext:
             body += "\n" + "\n".join(htext)
-        _rec("邮件", send_email(recipient, f"公考事考公告日报 {today}（无新增）", body))
         wx = f"**{today}**\n\n今日暂无新增公告。\n"
         if pages:
             wx += f"\n[查看完整看板]({pages})"
         if hmd:
             wx += "\n" + "\n".join(hmd)
-        _rec("微信", send_wechat(f"公考事考日报 {today}（无新增）", wx))
+        # 先发微信、拿到结果再发邮件，这样邮件正文才能带上"微信挂了"的提示
+        wres = _rec("微信", send_wechat(f"公考事考日报 {today}（无新增）", wx))
+        _rec("邮件", send_email(recipient, f"公考事考公告日报 {today}（无新增）",
+                               body + _wx_warn(wres)))
         return _finish()
 
     # 全局噪声过滤：剔除采购/中标/询价等非招聘公告
@@ -434,13 +454,14 @@ def main():
             body += f"\n查看完整看板：{pages}"
         if htext:
             body += "\n" + "\n".join(htext)
-        _rec("邮件", send_email(recipient, f"公考事考日报 {today}（无有效招聘）", body))
         wx = f"**{today}**\n\n今日新增 {len(noise)} 条，但均为采购/中标等非招聘信息，已过滤。\n"
         if pages:
             wx += f"\n[查看完整看板]({pages})"
         if hmd:
             wx += "\n" + "\n".join(hmd)
-        _rec("微信", send_wechat(f"公考事考日报 {today}（无有效招聘）", wx))
+        wres = _rec("微信", send_wechat(f"公考事考日报 {today}（无有效招聘）", wx))
+        _rec("邮件", send_email(recipient, f"公考事考日报 {today}（无有效招聘）",
+                               body + _wx_warn(wres)))
         return _finish()
 
     # 按公告发布日期分组（不是按地区）：先看「哪天发的」，再看「哪个地方」
@@ -460,11 +481,12 @@ def main():
     if pages:
         lines.append(f"查看完整看板：{pages}")
 
-    _rec("邮件", send_email(recipient, f"公考事考公告日报 {today}（新增 {len(notices)} 条）", "\n".join(lines)))
-    _rec("微信", send_wechat(
+    wres = _rec("微信", send_wechat(
         f"公考事考日报 {today}｜新增 {len(notices)} 条",
         build_wechat_markdown(today, notices, dates, by_date, pages, hmd),
     ))
+    _rec("邮件", send_email(recipient, f"公考事考公告日报 {today}（新增 {len(notices)} 条）",
+                           "\n".join(lines) + _wx_warn(wres)))
     return _finish()
 
 
