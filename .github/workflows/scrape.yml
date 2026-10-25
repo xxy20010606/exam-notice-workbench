@@ -58,25 +58,18 @@ jobs:
       - name: 安装依赖
         run: pip install -r requirements.txt
 
-      - name: 还原 Playwright 浏览器缓存（命中则跳过下载）
-        id: pwcache
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-
-
-      - name: 安装 Playwright Chromium（仅缓存未命中时执行）
-        if: steps.pwcache.outputs.cache-hit != 'true'
-        run: python -m playwright install chromium
-
-      - name: 保存 Playwright 浏览器缓存（首次安装后才会有内容）
-        if: steps.pwcache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ steps.pwcache-primary-key }}
+      - name: 安装 Playwright Chromium（含系统依赖）
+        # 2026-10-25 修：不再用 actions/cache 缓存浏览器。踩坑记录——
+        #   cache key 用的是 hashFiles('requirements.txt')，而 requirements.txt 只有
+        #   三行裸包名、**不锁版本**，内容恒定 → hash 恒定 → 缓存一旦保存就永远命中
+        #   → 下面的 install 被永久跳过；但 pip 每轮装的是**最新版** playwright，
+        #   缓存里的浏览器版本对不上，运行时抛 "Executable doesn't exist"。
+        #   更要命的是这个报错文案含 "playwright" 字样，被 scraper.py 误判成
+        #   "Playwright 未安装" —— 于是 34 个 browser 源在云端静默失效，
+        #   全靠本地 WorkBuddy 通道补，电脑不开机时这些源就是空的。
+        # 代价：每轮多花约 60 秒。稳定优先。
+        # --with-deps：额外 apt 装 libnss3 等系统库，缺了 chromium 起不来。
+        run: python -m playwright install --with-deps chromium
 
       - name: 抓取并更新看板（含浙江全部地区）
         env:

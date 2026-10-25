@@ -1092,8 +1092,23 @@ def _raw_fetch(url, method, encoding=None, browser_wait=3000, browser_wait_until
             return fetch_browser(url, timeout=browser_timeout, wait=browser_wait, wait_until=browser_wait_until, block_external=block_external)
         except Exception as e:
             msg = str(e)
-            if "playwright" in msg.lower() or "no module" in msg.lower():
-                raise RuntimeError("Playwright 未安装，无法抓取浏览器型源（" + url + "）")
+            low = msg.lower()
+            # 分类报错。以前这里一律说"Playwright 未安装"，把一个真故障藏了很久：
+            # 云端缓存着旧浏览器、pip 却装了新版 playwright，抛的是
+            # "Executable doesn't exist"（文案里含 playwright 字样），被当成"没装"，
+            # 于是 34 个 browser 源在云端静默失效，谁也不会往这个方向查。
+            # 宁可多几个分支，也要让日志一眼看出是"包没装""浏览器不对"还是"缺系统库"。
+            if "no module named" in low or "modulenotfounderror" in low:
+                raise RuntimeError("Playwright 模块未安装（pip install playwright）：" + url)
+            if "executable doesn" in low:
+                raise RuntimeError("Playwright 浏览器二进制缺失或版本不匹配"
+                                   "（需 python -m playwright install chromium）：" + url)
+            if "missing dependencies" in low or "host system is missing" in low:
+                raise RuntimeError("Chromium 缺系统依赖"
+                                   "（需 python -m playwright install --with-deps chromium）：" + url)
+            if "playwright" in low:
+                raise RuntimeError("Playwright 异常：" + (msg.splitlines() or [""])[0][:160]
+                                   + "（" + url + "）")
             raise
     return fetch_http(url, encoding=encoding, timeout=http_timeout, ip_family=ip_family)
 

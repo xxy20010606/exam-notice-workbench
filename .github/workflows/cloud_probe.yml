@@ -29,18 +29,11 @@ jobs:
       - name: 安装依赖
         run: pip install -r requirements.txt
 
-      - name: 还原 Playwright 浏览器缓存
-        id: pwcache
-        uses: actions/cache/restore@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('requirements.txt') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-
-
-      - name: 安装 Playwright Chromium（缓存未命中时）
-        if: steps.pwcache.outputs.cache-hit != 'true'
-        run: python -m playwright install chromium
+      - name: 安装 Playwright Chromium（含系统依赖）
+        # 与 scrape.yml 保持一致：不缓存浏览器，每轮现装。
+        # 缓存 key 用 hashFiles('requirements.txt') 而该文件不锁版本，会永久命中旧浏览器，
+        # 导致 34 个 browser 源在云端静默失效（详见 scrape.yml 里的踩坑注释）。
+        run: python -m playwright install --with-deps chromium
 
       - name: 跑探针（全量源 / 不写状态 / 不提交）
         env:
