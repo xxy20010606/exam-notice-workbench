@@ -6,7 +6,16 @@ name: 云端可达性探针（手动）
 # 只在手动点击时运行，跑完只输出报告 —— **不提交任何文件**（权限只给 read），
 # 也不写 sources_status，不会污染健康度。
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      only_region:
+        description: '只测某个地区（如 浙江 / 江苏 / 上海），留空=全部。全量跑 browser 源会超时，建议分区'
+        required: false
+        default: ''
+      skip_browser:
+        description: '跳过 browser 源（只测 http/api，1-2 分钟出结果）'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -14,7 +23,9 @@ permissions:
 jobs:
   probe:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 全量实测约 50-60 分钟（34 个 browser 源串行，单个 browser_timeout 90s × 重试）。
+    # 第一次设 45 分钟被砍了。想快就用 only_region 分区跑，一个省约 5-10 分钟。
+    timeout-minutes: 75
     steps:
       - name: 检出仓库
         uses: actions/checkout@v5
@@ -35,7 +46,16 @@ jobs:
         # 导致 34 个 browser 源在云端静默失效（详见 scrape.yml 里的踩坑注释）。
         run: python -m playwright install --with-deps chromium
 
-      - name: 跑探针（全量源 / 不写状态 / 不提交）
+      - name: 跑探针（不写状态 / 不提交）
         env:
           SCRAPE_PROXY: ${{ secrets.SCRAPE_PROXY }}
-        run: python probe_cloud.py
+        run: |
+          ARGS=""
+          if [ -n "${{ inputs.only_region }}" ]; then
+            ARGS="$ARGS --only-region ${{ inputs.only_region }}"
+          fi
+          if [ "${{ inputs.skip_browser }}" = "true" ]; then
+            ARGS="$ARGS --skip-browser"
+          fi
+          echo "探针参数：${ARGS:-（全量）}"
+          python probe_cloud.py $ARGS

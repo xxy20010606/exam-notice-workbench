@@ -20,11 +20,29 @@ import scraper  # noqa: E402
 
 
 def main():
+    import argparse
+    ap = argparse.ArgumentParser(description="云端可达性探针")
+    ap.add_argument("--only-region", default=None,
+                    help="只测 region 含该关键字的源（如 浙江）。"
+                         "全量跑 34 个 browser 源串行会超过 Actions 单 job 上限，"
+                         "分区跑是更快拿到结论的办法。")
+    ap.add_argument("--skip-browser", action="store_true",
+                    help="跳过 browser 源，只测 http/api/jsonapi 等轻量源（1-2 分钟出结果）")
+    args = ap.parse_args()
+
+    scope = []
+    if args.only_region:
+        scope.append(f"地区含「{args.only_region}」")
+    if args.skip_browser:
+        scope.append("跳过 browser 源")
     print("=" * 64)
-    print("云端可达性探针（海外 IP / 全量源 / 不写状态 / 不提交）")
+    print("云端可达性探针（海外 IP / 不写状态 / 不提交）")
+    print("范围：" + ("、".join(scope) if scope else "全量启用源"))
     print("=" * 64)
 
-    report = scraper.run_all(write_status=False)
+    report = scraper.run_all(write_status=False,
+                             only_region=args.only_region,
+                             skip_browser=args.skip_browser)
     all_src = report.get("sources", [])
     skipped = [s for s in all_src if s.get("skipped")]
     ran = [s for s in all_src if not s.get("skipped")]
@@ -66,6 +84,7 @@ def main():
     md = []
     md.append("## 云端（海外 IP）抓取可达性")
     md.append("")
+    md.append(f"- 范围：`{' '.join(sys.argv[1:]) or '全量'}`")
     md.append(f"- 实际尝试 **{len(ran)}** 个源，跳过 {len(skipped)} 个")
     md.append(f"- 成功 **{len(ok)}**（有产出 {len(has_data)} / 零产出 {len(zero)}）")
     md.append(f"- 失败 **{len(failed)}**")
