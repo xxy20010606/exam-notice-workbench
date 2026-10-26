@@ -258,6 +258,21 @@ def fetch_http(url, timeout=30, retries=2, encoding=None, ip_family=None):
         "Accept-Language": "zh-CN,zh;q=0.9",
         "Referer": url,
     }
+    # 带 Cookie 的 opener。
+    # 为什么必须有：不少政务站（典型：河南省政府网 www.henan.gov.cn 的公务员专栏）
+    # 的反爬流程是「首次请求 302 + Set-Cookie，浏览器带同一个 Cookie 再请求才给 200」。
+    # 而 urllib.request.urlopen 用的是全局 opener，**不带 cookie jar**，
+    # 于是这类站会一路 302 到 utllib 判定「重定向死循环」直接报错 ——
+    # 报错文案是 HTTP 302 无限循环，看起来像站点改版，其实是缺 Cookie 支持。
+    # 实测 2026-10-26：河南-省考 无 Cookie → 302 死循环；带 Cookie → 200 / 13091 字节。
+    # 每个请求用**独立的空 jar**：只求「同一次请求内的 302 往返能带上 cookie」，
+    # 不做跨请求会话。跨源共享 jar 会互相污染，得不偿失。
+    def _mk_opener():
+        import http.cookiejar
+        return urllib.request.build_opener(
+            urllib.request.HTTPSHandler(context=ctx),
+            urllib.request.HTTPCookieProcessor(http.cookiejar.CookieJar()),
+        )
     # 通过临时 monkey-patch socket.getaddrinfo 指定协议族（仅影响本函数内 urllib 调用）
     _orig_gai = _socket_mod.getaddrinfo
 
@@ -285,7 +300,9 @@ def fetch_http(url, timeout=30, retries=2, encoding=None, ip_family=None):
             try:
                 _socket_mod.getaddrinfo = pf or _orig_gai
                 req = urllib.request.Request(url, headers=headers)
-                with urllib.request.urlopen(req, timeout=timeout, context=ctx) as r:
+                # 每次尝试用一个新 opener（新 cookie jar）：302+cookie 的站在这里
+                # 才能走完「跳一次、带上 cookie、拿到 200」的完整流程。
+                with _mk_opener().open(req, timeout=timeout) as r:
                     return _decode_response(r, encoding)
             except Exception as e:
                 last = e

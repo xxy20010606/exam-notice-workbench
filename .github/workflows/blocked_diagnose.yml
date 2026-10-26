@@ -1,0 +1,87 @@
+name: 换请求头诊断（403 到底是 WAF 还是 IP 封）
+
+# 为什么需要这个 workflow：
+#   云端普查有 10 个源报 403 / 493 / 接口异常。这 10 个在**本地（国内 IP）全都能 200**，
+#   但这一点推不出任何结论 —— 中国大陆 IP 访问国内政府站本来就该通。
+#   真正要分清的是两种成因，处置代价差一个量级：
+#     ① WAF 按 UA / Referer / 请求头组合拦 → 换一套头就通，代码可修；
+#     ② 按 IP 段封（海外 IP 一律拒） → 只能上代理，代码无解。
+#   只有在**海外出口（Actions）**对同一个 URL 打多种请求头变体，才能分出来。
+#   本地跑这个脚本是「全绿」，那只能证明 URL 没写错，证明不了 ②/① 的归属。
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/blocked-trigger.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    # 10 个源 × 8 个变体 × 最长 20s，再加接口二次探测，留够余量。
+    timeout-minutes: 30
+    concurrency:
+      group: blocked-diagnose
+      cancel-in-progress: true
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: 跑诊断
+        env:
+          # 故意不传 SCRAPE_PROXY：这里要看的就是「裸海外 IP 能拿到什么」，
+          # 走代理会把 IP 层的问题盖掉，诊断结论就失真了。
+          PYTHONIOENCODING: utf-8
+        run: |
+          python tools/diagnose_blocked.py \
+            --json-out reports/blocked.json \
+            --md-out reports/换头诊断.md 2>&1 | tee /tmp/diag.log
+
+      - name: 写进 workflow summary
+        if: always()
+        run: |
+          {
+            if [ -f reports/换头诊断.md ]; then
+              cat reports/换头诊断.md
+            else
+              echo "## 诊断报告生成失败"
+              echo ""
+              echo '```'
+              tail -40 /tmp/diag.log 2>/dev/null || true
+              echo '```'
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 提交到 diag-report 分支
+        if: always()
+        run: |
+          if [ ! -s reports/blocked.json ]; then
+            echo "[跳过] 没生成 blocked.json，不提交"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # 用独立分支，不复用 cloud_reachability.yml 的 probe-report：
+          # 那个 workflow 末尾是 `git push --force origin probe-report`，
+          # 两个 workflow 抢同一分支必然互相清掉对方的报告。
+          git checkout -B diag-report
+          git add -f reports/blocked.json reports/换头诊断.md
+          git commit -m "chore(换头诊断): 云端实测 $(date +'%Y-%m-%d %H:%M') UTC" || echo "[无变化]"
+          git push --force origin diag-report
+          echo "[OK] 已推到 diag-report 分支：reports/换头诊断.md"

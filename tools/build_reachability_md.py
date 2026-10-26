@@ -28,6 +28,9 @@ def _load(p):
 
 def main():
     light_p, browser_p, out_p = (sys.argv[1:4] + ["", "", ""])[:3]
+    # 第 4 个参数是标题前缀：同一份脚本既要出「云端实测」，也要能出「本机对照」，
+    # 否则两张表标题一模一样，贴进聊天窗口分不清哪张是海外出口的结果。
+    label = sys.argv[4] if len(sys.argv) > 4 else "云端（海外 IP）"
     light = _load(light_p)
     brow = _load(browser_p)
     if not light and not brow:
@@ -72,7 +75,7 @@ def main():
         groups[r[3]].append(r)
 
     order = ["A 云端可抓", "B 云端零产出", "C 云端失败", "D 需浏览器", "未测"]
-    md = ["# 云端（海外 IP）可达性实测", ""]
+    md = [f"# {label}可达性实测", ""]
     for p, tag in ((light, "轻量源"), (brow, "浏览器源")):
         if p:
             md.append(f"- {tag}实测时间：{p.get('run_at')}")
