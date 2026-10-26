@@ -144,6 +144,54 @@ def _decode_response(r, encoding):
     return raw.decode(cs, errors="ignore")
 
 
+def _proxy_fetch_text(url, headers=None, data=None, method=None, timeout=30,
+                      encoding=None, tries=2):
+    """经 SCRAPE_PROXY 取一次内容，返回已解码文本。未配置代理时抛异常。
+
+    ⚠️ 别写成 `opener.open(req, timeout=..., context=ctx)`。
+    `OpenerDirector.open()` 只接受 (fullurl, data, timeout)，多传 context 直接
+    `TypeError: got an unexpected keyword argument 'context'`。而这段代码外面包着
+    `except Exception`，异常被吞掉写进 last —— 报错看起来像「代理连不上」，
+    实际是调用方式错了。四个请求函数（fetch_http / _http_post_json /
+    _http_get_json / _http_post_form）原来全是这个写法，后果是
+    **SCRAPE_PROXY 配了等于没配**，四个函数一次都没成功走过代理。
+    正确做法：把 context 挂到 HTTPSHandler 上，再和 ProxyHandler 一起 build_opener。
+
+    实测（2026-10-26，本地最小 CONNECT 代理）：
+      旧写法 → TypeError；
+      新写法 → 代理收到 CONNECT hrss.zhenjiang.gov.cn:443，返回 200 / 12381 字节。
+    """
+    import urllib.request, ssl
+    proxy = os.environ.get("SCRAPE_PROXY", "").strip()
+    if not proxy:
+        raise RuntimeError("未配置 SCRAPE_PROXY（本次不走代理）")
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    if hasattr(ssl, "OP_LEGACY_SERVER_CONNECT"):
+        try:
+            ctx.options |= ssl.OP_LEGACY_SERVER_CONNECT
+        except Exception:
+            pass
+    opener = urllib.request.build_opener(
+        urllib.request.ProxyHandler({"http": proxy, "https": proxy}),
+        urllib.request.HTTPSHandler(context=ctx),
+    )
+    # 不在这里强制 getaddrinfo 走 IPv4：域名由代理端解析，本机改解析器对代理
+    # 没有任何作用，写了只是噪音。
+    last = None
+    for _ in range(max(1, int(tries))):
+        try:
+            req = urllib.request.Request(url, data=data,
+                                         headers=headers or {}, method=method)
+            with opener.open(req, timeout=timeout) as r:
+                return _decode_response(r, encoding)
+        except Exception as e:
+            last = e
+            time.sleep(1.0)
+    raise last
+
+
 def fetch_http(url, timeout=30, retries=2, encoding=None, ip_family=None):
     """GET 一个页面，返回解码后的 HTML。
 
@@ -191,8 +239,12 @@ def fetch_http(url, timeout=30, retries=2, encoding=None, ip_family=None):
     # 首族按 retries 重试；仅 "ipv6" 会在全败后追加一次 ipv4 兜底。
     # 反向不追加（ipv4 失败不试 ipv6），保证既有源行为零变化。
     fams = [patch] + ([_P["ipv4"]] if fam == "ipv6" else [])
+    # **配了代理时直连只试 1 次**：直连失败就交给代理，没必要把同一个超时连付三遍。
+    # 对镇江/宿迁这种整个域名被海外 IP 封死的站，原来是 15s×3+退避=31.5s 才轮到代理；
+    # 现在 15s 就切过去。没配代理时保持原样（那时直连是唯一路径，重试是必要的）。
+    _direct_tries = 1 if proxy else (retries + 1)
     for pi, pf in enumerate(fams):
-        for _ in range((retries + 1) if pi == 0 else 1):
+        for _ in range(_direct_tries if pi == 0 else 1):
             try:
                 _socket_mod.getaddrinfo = pf or _orig_gai
                 req = urllib.request.Request(url, headers=headers)
@@ -206,16 +258,10 @@ def fetch_http(url, timeout=30, retries=2, encoding=None, ip_family=None):
     # 第二轮：直连全失败且配置了代理 → 回退走国内代理（代理是 IPv4 出口）
     if proxy:
         try:
-            _socket_mod.getaddrinfo = _P["ipv4"]
-            opener = urllib.request.build_opener(
-                urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
-            req = urllib.request.Request(url, headers=headers)
-            with opener.open(req, timeout=timeout, context=ctx) as r:
-                return _decode_response(r, encoding)
+            return _proxy_fetch_text(url, headers=headers, timeout=timeout,
+                                     encoding=encoding, tries=2)
         except Exception as e:
             last = e
-        finally:
-            _socket_mod.getaddrinfo = _orig_gai
     raise last
 
 
@@ -239,7 +285,8 @@ def _http_post_json(url, payload, timeout=30, retries=2):
     def _ipv4_only(host, port, family=0, *a, **kw):
         return _orig_gai(host, port, _socket_mod.AF_INET if family == 0 else family, *a, **kw)
     last = None
-    for _ in range(retries + 1):
+    # 配了代理时直连只试 1 次（失败就交给代理），理由见 fetch_http 里的同款说明
+    for _ in range(1 if proxy else retries + 1):
         try:
             _socket_mod.getaddrinfo = _ipv4_only
             req = urllib.request.Request(url, data=data, headers=headers, method="POST")
@@ -252,15 +299,9 @@ def _http_post_json(url, payload, timeout=30, retries=2):
             time.sleep(1.0)
     if proxy:
         try:
-            _socket_mod.getaddrinfo = _ipv4_only
-            opener = urllib.request.build_opener(
-                urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
-            req = urllib.request.Request(url, data=data, headers=headers, method="POST")
-            with opener.open(req, timeout=timeout, context=ctx) as r:
-                _socket_mod.getaddrinfo = _orig_gai
-                return _json.loads(r.read().decode("utf-8", errors="ignore"))
+            return _json.loads(_proxy_fetch_text(url, headers=headers, data=data,
+                                                 method="POST", timeout=timeout, tries=2))
         except Exception as e:
-            _socket_mod.getaddrinfo = _orig_gai
             last = e
     raise last
 
@@ -285,7 +326,8 @@ def _http_get_json(url, referer=None, timeout=20, retries=2):
     def _ipv4_only(host, port, family=0, *a, **kw):
         return _orig_gai(host, port, _socket_mod.AF_INET if family == 0 else family, *a, **kw)
     last = None
-    for _ in range(retries + 1):
+    # 配了代理时直连只试 1 次（失败就交给代理），理由见 fetch_http 里的同款说明
+    for _ in range(1 if proxy else retries + 1):
         try:
             _socket_mod.getaddrinfo = _ipv4_only
             req = urllib.request.Request(url, headers=headers)
@@ -298,15 +340,9 @@ def _http_get_json(url, referer=None, timeout=20, retries=2):
             time.sleep(1.0)
     if proxy:
         try:
-            _socket_mod.getaddrinfo = _ipv4_only
-            opener = urllib.request.build_opener(
-                urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
-            req = urllib.request.Request(url, headers=headers)
-            with opener.open(req, timeout=timeout, context=ctx) as r:
-                _socket_mod.getaddrinfo = _orig_gai
-                return _json.loads(r.read().decode("utf-8", errors="ignore"))
+            return _json.loads(_proxy_fetch_text(url, headers=headers,
+                                                 timeout=timeout, tries=2))
         except Exception as e:
-            _socket_mod.getaddrinfo = _orig_gai
             last = e
     raise last
 
@@ -394,7 +430,8 @@ def _http_post_form(url, data, headers=None, timeout=25, retries=1):
     def _ipv4_only(host, port, family=0, *a, **kw):
         return _orig_gai(host, port, _socket_mod.AF_INET if family == 0 else family, *a, **kw)
     last = None
-    for _ in range(retries + 1):
+    # 配了代理时直连只试 1 次（失败就交给代理），理由见 fetch_http 里的同款说明
+    for _ in range(1 if proxy else retries + 1):
         try:
             _socket_mod.getaddrinfo = _ipv4_only
             req = urllib.request.Request(url, data=body, headers=hdr, method="POST")
@@ -407,15 +444,12 @@ def _http_post_form(url, data, headers=None, timeout=25, retries=1):
             time.sleep(1.0)
     if proxy:
         try:
-            _socket_mod.getaddrinfo = _ipv4_only
-            opener = urllib.request.build_opener(
-                urllib.request.ProxyHandler({"http": proxy, "https": proxy}))
-            req = urllib.request.Request(url, data=body, headers=hdr, method="POST")
-            with opener.open(req, timeout=timeout, context=ctx) as r:
-                _socket_mod.getaddrinfo = _orig_gai
-                return _json.loads(r.read().decode("utf-8", errors="ignore"))
-        except Exception:
-            _socket_mod.getaddrinfo = _orig_gai
+            return _json.loads(_proxy_fetch_text(url, headers=hdr, data=body,
+                                                 method="POST", timeout=timeout, tries=2))
+        except Exception as e:
+            # 以前这里既不 return 也不记 last，代理失败时会把「直连失败」的旧异常
+            # 抛出去，于是日志里永远看不到代理那边的真实原因。
+            last = e
     raise last
 
 

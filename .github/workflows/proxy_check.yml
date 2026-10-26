@@ -1,0 +1,49 @@
+name: 代理验收（手动）
+
+# 目的：SCRAPE_PROXY 配了到底管不管用，30 秒给出答案。
+#
+# 为什么需要独立一个 workflow：`SCRAPE_PROXY` 这个 Secret 之前挂了很久都没生效，
+# 因为四个请求函数把 `context` 传给了 `OpenerDirector.open()`（不接受这个参数），
+# TypeError 被外层 except 吞掉 → 报错看起来像「代理连不上」。这种「配了等于没配」
+# 的状态没有任何信号，只能靠一把专门的尺子去量。
+#
+# 用法：配好 Secret 后手动点一次，看 summary 里「代理可救 ✓」的条数。
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v5
+
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: 跑验收
+        env:
+          SCRAPE_PROXY: ${{ secrets.SCRAPE_PROXY }}
+        run: |
+          set +e
+          python tools/check_proxy.py 2>&1 | tee /tmp/out.txt
+          CODE=${PIPESTATUS[0]}
+          {
+            echo "## SCRAPE_PROXY 验收"
+            echo ""
+            echo '```'
+            cat /tmp/out.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $CODE
