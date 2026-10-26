@@ -87,7 +87,22 @@ URL_DATE_RE = re.compile(
 
 
 def now_iso():
-    return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    """当前时间字符串，**统一按北京时间**。
+
+    原来直接用 datetime.datetime.now()，在 GitHub Actions（UTC 环境）里写的是 UTC，
+    而 notices.db 是「本地通道（北京）+ 云端（UTC）」共写的同一个库，混在一起会错位 8 小时：
+
+      · daily_digest 按北京日期筛新公告（`date=? OR first_seen LIKE '今天%'`）。
+        云端 UTC 20:00 抓的那轮 = 北京次日 04:00，first_seen 落在"昨天"，
+        那批公告就进不了当天的日报 —— 除非它们的 date 字段恰好命中。
+      · run_all 拿 last_attempt_at 和 now() 相减算重试窗口，一北京一 UTC 会少算 8 小时，
+        失败源被过度跳过（明明过了 12 小时重试窗口，却认为还没到）。
+
+    统一成北京时间后两边口径一致。历史数据里混着 UTC 值，但只影响「重试窗口」这类
+    柔性判断，不影响已入库公告。
+    """
+    return (datetime.datetime.now(datetime.timezone.utc)
+            + datetime.timedelta(hours=8)).strftime("%Y-%m-%d %H:%M:%S")
 
 
 def _norm_title(t):
@@ -1861,7 +1876,10 @@ def run_all(limit_per_source=40, max_workers=8,
         "SELECT name, fail_streak, last_attempt_at FROM sources_status"
     ).fetchall()
     fail_info = {r[0]: {"streak": r[1] or 0, "last_attempt_at": r[2] or ""} for r in rows}
-    now_dt = datetime.datetime.now()
+    # 与 last_attempt_at（now_iso 写的北京时间）同一基准，否则云端的 UTC now()
+    # 会让 elapsed 少算 8 小时，源被过度跳过。strptime 出来是 naive，这里也去掉 tzinfo。
+    now_dt = (datetime.datetime.now(datetime.timezone.utc)
+              + datetime.timedelta(hours=8)).replace(tzinfo=None)
 
     # 清理孤儿状态行（已删除/改名源的状态残留），避免健康检查误报"长期未尝试"
     # 仅在全量运行时执行：only_region/exclude_region 会把 sources 缩成子集，
