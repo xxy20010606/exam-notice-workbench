@@ -205,13 +205,14 @@
     "extra_urls": [
       {
         "url": "http://jshrss.jiangsu.gov.cn/col/col92919/index.html",
-        "method": "browser"
+        "method": "jpage"
       },
       "http://jshrss.jiangsu.gov.cn/col/col92920/index.html"
     ],
     "method": "http",
     "title_include": "考试录用|公务员招录|公务员招考|录用公务员|简章|大纲|职位表|专业参考目录",
-    "title_exclude": "资格|职称|执业|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考|体检|回避|奖励|处分|申诉|试用期|刑法|解释|复函|办法|规定"
+    "title_exclude": "资格|职称|执业|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考|体检|回避|奖励|处分|申诉|试用期|刑法|解释|复函|办法|规定",
+    "note": "2026-10-26：col92919「岗位信息」原本是 {\"method\":\"browser\"}，因为该栏目列表由 jpage 组件渲染。现改用 method=jpage（columnid=92919/unitid=325505），纯 http 即可，lite 模式（无 playwright）也能跑——原先本地通道每次都报「[extra_urls] 子栏目失败：Playwright 模块未安装」。该栏目 totalRecord 只有 3 条（职位表就几份），所以产出没有变化，收益是去掉一个浏览器依赖。"
   },
   {
     "name": "浙江-省考",

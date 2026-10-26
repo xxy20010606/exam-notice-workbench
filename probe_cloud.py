@@ -191,6 +191,25 @@ def main():
             err = (s.get("error") or "").strip().splitlines()
             err = (err[0][:80] if err else "—").replace("|", "\\|")
             md.append(f"| {s.get('name')} | {s.get('region')} | {err} |")
+    # 全量明细：以前 summary 只列失败源，看不出「哪个源抓到了几条」——
+    # 每次都要回头翻原始日志才知道新修的源到底有没有产出。直接铺一张全量表。
+    if ran:
+        md.append("")
+        md.append(f"### 全部 {len(ran)} 个源明细（按产出倒序）")
+        md.append("")
+        md.append("| 源 | 地区 | 产出 | 状态 |")
+        md.append("|---|---|---|---|")
+        for s in sorted(ran, key=lambda x: (0 if x.get("error") else 1,
+                                            -(x.get("count") or 0),
+                                            x.get("name") or "")):
+            if s.get("error"):
+                state = "✗ 失败"
+            elif (s.get("count") or 0) > 0:
+                state = "✓"
+            else:
+                state = "零产出"
+            md.append(f"| {s.get('name')} | {s.get('region')} | "
+                      f"{s.get('count') or 0} | {state} |")
     summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary_file:
         try:
