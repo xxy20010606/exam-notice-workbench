@@ -12,11 +12,55 @@
 安全性：不写 sources_status、不提交任何文件（对应 workflow 里没有 commit 步骤）。
 跑完只打印报告，库改动随 runner 销毁。
 """
+import collections
 import os
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import scraper  # noqa: E402
+
+
+def expected_names(only_region=None):
+    """按 sources.json 算出「本轮应该出现在的报告里」的源名，用于完整性自检。"""
+    import json
+    here = os.path.dirname(os.path.abspath(__file__))
+    d = json.load(open(os.path.join(here, "sources.json"), encoding="utf-8"))
+    srcs = d["sources"] if isinstance(d, dict) else d
+    if only_region:
+        srcs = [s for s in srcs if only_region in (s.get("region") or "")]
+    return [s["name"] for s in srcs if s.get("enabled", True) is not False]
+
+
+def check_integrity(all_src, only_region=None):
+    """校验报告条目与源配置是否一一对应。返回 (问题描述列表, 去重后的条目)。
+
+    为什么需要这一步：2026-10-26 run #8 的「零产出 2 个」里出现了两行**一模一样**
+    的源名（江苏镇江-人社招聘搜索）。当时的直接后果是把它误读成「还有两个源在云端
+    掉成 0」，白查一轮。这类重复既虚增计数，也往往意味着有源没被报告出来
+    （真故障被藏起来）。靠人眼对 15 行表格数不出这种事，只能让脚本自己喊。
+    """
+    problems = []
+    names = [x.get("name") for x in all_src]
+    cnt = collections.Counter(names)
+    dup = [n for n, c in cnt.items() if c > 1 and n]
+    exp = expected_names(only_region)
+    missing = [n for n in exp if n not in cnt]
+    if len(all_src) != len(exp):
+        problems.append(f"报告 {len(all_src)} 条 ≠ 配置 {len(exp)} 个源")
+    if dup:
+        problems.append("重名源：" + "、".join(dup))
+    if missing:
+        problems.append("配置里有但报告缺失：" + "、".join(missing))
+    if dup:
+        # 同名只留一条：优先保留带 error 的（失败比 0 产出更严重），否则保留第一条
+        keep = {}
+        for x in all_src:
+            n = x.get("name")
+            prev = keep.get(n)
+            if prev is None or (x.get("error") and not prev.get("error")):
+                keep[n] = x
+        all_src = list(keep.values())
+    return problems, all_src
 
 
 def http_on_browser(only_region=None):
@@ -139,6 +183,7 @@ def main():
                              only_region=args.only_region,
                              skip_browser=args.skip_browser)
     all_src = report.get("sources", [])
+    problems, all_src = check_integrity(all_src, args.only_region)
     skipped = [s for s in all_src if s.get("skipped")]
     ran = [s for s in all_src if not s.get("skipped")]
     failed = [s for s in ran if s.get("error")]
@@ -152,6 +197,11 @@ def main():
     print(f"  成功 {len(ok)} 个（其中有产出 {len(has_data)}，零产出 {len(zero)}）")
     print(f"  失败 {len(failed)} 个")
     print("-" * 64)
+    if problems:
+        print()
+        print("### ⚠️ 报告完整性异常 —— 下面的数字可能不可信")
+        for p in problems:
+            print(f"  ! {p}")
 
     if failed:
         print()
@@ -183,6 +233,11 @@ def main():
     md.append(f"- 实际尝试 **{len(ran)}** 个源，跳过 {len(skipped)} 个")
     md.append(f"- 成功 **{len(ok)}**（有产出 {len(has_data)} / 零产出 {len(zero)}）")
     md.append(f"- 失败 **{len(failed)}**")
+    if problems:
+        md.append("")
+        md.append("> ⚠️ **报告完整性异常，以下数字可能不可信**")
+        for p in problems:
+            md.append(f"> - {p}")
     # 全量明细：以前 summary 只列失败源，看不出「哪个源抓到了几条」——
     # 每次都要回头翻原始日志才知道新修的源到底有没有产出。直接铺一张全量表。
     # 放在失败详情表**前面**：这张表才是「一眼看完谁通谁不通」的总览，
