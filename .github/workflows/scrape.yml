@@ -114,6 +114,29 @@ jobs:
       - name: 部署 Pages
         uses: actions/deploy-pages@v5
 
+      # ---------- 失败告警：整轮挂掉必须让手机响一声 ----------
+      # 为什么补这一步：2026-10-26 给 sources.json 加了 method=jpage/jpaas，
+      # 但 validate_sources.py 的白名单没同步 —— 于是「校验」这一**第一步**就退出 1，
+      # 后面抓取、体检、提交、部署全被跳过。而全流程唯一的告警是 health_check 那条
+      # ——它排在校验后面，根本没机会运行。结果就是：云端连续几轮一个源都没抓，
+      # 手机上却什么通知都没有，只能靠人自己翻 Actions 列表才发现。
+      # 铁律是「电脑不开机，手机点链接就得看到当天最新的」，那么「没更新」这件事
+      # 必须比「更新了」更响。放在 job 最后 + if: failure()，任何一步失败都覆盖。
+      - name: 失败告警（任一环节挂掉都推微信）
+        if: failure()
+        env:
+          SERVERCHAN_KEY: ${{ secrets.SERVERCHAN_KEY }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$SERVERCHAN_KEY" ]; then
+            echo "[告警] 未配置 SERVERCHAN_KEY，跳过"
+            exit 0
+          fi
+          curl -s -X POST "https://sctapi.ftqq.com/${SERVERCHAN_KEY}.send" \
+            --data-urlencode "title=公考看板云端抓取失败，今天不会更新" \
+            --data-urlencode "desp=本轮 workflow 有步骤返回失败，抓取/提交/部署可能整段被跳过。日志：${RUN_URL}" \
+            -o /dev/null -w "[告警] HTTP %{http_code}\n"
+
   # ---------- WorkBuddy 国内通道：国内自动化 push 的数据 commit 只重建看板并部署 ----------
   # 国内自动化（WorkBuddy 沙箱，中国出口 IP）抓取非 browser 源并 push notices.db/index.html，
   # message 含「WorkBuddy国内抓取」。此 job 不抓取，仅用最新库重建看板并发布 Pages，

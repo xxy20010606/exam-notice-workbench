@@ -28,7 +28,15 @@ SOURCES = os.path.join(ROOT, "sources.json")
 REGEX_KEY_RE = re.compile(r"(include|exclude|regex|_re|_pattern)$", re.IGNORECASE)
 # api 用于纯 HTTP JSON API 分页源（福建统一平台）；manda 用于上海站群站内搜索(POST JSON)
 # jsptsearch 用于江苏站群 search4 站内搜索(GET SSR, 如苏州市人社局招聘检索)
-VALID_METHODS = {"http", "browser", "api", "manda", "jsptsearch", "jsonapi", "gwycolumn"}
+# jpage 用于江苏政务网统一 CMS 的 dataproxy.jsp 列表接口（一个请求 300 条）
+# jpaas 用于汉王 jpaas-publish-server 列表接口（泰州/扬州/浙江多市）
+# ↑ 这两个是 2026-10-26 新增的。**加 method 必须同步改这里**：scrape.yml 第一件事
+#   就是跑本脚本，漏改会让整个云端抓取在校验步骤直接退出，一个源都不抓，
+#   而且报错藏在 workflow 的第一屏，很容易被当成「站点又改版了」去查源。
+VALID_METHODS = {"http", "browser", "api", "manda", "jsptsearch", "jsonapi",
+                 "gwycolumn", "jpage", "jpaas"}
+# 接口源的分页参数：正整数，有上限（jpaas 实测 pageSize 传 200 会被服务端压回 99）
+INT_OPTS = {"jpage_pages": (1, 20), "jpaas_pages": (1, 20), "jpaas_page_size": (1, 200)}
 VALID_WAIT_UNTIL = {"load", "domcontentloaded", "networkidle"}
 VALID_URL_RE = re.compile(r"^https?://[^\s/]+", re.IGNORECASE)
 
@@ -76,7 +84,15 @@ def main():
         # method
         method = s.get("method")
         if method is not None and method not in VALID_METHODS:
-            errors.append(f"{tag} method 非法: {method!r}（应为 http/browser）")
+            errors.append(f"{tag} method 非法: {method!r}（合法值：{'/'.join(sorted(VALID_METHODS))}）")
+
+        # 接口源的分页参数：必须是落在区间内的整数
+        for k, (lo, hi) in INT_OPTS.items():
+            if k not in s:
+                continue
+            v = s[k]
+            if not isinstance(v, int) or isinstance(v, bool) or not (lo <= v <= hi):
+                errors.append(f"{tag} {k} 必须是 {lo}~{hi} 的整数（当前: {v!r}）")
 
         # 正则类字段（值为 null/None 表示禁用，合法；非空字符串必须能编译）
         for k, v in s.items():
