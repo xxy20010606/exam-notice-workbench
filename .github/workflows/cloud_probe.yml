@@ -48,6 +48,12 @@ jobs:
         # 与 scrape.yml 保持一致：不缓存浏览器，每轮现装。
         # 缓存 key 用 hashFiles('requirements.txt') 而该文件不锁版本，会永久命中旧浏览器，
         # 导致 34 个 browser 源在云端静默失效（详见 scrape.yml 里的踩坑注释）。
+        #
+        # 但**跳过 browser 源时就不要装了**：--with-deps 会 apt 装 libnss3 等一大串系统库，
+        # 单这一步就要 8 分钟左右。之前不论参数怎么传都装，于是
+        # 「only_region=江苏 + skip_browser」这种一秒都不跑浏览器的探针也要 13 分钟，
+        # 而实际跑源只用了 5 分钟。http_on_browser 模式同理（它是用纯 http 取页面）。
+        if: "${{ inputs.skip_browser != true && inputs.http_on_browser != true }}"
         run: python -m playwright install --with-deps chromium
 
       - name: 跑探针（不写状态 / 不提交）

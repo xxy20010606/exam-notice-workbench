@@ -183,24 +183,20 @@ def main():
     md.append(f"- 实际尝试 **{len(ran)}** 个源，跳过 {len(skipped)} 个")
     md.append(f"- 成功 **{len(ok)}**（有产出 {len(has_data)} / 零产出 {len(zero)}）")
     md.append(f"- 失败 **{len(failed)}**")
-    if failed:
-        md.append("")
-        md.append("| 失败源 | 地区 | 错误 |")
-        md.append("|---|---|---|")
-        for s in sorted(failed, key=lambda x: x.get("name") or ""):
-            err = (s.get("error") or "").strip().splitlines()
-            err = (err[0][:80] if err else "—").replace("|", "\\|")
-            md.append(f"| {s.get('name')} | {s.get('region')} | {err} |")
     # 全量明细：以前 summary 只列失败源，看不出「哪个源抓到了几条」——
     # 每次都要回头翻原始日志才知道新修的源到底有没有产出。直接铺一张全量表。
+    # 放在失败详情表**前面**：这张表才是「一眼看完谁通谁不通」的总览，
+    # 放后面会掉到首屏之外，每次都得往下滚才看得到。
     if ran:
         md.append("")
-        md.append(f"### 全部 {len(ran)} 个源明细（按产出倒序）")
+        md.append(f"### 全部 {len(ran)} 个源明细（按产出倒序，表格最下面就是要处理的）")
         md.append("")
         md.append("| 源 | 地区 | 产出 | 状态 |")
         md.append("|---|---|---|---|")
-        for s in sorted(ran, key=lambda x: (0 if x.get("error") else 1,
-                                            -(x.get("count") or 0),
+        # 排序：产出降序；同为 0 产出时把「失败」排在「零产出」前面（更严重）；
+        # 再按名字稳定排序。这样表格底部天然聚齐了所有该看的行。
+        for s in sorted(ran, key=lambda x: (-(x.get("count") or 0),
+                                            0 if x.get("error") else 1,
                                             x.get("name") or "")):
             if s.get("error"):
                 state = "✗ 失败"
@@ -210,6 +206,17 @@ def main():
                 state = "零产出"
             md.append(f"| {s.get('name')} | {s.get('region')} | "
                       f"{s.get('count') or 0} | {state} |")
+    # 失败源的具体报错放在最后：明细表已经标出「✗ 失败」，这里补的是错误原因
+    if failed:
+        md.append("")
+        md.append(f"### 失败源错误详情（{len(failed)} 个）")
+        md.append("")
+        md.append("| 失败源 | 地区 | 错误 |")
+        md.append("|---|---|---|")
+        for s in sorted(failed, key=lambda x: x.get("name") or ""):
+            err = (s.get("error") or "").strip().splitlines()
+            err = (err[0][:80] if err else "—").replace("|", "\\|")
+            md.append(f"| {s.get('name')} | {s.get('region')} | {err} |")
     summary_file = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary_file:
         try:
