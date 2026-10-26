@@ -79,6 +79,32 @@ def http_on_browser(only_region=None):
     print(f"http 都不可达：{len(dead)} 个（海外 IP 封锁，只能代理或本地通道）")
     for n in dead:
         print(f"    · {n}")
+
+    # 也写一份到 workflow summary。第一版漏了这个，跑完页面是空的，
+    # 只能点进 probe 步骤翻日志才看得到结论。
+    md = ["## 纯 http 直取（对 browser 源）", "",
+          f"- 测试 **{len(srcs)}** 个源" +
+          (f"（地区含「{only_region}」）" if only_region else ""),
+          f"- 可改 http 直接可用 **{len(usable)}** 个",
+          f"- http 通了但解析 0 条 **{len(empty)}** 个",
+          f"- http 都不可达 **{len(dead)}** 个（海外 IP 封锁）"]
+    if usable:
+        md += ["", "### 可改 http 直接可用", "", "| 源 | 命中条数 |", "|---|---|"]
+        md += [f"| {n} | {c} |" for n, c in usable]
+    if empty:
+        md += ["", "### http 通了但解析 0 条（需调 container / 正则）", ""]
+        md += [f"- {n}" for n in empty]
+    if dead:
+        md += ["", "### http 都不可达（只能代理或本地通道）", ""]
+        md += [f"- {n}" for n in dead]
+    sf = os.environ.get("GITHUB_STEP_SUMMARY")
+    if sf:
+        try:
+            with open(sf, "a", encoding="utf-8") as f:
+                f.write("\n".join(md) + "\n")
+            print("\n[探针] 已写入 GITHUB_STEP_SUMMARY")
+        except Exception as e:
+            print(f"[探针] 写 summary 失败：{e}")
     return 0
 
 
