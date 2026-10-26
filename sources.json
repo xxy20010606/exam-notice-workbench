@@ -871,7 +871,7 @@
     "page_url_template": "https://rsj.sh.gov.cn/tsydwgkzp_17406/index_{page}.html",
     "max_pages": 60,
     "limit": 500,
-    "note": "上海市事业单位公开招聘公告主平台。2026-10-22 修复：该栏目标注 totalPage=550，翻页靠 pagination.min.js 的 location.href=\"index_\"+i+\".html\" 动态跳转，页面上没有 <a href=\"index_2.html\"> 这类静态分页链接，所以原来只抓第 1 页（6 条/页），库里 54 条是首页快照的历史累积。已配 page_url_template + max_pages=40（约近一年）+ limit=400。"
+    "note": "上海市事业单位公开招聘公告主平台。2026-10-22 修复：该栏目标注 totalPage=550，翻页靠 pagination.min.js 的 location.href=\"index_\"+i+\".html\" 动态跳转，页面上没有 <a href=\"index_2.html\"> 这类静态分页链接，所以原来只抓第 1 页（6 条/页），库里 54 条是首页快照的历史累积。已配 page_url_template + max_pages=60（约近一年）+ limit=500。2026-10-26 复核页数：实测 60 页 = 1380 条候选 → 264 条真公告，覆盖 2025-12-10~2026-10-23（10 个月）；砍到 20 页只剩 72 条（2026-07-07 起，3.5 个月），只省 7 秒却丢 192 条 —— 不划算，所以 max_pages 保持 60 不动，改的是 scraper 的翻页方式（8 路并发，60 页 15.4s → 4.3s，产出零变化）。"
   },
   {
     "name": "上海-宝山区-事业单位",
