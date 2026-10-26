@@ -16,6 +16,10 @@ on:
         description: '跳过 browser 源（只测 http/api，1-2 分钟出结果）'
         type: boolean
         default: false
+      http_on_browser:
+        description: '对 browser 源改用纯 http 直取（判断是网络封锁还是只有浏览器不通）'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -56,6 +60,9 @@ jobs:
           fi
           if [ "${{ inputs.skip_browser }}" = "true" ]; then
             ARGS="$ARGS --skip-browser"
+          fi
+          if [ "${{ inputs.http_on_browser }}" = "true" ]; then
+            ARGS="$ARGS --http-on-browser"
           fi
           echo "探针参数：${ARGS:-（全量）}"
           python probe_cloud.py $ARGS

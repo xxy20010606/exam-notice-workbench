@@ -19,6 +19,69 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import scraper  # noqa: E402
 
 
+def http_on_browser(only_region=None):
+    """对 method=browser 的源，改用**纯 http** 试一次并解析。
+
+    回答一个卡住判断的问题：这些站在云端是「彻底不可达」，还是「只有浏览器不通」？
+
+    · 如果 http 能拿到并解析出条目 → 说明站是服务端渲染，把源从 browser 改成 http
+      就能在云端工作，13 个浙江源、乃至 34 个 browser 源里的一大批都能救回来。
+    · 如果 http 也超时 → 就是海外 IP 在 TCP 层被封锁，代码解决不了，
+      只能配 SCRAPE_PROXY 走国内代理，或者接受「这些源只在本地通道补」。
+
+    为什么值得单独测：浏览器会加载 CSS/JS/图片，主文档能通、子资源被封也会表现为
+    整体 Timeout；纯 http 只取一个 HTML，能更干净地判断网络可达性。
+    """
+    import json
+    import time as _t
+
+    here = os.path.dirname(os.path.abspath(__file__))
+    d = json.load(open(os.path.join(here, "sources.json"), encoding="utf-8"))
+    srcs = [s for s in (d["sources"] if isinstance(d, dict) else d)
+            if s.get("method", "http") == "browser" and s.get("enabled", True)]
+    if only_region:
+        srcs = [s for s in srcs if only_region in (s.get("region") or "")]
+
+    print()
+    print("=" * 64)
+    print(f"纯 http 直取测试：{len(srcs)} 个 browser 源" +
+          (f"（地区含「{only_region}」）" if only_region else "（全部）"))
+    print("=" * 64)
+
+    usable, empty, dead = [], [], []
+    for s in srcs:
+        t0 = _t.time()
+        try:
+            html = scraper.fetch_http(s["url"], timeout=20, retries=0)
+            st = {}
+            items = scraper.parse_source(s, html, st)
+            dt = _t.time() - t0
+            raw = st.get("raw", 0)
+            if items:
+                print(f"  ✅ {s['name']}: HTML {len(html)}B / 候选 {raw} / 命中 {len(items)} 条  ({dt:.1f}s)")
+                usable.append((s["name"], len(items)))
+            else:
+                print(f"  ⚠️ {s['name']}: HTML {len(html)}B / 候选 {raw} / 命中 0  ({dt:.1f}s)")
+                empty.append(s["name"])
+        except Exception as e:
+            msg = str(e).strip().splitlines()
+            print(f"  ✗ {s['name']}: {(msg[0] if msg else '')[:90]}")
+            dead.append(s["name"])
+
+    print()
+    print("-" * 64)
+    print(f"可改 http 直接可用：{len(usable)} 个")
+    for n, c in usable:
+        print(f"    · {n}（{c} 条）")
+    print(f"http 通了但解析 0 条：{len(empty)} 个（需调 container/正则）")
+    for n in empty:
+        print(f"    · {n}")
+    print(f"http 都不可达：{len(dead)} 个（海外 IP 封锁，只能代理或本地通道）")
+    for n in dead:
+        print(f"    · {n}")
+    return 0
+
+
 def main():
     import argparse
     ap = argparse.ArgumentParser(description="云端可达性探针")
@@ -28,7 +91,13 @@ def main():
                          "分区跑是更快拿到结论的办法。")
     ap.add_argument("--skip-browser", action="store_true",
                     help="跳过 browser 源，只测 http/api/jsonapi 等轻量源（1-2 分钟出结果）")
+    ap.add_argument("--http-on-browser", action="store_true",
+                    help="对 browser 源改用纯 http 直取并解析，判断是「网站不可达」"
+                         "还是「只有浏览器不通」")
     args = ap.parse_args()
+
+    if args.http_on_browser:
+        return http_on_browser(args.only_region)
 
     scope = []
     if args.only_region:
