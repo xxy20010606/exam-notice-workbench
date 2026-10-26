@@ -1010,13 +1010,11 @@
     "name": "上海-虹口区-事业单位",
     "category": "事业编",
     "region": "上海",
-    "url": "https://www.shhk.gov.cn/",
-    "method": "browser",
+    "url": "https://www.shhk.gov.cn/xwzx/002002/moreinfo.html",
+    "method": "http",
     "title_include": "招聘|招考|招录|引进|遴选|选调",
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|未达开考|开考比例|达不到开考|取消开考|岗位未达开考|开考比例|达不到开考|取消开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
-    "browser_wait": 10000,
-    "browser_wait_until": "domcontentloaded",
-    "browser_timeout": 30000
+    "note": "2026-10-26 修复：原 url 填的是**区政府首页** https://www.shhk.gov.cn/（81KB 但全是导航，一条招聘公告都没有），所以这个源一直是 0 条。改抓「新闻中心/公示公告」栏目 moreinfo.html，该页是纯 SSR，http 直取就能解析。20 条/页约覆盖 7 周，配合每日抓取不会漏。该栏目混着规划公示/加装电梯/人才驿站等大量非招聘噪声，靠 title_include 只认招聘动词挡掉。"
   },
   {
     "name": "上海-杨浦区-事业单位",
