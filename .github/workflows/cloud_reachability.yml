@@ -1,0 +1,114 @@
+name: 云端可达性普查（落盘报告）
+
+# 目的：回答「电脑不开机时，手机上看板里到底有多少是当天的」。
+# 做法：在 Actions（海外 IP）里把**全部启用源**真连一遍，结果写成仓库文件。
+#
+# 为什么要单独一个 workflow、而且要把结果提交进仓库：
+#   以前云端可达性只存在于 Actions 控制台日志里 —— 会过期、要看就得点网页翻，
+#   脚本和看板都读不到，于是每次讨论「哪些源只能本地补」都靠记忆和零散截图。
+#   落成 reports/ 下的文件后，任何一次判断都有据可查。
+#
+# 提交到独立分支 probe-report（force），不碰 main：
+#   · main 上有 scrape.yml 在写 notices.db，同分支并行提交必然打架；
+#   · 报告是「观测数据」，不该跟着产品代码一起走发布。
+#
+# 触发：手动点，或改 tools/probe-trigger.txt 后 push（换一行内容即可）。
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'tools/probe-trigger.txt'
+
+permissions:
+  contents: write
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    # 轻量源 ~58 个并发跑，浏览器源 ~34 个串行 http 探测（每个最长 20s）。
+    # 装 Playwright 那 8 分钟这里不需要：两趟都走纯 http。
+    timeout-minutes: 60
+    concurrency:
+      group: reachability-census
+      cancel-in-progress: true
+    steps:
+      - name: 检出仓库
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: 配置 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: requirements.txt
+
+      - name: 安装依赖
+        run: pip install -r requirements.txt
+
+      - name: 普查一：全部轻量源（http/api/jsonapi/manda/jsptsearch/jpage/jpaas）
+        continue-on-error: true
+        env:
+          SCRAPE_PROXY: ${{ secrets.SCRAPE_PROXY }}
+        run: |
+          python probe_cloud.py --skip-browser \
+            --json-out reports/cloud_reachability.json 2>&1 | tee /tmp/light.log
+
+      - name: 普查二：浏览器源的纯 http 可达性
+        continue-on-error: true
+        env:
+          SCRAPE_PROXY: ${{ secrets.SCRAPE_PROXY }}
+        run: |
+          python probe_cloud.py --http-on-browser \
+            --json-out reports/cloud_reachability_browser.json 2>&1 | tee /tmp/brow.log
+
+      - name: 合成人看的报告
+        if: always()
+        run: |
+          python tools/build_reachability_md.py \
+            reports/cloud_reachability.json \
+            reports/cloud_reachability_browser.json \
+            reports/云端可达性.md || true
+
+      - name: 写进 workflow summary
+        if: always()
+        run: |
+          {
+            echo "## 云端可达性普查"
+            echo ""
+            if [ -f reports/云端可达性.md ]; then
+              cat reports/云端可达性.md
+            else
+              echo "报告生成失败，看下面的日志"
+            fi
+            echo ""
+            echo "<details><summary>轻量源原始日志（末尾 60 行）</summary>"
+            echo ""
+            echo '```'
+            tail -60 /tmp/light.log 2>/dev/null || true
+            echo '```'
+            echo "</details>"
+            echo "<details><summary>浏览器源原始日志（末尾 60 行）</summary>"
+            echo ""
+            echo '```'
+            tail -60 /tmp/brow.log 2>/dev/null || true
+            echo '```'
+            echo "</details>"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 提交到 probe-report 分支
+        if: always()
+        run: |
+          if [ ! -s reports/cloud_reachability.json ] && [ ! -s reports/cloud_reachability_browser.json ]; then
+            echo "[跳过] 两份报告都没生成，不提交"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B probe-report
+          git add -f reports/
+          git commit -m "chore(可达性普查): 云端实测 $(date +'%Y-%m-%d %H:%M') UTC"
+          git push --force origin probe-report
+          echo "[OK] 已推到 probe-report 分支：reports/云端可达性.md"

@@ -13,6 +13,8 @@
 跑完只打印报告，库改动随 runner 销毁。
 """
 import collections
+import datetime
+import json
 import os
 import sys
 
@@ -75,7 +77,26 @@ def check_integrity(all_src, only_region=None):
     return problems, all_src
 
 
-def http_on_browser(only_region=None):
+def _dump_json(obj, path):
+    """把探针结果写成 JSON。
+
+    为什么要这个：云端可达性是「哪些源不开机也能抓」的唯一依据，但以前它只存在于
+    Actions 的控制台日志里 —— 而日志会过期、要看就得点进网页翻，脚本、看板、
+    聊天里都没法引用。落成仓库文件之后，任何一次抓取前都能读到一份「上次实测结论」，
+    不要再靠记忆和零散截图推断。
+    """
+    if not path:
+        return
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="\n") as f:
+            json.dump(obj, f, ensure_ascii=False, indent=1)
+        print(f"[探针] 结果已写入 {path}")
+    except Exception as e:
+        print(f"[探针] 写 {path} 失败：{e}")
+
+
+def http_on_browser(only_region=None, json_out=None):
     """对 method=browser 的源，改用**纯 http** 试一次并解析。
 
     回答一个卡住判断的问题：这些站在云端是「彻底不可达」，还是「只有浏览器不通」？
@@ -105,6 +126,7 @@ def http_on_browser(only_region=None):
     print("=" * 64)
 
     usable, empty, dead = [], [], []
+    detail = []
     for s in srcs:
         t0 = _t.time()
         try:
@@ -116,13 +138,22 @@ def http_on_browser(only_region=None):
             if items:
                 print(f"  ✅ {s['name']}: HTML {len(html)}B / 候选 {raw} / 命中 {len(items)} 条  ({dt:.1f}s)")
                 usable.append((s["name"], len(items)))
+                detail.append({"name": s["name"], "region": s.get("region"),
+                               "verdict": "http_usable", "bytes": len(html),
+                               "raw": raw, "count": len(items), "seconds": round(dt, 1)})
             else:
                 print(f"  ⚠️ {s['name']}: HTML {len(html)}B / 候选 {raw} / 命中 0  ({dt:.1f}s)")
                 empty.append(s["name"])
+                detail.append({"name": s["name"], "region": s.get("region"),
+                               "verdict": "http_reachable_but_0", "bytes": len(html),
+                               "raw": raw, "count": 0, "seconds": round(dt, 1)})
         except Exception as e:
             msg = str(e).strip().splitlines()
             print(f"  ✗ {s['name']}: {(msg[0] if msg else '')[:90]}")
             dead.append(s["name"])
+            detail.append({"name": s["name"], "region": s.get("region"),
+                           "verdict": "http_unreachable", "error": (msg[0] if msg else "")[:200],
+                           "seconds": round(_t.time() - t0, 1)})
 
     print()
     print("-" * 64)
@@ -161,6 +192,15 @@ def http_on_browser(only_region=None):
             print("\n[探针] 已写入 GITHUB_STEP_SUMMARY")
         except Exception as e:
             print(f"[探针] 写 summary 失败：{e}")
+
+    _dump_json({"mode": "http_on_browser",
+                "run_at": datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "only_region": only_region,
+                "total": len(srcs),
+                "http_usable": [n for n, _ in usable],
+                "http_reachable_but_0": empty,
+                "http_unreachable": dead,
+                "detail": detail}, json_out)
     return 0
 
 
@@ -176,10 +216,13 @@ def main():
     ap.add_argument("--http-on-browser", action="store_true",
                     help="对 browser 源改用纯 http 直取并解析，判断是「网站不可达」"
                          "还是「只有浏览器不通」")
+    ap.add_argument("--json-out", default=None,
+                    help="把结果写成 JSON 落盘（云端提交成仓库文件后，"
+                         "本机和看板都能读到「上次实测结论」，不用翻 Actions 日志）")
     args = ap.parse_args()
 
     if args.http_on_browser:
-        return http_on_browser(args.only_region)
+        return http_on_browser(args.only_region, args.json_out)
 
     scope = []
     if args.only_region:
@@ -193,7 +236,12 @@ def main():
 
     report = scraper.run_all(write_status=False,
                              only_region=args.only_region,
-                             skip_browser=args.skip_browser)
+                             skip_browser=args.skip_browser,
+                             # 探针的目的是「普查」，不是「日常抓取」：绝不能因为
+                             # sources_status 里 fail_streak 到阈值就把源跳过 ——
+                             # 那会让报告里凭空少掉几个源，而少了的那几个恰恰是
+                             # 最容易出问题的。普查必须每个源都真连一次。
+                             force_http_retry=True)
     all_src = report.get("sources", [])
     problems, all_src = check_integrity(all_src, args.only_region)
     skipped = [s for s in all_src if s.get("skipped")]
@@ -297,6 +345,34 @@ def main():
             print("\n[探针] 已写入 GITHUB_STEP_SUMMARY")
         except Exception as e:
             print(f"[探针] 写 summary 失败：{e}")
+
+    # 落盘一份机器可读的结果。report["sources"] 里没有 method（云端只关心成功/失败），
+    # 但「这场失败是浏览器起不来，还是网络不可达」必须能分辨，所以从 sources.json 补。
+    import json as _json
+    _here = os.path.dirname(os.path.abspath(__file__))
+    _d = _json.load(open(os.path.join(_here, "sources.json"), encoding="utf-8"))
+    _srcs = _d["sources"] if isinstance(_d, dict) else _d
+    _method = {s["name"]: s.get("method", "http") for s in _srcs}
+    _dump_json({
+        "mode": "probe",
+        "run_at": report.get("run_at"),
+        "only_region": args.only_region,
+        "skip_browser": args.skip_browser,
+        "integrity_problems": problems,
+        "summary": {"ran": len(ran), "skipped": len(skipped),
+                    "has_data": len(has_data), "zero": len(zero), "failed": len(failed)},
+        "sources": [{
+            "name": s.get("name"),
+            "region": s.get("region"),
+            "category": s.get("category"),
+            "method": _method.get(s.get("name"), "http"),
+            "count": s.get("count") or 0,
+            "raw": s.get("raw"),
+            "skipped": bool(s.get("skipped")),
+            "skip_reason": s.get("skip_reason"),
+            "error": (s.get("error") or "").splitlines()[0] if s.get("error") else None,
+        } for s in all_src],
+    }, args.json_out)
 
     return 0
 
