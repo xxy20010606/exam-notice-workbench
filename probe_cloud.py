@@ -21,14 +21,22 @@ import scraper  # noqa: E402
 
 
 def expected_names(only_region=None):
-    """按 sources.json 算出「本轮应该出现在的报告里」的源名，用于完整性自检。"""
+    """按 sources.json 算出「本轮应该出现在报告里」的源名，用于完整性自检。
+
+    返回 (本轮应有的源名, sources.json 里全部启用的源数)。
+    第二个值只用来写清「少掉的那些是被 --only-region 正常排除的，还是真丢了」——
+    以前只报 `报告 17 条 ≠ 配置 92 个源`，看到的人第一反应都是「丢了 75 个源」，
+    其实绝大多数是被地区过滤排除掉的。报数字不解释来源，等于制造恐慌。
+    """
     import json
     here = os.path.dirname(os.path.abspath(__file__))
     d = json.load(open(os.path.join(here, "sources.json"), encoding="utf-8"))
     srcs = d["sources"] if isinstance(d, dict) else d
+    srcs = [s for s in srcs if s.get("enabled", True) is not False]
+    total = len(srcs)
     if only_region:
         srcs = [s for s in srcs if only_region in (s.get("region") or "")]
-    return [s["name"] for s in srcs if s.get("enabled", True) is not False]
+    return [s["name"] for s in srcs], total
 
 
 def check_integrity(all_src, only_region=None):
@@ -43,10 +51,14 @@ def check_integrity(all_src, only_region=None):
     names = [x.get("name") for x in all_src]
     cnt = collections.Counter(names)
     dup = [n for n, c in cnt.items() if c > 1 and n]
-    exp = expected_names(only_region)
+    exp, total = expected_names(only_region)
     missing = [n for n in exp if n not in cnt]
     if len(all_src) != len(exp):
-        problems.append(f"报告 {len(all_src)} 条 ≠ 配置 {len(exp)} 个源")
+        tail = ""
+        if total != len(exp):
+            tail = (f"（sources.json 共 {total} 个启用源，其中 {total - len(exp)} 个"
+                    f"被 --only-region 排除，不参与本轮）")
+        problems.append(f"报告 {len(all_src)} 条 ≠ 本轮应有 {len(exp)} 个源{tail}")
     if dup:
         problems.append("重名源：" + "、".join(dup))
     if missing:
@@ -194,8 +206,12 @@ def main():
     print()
     print("-" * 64)
     print(f"实际尝试 {len(ran)} 个源 | 跳过 {len(skipped)} 个")
-    print(f"  成功 {len(ok)} 个（其中有产出 {len(has_data)}，零产出 {len(zero)}）")
-    print(f"  失败 {len(failed)} 个")
+    # 三个桶必须刚好拼成「已尝试」。分开写三个数字时，人是不会去加它们的——
+    # 2026-10-26 浙江探针的 summary 就摆着「实际尝试 10 / 成功 2 / 失败 6」，
+    # 差 2 个谁也没发现。这里直接把加法写出来，缺口一眼可见。
+    print(f"  有产出 {len(has_data)} + 零产出 {len(zero)} + 失败 {len(failed)}"
+          f" = {len(has_data) + len(zero) + len(failed)}"
+          f"{'  ← 与已尝试不一致，报告不可信' if len(has_data) + len(zero) + len(failed) != len(ran) else ''}")
     print("-" * 64)
     if problems:
         print()
@@ -230,9 +246,10 @@ def main():
     md.append("## 云端（海外 IP）抓取可达性")
     md.append("")
     md.append(f"- 范围：`{' '.join(sys.argv[1:]) or '全量'}`")
-    md.append(f"- 实际尝试 **{len(ran)}** 个源，跳过 {len(skipped)} 个")
-    md.append(f"- 成功 **{len(ok)}**（有产出 {len(has_data)} / 零产出 {len(zero)}）")
-    md.append(f"- 失败 **{len(failed)}**")
+    md.append(f"- 已尝试 **{len(ran)}** 个源（跳过 {len(skipped)} 个）"
+              f" = 有产出 {len(has_data)} + 零产出 {len(zero)} + 失败 {len(failed)}")
+    if len(has_data) + len(zero) + len(failed) != len(ran):
+        md.append("> ❌ **上面这行加法不成立 —— 有源既没成功也没报错，明细表可能缺行**")
     if problems:
         md.append("")
         md.append("> ⚠️ **报告完整性异常，以下数字可能不可信**")

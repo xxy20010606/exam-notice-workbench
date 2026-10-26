@@ -1137,6 +1137,72 @@ def _raw_fetch(url, method, encoding=None, browser_wait=3000, browser_wait_until
     return fetch_http(url, encoding=encoding, timeout=http_timeout, ip_family=ip_family)
 
 
+def _reach_gate(url, timeout=6, ip_family=None):
+    """接口源的前置闸门：先用 6s 判一次「这个域在当前出口最基础的那层通不通」。
+
+    为什么需要：`_ssl.c:999 handshake operation timed out` 这类失败**不是慢，是
+    传输层被丢包**（国内 gov 站对海外 IP 的典型做法），但 urllib 只能靠 socket
+    timeout 兜底，于是一个死源要耗 `timeout × (retries+1) + 退避`。
+    实测 2026-10-26 浙江探针：8 个接口源全是这个错，单源近 65 秒，
+    整轮 1 分 59 秒——其中 90% 的时间在等一个注定不会完成的握手。
+
+    这里先花最多 6 秒做一次最便宜的连通性探测：
+      · https 源 → TCP 连上后再走一遍真实 TLS 握手（两道都过才算活）；
+      · http 源  → 只做 TCP connect。很多政务站 http 会自动跳 https，
+        跳过去才炸 TLS；只测 TCP 挡不住那一层，但能挡住「整台机器不可达」
+        这最常见的一种，且绝不会把「http 正常、443 被封」的源误判死。
+    通 → 正常往下走，多出来的开销 0.1~0.3s；
+    不通 → 立刻抛，整个源 ≤6s 收工，报错文案直接点名是哪一层不通，
+           不用再靠猜「是超时、是改版、还是反爬」。
+
+    配了 SCRAPE_PROXY 就直接跳过：直连不通是预期内的，代理出口可能正好通，
+    提前判死会把本来能救的源判掉。
+    """
+    import ssl, socket as _s
+    pp = urllib.parse.urlsplit(url)
+    if not pp.hostname:
+        return
+    if os.environ.get("SCRAPE_PROXY", "").strip():
+        return
+    is_tls = pp.scheme == "https"
+    port = pp.port or (443 if is_tls else 80)
+    ctx = None
+    if is_tls:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        if hasattr(ssl, "OP_LEGACY_SERVER_CONNECT"):
+            try:
+                ctx.options |= ssl.OP_LEGACY_SERVER_CONNECT
+            except Exception:
+                pass
+    # 与 fetch_http 保持同一套协议族约定：默认强制 IPv4（Actions 上优先 IPv6 会误判死）
+    _orig = _s.getaddrinfo
+    fam = (ip_family or "ipv4").strip().lower()
+
+    def _only(host, p, family=0, *a, **kw):
+        return _orig(host, p, _s.AF_INET if family == 0 else family, *a, **kw)
+
+    layer = "TLS 握手" if is_tls else "TCP 连接"
+    try:
+        if fam != "auto":
+            _s.getaddrinfo = _only
+        sock = _s.create_connection((pp.hostname, port), timeout=timeout)
+        try:
+            if is_tls:
+                ctx.wrap_socket(sock, server_hostname=pp.hostname).close()
+        finally:
+            try:
+                sock.close()
+            except Exception:
+                pass
+    except Exception as e:
+        raise RuntimeError(f"{layer} {timeout}s 内未完成（{pp.hostname}:{port}）"
+                           f"，判定该域对当前出口不可达：{str(e)[:110]}")
+    finally:
+        _s.getaddrinfo = _orig
+
+
 # ---------------- 江苏政务网 jpage 列表接口 ----------------
 # 江苏（以及不少同源 CMS 的市局站）栏目页长这样：
 #   <div id="325517"><script type="text/xml"><datastore>...</datastore></script></div>
@@ -1168,7 +1234,9 @@ def fetch_jpage(url, pages=3, timeout=20, ip_family=None, proxy_path=None):
     退化策略：扒不到 param 或接口不通时，直接返回栏目页原始 HTML ——
     至少保住首屏那 20 条静态条目，不会因为接口改版把整个源打成 0 条。
     """
-    index_html = fetch_http(url, timeout=timeout, ip_family=ip_family)
+    # retries=1（默认 2）：首页这一发是「通就 1s 内通，不通就是死源」的语义，
+    # 第三次重试只是在给 TLS 丢包多付一个 timeout + 1.5s 退避，见 _reach_gate 说明。
+    index_html = fetch_http(url, timeout=timeout, ip_family=ip_family, retries=1)
     m = re.search(r"/col/(col)?(\d+)", url)
     want_col = m.group(2) if m else ""
     params = []
@@ -1275,7 +1343,9 @@ def fetch_jpaas(url, pages=2, page_size=100, timeout=20, ip_family=None):
     自动从栏目页里找「带 queryData 的 script」拿到接口地址与栏目参数，
     不硬编码 webId/pageId —— 站点换模板换了 id 也不会静默失效。
     """
-    index_html = fetch_http(url, timeout=timeout, ip_family=ip_family)
+    # retries=1（默认 2）：首页这一发是「通就 1s 内通，不通就是死源」的语义，
+    # 第三次重试只是在给 TLS 丢包多付一个 timeout + 1.5s 退避，见 _reach_gate 说明。
+    index_html = fetch_http(url, timeout=timeout, ip_family=ip_family, retries=1)
     api_url, qd = "", {}
     for sm in JPAAS_SCRIPT_RE.finditer(index_html):
         attrs = dict(JPAAS_ATTR_RE.findall(sm.group(1)))
@@ -1345,23 +1415,31 @@ def fetch(source):
     # 一个请求拿 300 条，比点 8 页又快又全，而且云端也能跑。
     if method == "jpage":
         try:
+            _reach_gate(source["url"], ip_family=ip_family)
             return fetch_jpage(source["url"], pages=int(source.get("jpage_pages", 3)),
                                timeout=http_timeout, ip_family=ip_family,
                                proxy_path=source.get("jpage_proxy_path"))
         except Exception as e:
-            # 接口整个不通 → 退回普通 http，保住首屏静态条目，别让源直接归零
-            print(f"[jpage] 接口不可用（{str(e)[:80]}），改走普通 http")
-            return _raw_fetch(source["url"], "http", encoding=encoding, ip_family=ip_family)
+            # 不在这里退回普通 http。理由：fetch_jpage 内部已经把「拿到页面但接口
+            # 返回 0 条」这种情况降级成返回静态首屏了，能走到这个 except 的只剩
+            # 网络层失败（超时/TLS 握手失败/拒连）。而普通 http 打的是同一个域名，
+            # 必然一样失败，白等一轮重试。
+            # 实测样本：2026-10-26 浙江探针，6 个 zj.gov.cn 系的 jpaas 源全部
+            # `_ssl.c:999 handshake operation timed out`，每个源因为这次多余的
+            # 回退多耗十几秒，8 个源跑了 1 分 59 秒。
+            print(f"[jpage] 接口不可用（{str(e)[:80]}）→ 不再重试同域名的普通 http")
+            raise
     # jpaas：汉王 CMS（泰州等江苏市级站）。同 jpage，也是「栏目页只有壳，
     # 列表靠接口」的站，但接口与分页方式完全不同，故单独一条路径。
     if method == "jpaas":
         try:
+            _reach_gate(source["url"], ip_family=ip_family)
             return fetch_jpaas(source["url"], pages=int(source.get("jpaas_pages", 2)),
                                page_size=int(source.get("jpaas_page_size", 100)),
                                timeout=http_timeout, ip_family=ip_family)
         except Exception as e:
-            print(f"[jpaas] 接口不可用（{str(e)[:80]}），改走普通 http")
-            return _raw_fetch(source["url"], "http", encoding=encoding, ip_family=ip_family)
+            print(f"[jpaas] 接口不可用（{str(e)[:80]}）→ 不再重试同域名的普通 http")
+            raise
     html = _raw_fetch(source["url"], method, encoding=encoding,
                       browser_wait=browser_wait, browser_wait_until=browser_wait_until,
                       browser_timeout=browser_timeout, http_timeout=http_timeout,
