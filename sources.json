@@ -83,7 +83,9 @@
     "url": "https://rsj.longyan.gov.cn/zwgk/gggs/",
     "method": "http",
     "title_include": "20\\d{2}年.*招聘|事业单位公开招聘|公开招聘事业单位|招聘.{0,15}(公告|简章|通告|工作人员|人)",
-    "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|未达开考|开考比例|达不到开考|取消开考|岗位未达开考|开考比例|达不到开考|取消开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$"
+    "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|未达开考|开考比例|达不到开考|取消开考|岗位未达开考|开考比例|达不到开考|取消开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
+    "cloud_skip": true,
+    "note": "[云端实测 IP 封锁 2026-10-26] 海外出口换 8 种请求头（现状UA/Chrome全头/+Referer自身/+Referer百度/移动Chrome/微信内置/裸curl/无UA）全部被拦，改代码救不回来，仅为本地通道保留。cloud_skip=true 让云端整轮跳过（本地仍抓）。要复验请跑 tools/diagnose_blocked.py。"
   },
   {
     "name": "北京-省考",
@@ -130,7 +132,8 @@
     "manda_days": 500,
     "title_include": "公告",
     "title_exclude": "核减|准考证|成绩|打印入口|报名入口|查询|测评|咨询电话|联系地址|政策法规|集锦|体检|体能|证件审核|通告|标准",
-    "note": "原源已删（孤儿记录），本次靠逆向 SPA 接口恢复。hebpta.com.cn 首页是 Vue SPA（project-loading 空壳，http 只回 2.6KB），列表数据在 https://www.hebpta.com.cn:8090/door/homeArticleList?pageNum=1&pageSize=200&belongSectionId=303，返回 JSON 且 data.records 是列表、data.total=38（一页拿完，无需翻页）。栏目 id 来自 /door/homeSection 的栏目树：293 通知公告(521条) / 303 公务员考试(38) / 304 事业单位考试(38) / 344 社会招聘信息专栏(8)。URL 规则：jumpType=2 时 jumpLink 是完整外链；jumpType=null 时 jumpLink 为 null，站内详情页须拼 /article?id={栏目}&artId={id}。"
+    "note": "[云端实测 IP 封锁 2026-10-26] 海外出口换 8 种请求头（现状UA/Chrome全头/+Referer自身/+Referer百度/移动Chrome/微信内置/裸curl/无UA）全部被拦，改代码救不回来，仅为本地通道保留。cloud_skip=true 让云端整轮跳过（本地仍抓）。要复验请跑 tools/diagnose_blocked.py。 ｜ 原注：原源已删（孤儿记录），本次靠逆向 SPA 接口恢复。hebpta.com.cn 首页是 Vue SPA（project-loading 空壳，http 只回 2.6KB），列表数据在 https://www.hebpta.com.cn:8090/door/homeArticleList?pageNum=1&pageSize=200&belongSectionId=303，返回 JSON 且 data.records 是列表、data.total=38（一页拿完，无需翻页）。栏目 id 来自 /door/homeSection 的栏目树：293 通知公告(521条) / 303 公务员考试(38) / 304 事业单位考试(38) / 344 社会招聘信息专栏(8)。URL 规则：jumpType=2 时 jumpLink 是完整外链；jumpType=null 时 jumpLink 为 null，站内详情页须拼 /article?id={栏目}&artId={id}。",
+    "cloud_skip": true
   },
   {
     "name": "山西-省考",
@@ -241,7 +244,8 @@
       "http://www.apta.gov.cn/Officer/TopicIndex?examid=434",
       "http://www.apta.gov.cn/Officer/TopicIndex?examid=430"
     ],
-    "note": "2026-10-22 修复：原 URL 是 www.apta.gov.cn 首页，抓到的全是二级造价工程师、执业药师、计算机软件等职业资格考试（与公务员无关）。已改到「公务员与事业单位考试」栏目 /Officer，并用 page_urls 挂上当前 4 个活跃专题（examid 431/426/434/430）。实测事业单位专题可解析 16 条真公告、遴选专题 44 条。注意：examid 会随年度换新，每年需复核一次；新专题可在 /Officer 页面查到。"
+    "note": "[云端实测 IP 封锁 2026-10-26] 海外出口换 8 种请求头（现状UA/Chrome全头/+Referer自身/+Referer百度/移动Chrome/微信内置/裸curl/无UA）全部被拦，改代码救不回来，仅为本地通道保留。cloud_skip=true 让云端整轮跳过（本地仍抓）。要复验请跑 tools/diagnose_blocked.py。 ｜ 原注：2026-10-22 修复：原 URL 是 www.apta.gov.cn 首页，抓到的全是二级造价工程师、执业药师、计算机软件等职业资格考试（与公务员无关）。已改到「公务员与事业单位考试」栏目 /Officer，并用 page_urls 挂上当前 4 个活跃专题（examid 431/426/434/430）。实测事业单位专题可解析 16 条真公告、遴选专题 44 条。注意：examid 会随年度换新，每年需复核一次；新专题可在 /Officer 页面查到。",
+    "cloud_skip": true
   },
   {
     "name": "福建-省考",
@@ -276,7 +280,9 @@
     "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
     "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
-    "container": null
+    "container": null,
+    "cloud_skip": true,
+    "note": "[云端实测 IP 封锁 2026-10-26] 海外出口换 8 种请求头（现状UA/Chrome全头/+Referer自身/+Referer百度/移动Chrome/微信内置/裸curl/无UA）全部被拦，改代码救不回来，仅为本地通道保留。cloud_skip=true 让云端整轮跳过（本地仍抓）。要复验请跑 tools/diagnose_blocked.py。"
   },
   {
     "name": "河南-省考",
@@ -287,7 +293,9 @@
     "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
     "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
-    "container": null
+    "container": null,
+    "cloud_skip": true,
+    "note": "[云端实测 IP 封锁 2026-10-26] 海外出口换 8 种请求头（现状UA/Chrome全头/+Referer自身/+Referer百度/移动Chrome/微信内置/裸curl/无UA）全部被拦，改代码救不回来，仅为本地通道保留。cloud_skip=true 让云端整轮跳过（本地仍抓）。要复验请跑 tools/diagnose_blocked.py。"
   },
   {
     "name": "湖北-省考",
@@ -382,7 +390,9 @@
     "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
     "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考|招考简章|考试大纲|承诺书|登记表|推荐表|缴费|面试|裁减|拟录用|公示",
-    "container": null
+    "container": null,
+    "cloud_skip": true,
+    "note": "[云端实测 IP 封锁 2026-10-26] 海外出口换 8 种请求头（现状UA/Chrome全头/+Referer自身/+Referer百度/移动Chrome/微信内置/裸curl/无UA）全部被拦，改代码救不回来，仅为本地通道保留。cloud_skip=true 让云端整轮跳过（本地仍抓）。要复验请跑 tools/diagnose_blocked.py。"
   },
   {
     "name": "西藏-省考",
@@ -773,7 +783,9 @@
     "method": "browser",
     "title_include": "招聘|招考|招录|引进|遴选|选调|公告|公示|简章|通知|方案",
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|未达开考|开考比例|达不到开考|取消开考|岗位未达开考|开考比例|达不到开考|取消开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$|^(市直属事业单位招录|县、市（区）事业单位招录|事业单位招录)$",
-    "href_include": "content"
+    "href_include": "content",
+    "cloud_skip": true,
+    "note": "[云端实测 IP 封锁 2026-10-26] 海外出口换 8 种请求头（现状UA/Chrome全头/+Referer自身/+Referer百度/移动Chrome/微信内置/裸curl/无UA）全部被拦，改代码救不回来，仅为本地通道保留。cloud_skip=true 让云端整轮跳过（本地仍抓）。要复验请跑 tools/diagnose_blocked.py。"
   },
   {
     "name": "江苏连云港-事业单位",
@@ -819,7 +831,8 @@
     "href_include": "art",
     "jpaas_pages": 2,
     "jpaas_page_size": 100,
-    "note": "2026-10-26 从 browser 改 jpaas：该站是汉王 jpaas CMS，栏目列表由 /api-gateway/jpaas-publish-server/front/page/build/unit 返回 JSON（必须 GET，分页靠 paramJson={\"pageNo\":N,\"pageSize\":M}），纯 http 可直取，云端无需浏览器。接口共 569 条，两页约 95 条真公告。原 browser 方案每轮要起 Chromium（浙江批整体 20s 等待 × N 个源），改成接口后单个源 1-3 秒。若将来接口改结构导致解析 0 条，scraper 会自动回退浏览器兜底。"
+    "note": "[云端实测 IP 封锁 2026-10-26] 海外出口换 8 种请求头（现状UA/Chrome全头/+Referer自身/+Referer百度/移动Chrome/微信内置/裸curl/无UA）全部被拦，改代码救不回来，仅为本地通道保留。cloud_skip=true 让云端整轮跳过（本地仍抓）。要复验请跑 tools/diagnose_blocked.py。 ｜ 原注：2026-10-26 从 browser 改 jpaas：该站是汉王 jpaas CMS，栏目列表由 /api-gateway/jpaas-publish-server/front/page/build/unit 返回 JSON（必须 GET，分页靠 paramJson={\"pageNo\":N,\"pageSize\":M}），纯 http 可直取，云端无需浏览器。接口共 569 条，两页约 95 条真公告。原 browser 方案每轮要起 Chromium（浙江批整体 20s 等待 × N 个源），改成接口后单个源 1-3 秒。若将来接口改结构导致解析 0 条，scraper 会自动回退浏览器兜底。",
+    "cloud_skip": true
   },
   {
     "name": "江苏镇江-事业单位",
@@ -858,7 +871,9 @@
     "browser_wait": 10000,
     "browser_wait_until": "domcontentloaded",
     "browser_timeout": 30000,
-    "limit": 60
+    "limit": 60,
+    "cloud_skip": true,
+    "note": "[云端实测 IP 封锁 2026-10-26] 海外出口换 8 种请求头（现状UA/Chrome全头/+Referer自身/+Referer百度/移动Chrome/微信内置/裸curl/无UA）全部被拦，改代码救不回来，仅为本地通道保留。cloud_skip=true 让云端整轮跳过（本地仍抓）。要复验请跑 tools/diagnose_blocked.py。"
   },
   {
     "name": "上海-事业单位招聘",
@@ -1352,6 +1367,7 @@
     "manda_days": 500,
     "title_include": "招聘",
     "title_exclude": "准考证|报名入口|成绩|打印入口|查询|技师|三支一扶|调剂|大纲|一览表|拟聘|名单|重启|推迟|笔试安排|实际操作|答辩",
-    "note": "2026-10-24 新增。河北此前只有省考孤儿源、无事业编源。数据源同「河北-省考」，belongSectionId=304「事业单位考试」栏目，total=38 一页拿完。含历年省直事业单位统一招聘公告（2026下半年 08-20、2026上半年 02-05、2025、2024、2023、2022）与石家庄海关事业编公告。该栏目大量条目是「准考证打印入口/报名入口/成绩查询」入口类，靠 title_exclude 滤。"
+    "note": "[云端实测 IP 封锁 2026-10-26] 海外出口换 8 种请求头（现状UA/Chrome全头/+Referer自身/+Referer百度/移动Chrome/微信内置/裸curl/无UA）全部被拦，改代码救不回来，仅为本地通道保留。cloud_skip=true 让云端整轮跳过（本地仍抓）。要复验请跑 tools/diagnose_blocked.py。 ｜ 原注：2026-10-24 新增。河北此前只有省考孤儿源、无事业编源。数据源同「河北-省考」，belongSectionId=304「事业单位考试」栏目，total=38 一页拿完。含历年省直事业单位统一招聘公告（2026下半年 08-20、2026上半年 02-05、2025、2024、2023、2022）与石家庄海关事业编公告。该栏目大量条目是「准考证打印入口/报名入口/成绩查询」入口类，靠 title_exclude 滤。",
+    "cloud_skip": true
   }
 ]

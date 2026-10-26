@@ -2339,6 +2339,27 @@ def run_all(limit_per_source=40, max_workers=8,
     """
     with open(SOURCES, encoding="utf-8") as f:
         sources = json.load(f)
+    # 全量源名要在任何过滤之前取：孤儿状态清理必须按「配置里还存在哪些源」比对，
+    # 而不是按「本轮实际跑了哪些源」。否则 cloud_skip / only_region 这类过滤
+    # 会让被滤掉的源看起来是"已删除"，其 sources_status 行被连带删掉
+    # （2026-10-22 已经因为 only_region 踩过一次：90 个源状态被清空 + fail_streak 全丢）。
+    _all_names = {s["name"] for s in sources}
+    # cloud_skip=true：**只在云端**跳过，本地通道照抓。
+    #
+    # 用在哪：2026-10-26 云端换头诊断（tools/diagnose_blocked.py）实测确认，
+    # 有 10 个源在海外出口无论换 8 种请求头都是 403/493/超时/秒断 —— 是 IP 层封锁，
+    # 改代码救不回来。这些源本地（国内 IP）能正常抓，所以不能 enabled:false 一刀切；
+    # 但云端每次还会白等：河北两个各 12.3s×8 变体、龙岩 0.8s 秒断，
+    # 一轮 10 个源白白烧掉一两分钟，还把 fail_streak 顶满、把真实故障淹掉。
+    #
+    # 判据是 GITHUB_ACTIONS 环境变量（Actions 里恒为 "true"），不用 --cloud 开关，
+    # 免得 scrape.yml 忘传参数就静默失效 —— 那种"配了等于没配"的坑已经踩过一次。
+    if os.environ.get("GITHUB_ACTIONS", "").lower() == "true":
+        _before = len(sources)
+        sources = [s for s in sources if not s.get("cloud_skip")]
+        if len(sources) != _before:
+            print(f"[云端] cloud_skip 跳过 {_before - len(sources)} 个实测 IP 封锁源"
+                  f"（本地通道仍会抓）")
     # 混合架构：云端跑非浙江、自托管只跑浙江，互不污染 fail_streak
     if only_region:
         sources = [s for s in sources if only_region in (s.get("region", "") or "")]
@@ -2365,8 +2386,8 @@ def run_all(limit_per_source=40, max_workers=8,
     # （2026-10-22 踩坑：--only-region 福建 一次跑完，其余 90 个源状态全被清空，
     #   健康检查随后把它们全报成 not_run，历史 fail_streak 也一并丢失）。
     if not only_region and not exclude_region:
-        _names = {s["name"] for s in sources}
-        _orphans = [r[0] for r in conn.execute("SELECT name FROM sources_status").fetchall() if r[0] not in _names]
+        # 用 _all_names（过滤前的全量），不是 sources —— 见 _all_names 处的说明。
+        _orphans = [r[0] for r in conn.execute("SELECT name FROM sources_status").fetchall() if r[0] not in _all_names]
         for _n in _orphans:
             conn.execute("DELETE FROM sources_status WHERE name=?", (_n,))
         if _orphans:
