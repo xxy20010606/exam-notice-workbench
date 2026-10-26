@@ -366,9 +366,46 @@ def send_wechat(title, desp):
         return False
 
 
+def backfill_note(notices, today):
+    """补抓提示：统计「公告发布日期早于昨天」的条数，返回一行提示（无则空串）。
+
+    为什么需要这一行：关机几天后开机，补抓回来的公告 first_seen 全是今天，
+    从数据上看跟「今天刚发布」没有任何区别。而列表页有容量上限
+    （多数政务站一页只列 15-40 条，再叠加 scraper 的 limit_per_source=40 截断），
+    超出部分在补抓时就永久丢失了 —— 而且事后完全查不出来，
+    因为 health_check 只看「最后一次尝试的结果」，不看「多久没尝试」。
+
+    这一行是「断档」唯一能露出的痕迹：让用户知道这批是补的，
+    更早的很可能已经抓不到了，别以为看全了。
+    """
+    try:
+        cutoff = (today - timedelta(days=1)).isoformat()
+    except Exception:
+        return ""
+    n, oldest, newest = 0, "", ""
+    for it in notices:
+        d = (it.get("date") or "")[:10]
+        # 只认形如 YYYY-MM-DD 的日期；date 为空或「日期未知」的不参与统计
+        if len(d) == 10 and d[:4].isdigit() and d[4] == "-" and d < cutoff:
+            n += 1
+            if not oldest or d < oldest:
+                oldest = d
+            if not newest or d > newest:
+                newest = d
+    if not n:
+        return ""
+    span = oldest[5:] if oldest == newest else f"{oldest[5:]}～{newest[5:]}"
+    return (f"⚠️ 其中 {n} 条发布于 {span}，属补抓（关机期间积压的）。"
+            f"列表页容量有限，更早的公告或许已被挤出、抓不到了 —— "
+            f"要查全历史请直接看看板或原站。")
+
+
 def build_wechat_markdown(today, notices, dates, by_date, pages, health_md=None):
     """微信正文（Markdown）：按公告发布日期分段，条数过多时只列前 WX_MAX_ITEMS 条。"""
     lines = [f"**{today} 新增 {len(notices)} 条**", ""]
+    note = backfill_note(notices, today)
+    if note:
+        lines += [note, ""]
     shown = 0
     truncated = False
     for d in dates:
@@ -468,6 +505,9 @@ def main():
     dates, by_date = group_by_date(notices)
 
     lines = [f"{today} 公考/事考公告日报", f"今日新增 {len(notices)} 条，按发布日期分组：", ""]
+    note = backfill_note(notices, today)
+    if note:
+        lines += [note, ""]
     for d in dates:
         lines.append(f"【{day_label(d)}】{len(by_date[d])} 条")
         for it in by_date[d]:
