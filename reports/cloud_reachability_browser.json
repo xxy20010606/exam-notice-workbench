@@ -1,0 +1,185 @@
+{
+ "mode": "http_on_browser",
+ "run_at": "2026-10-26 09:19:54",
+ "only_region": null,
+ "total": 20,
+ "http_usable": [],
+ "http_reachable_but_0": [
+  "国考-2027年度专题",
+  "吉林-省考",
+  "上海-浦东区-事业单位",
+  "上海-黄浦区-事业单位",
+  "上海-杨浦区-事业单位",
+  "上海-青浦区-事业单位"
+ ],
+ "http_unreachable": [
+  "江西-省考",
+  "山东-省考",
+  "四川-省考",
+  "西藏-省考",
+  "浙江杭州-事业单位",
+  "浙江湖州-事业单位",
+  "浙江绍兴-事业单位",
+  "浙江台州-事业单位",
+  "浙江宁波-事业单位",
+  "浙江金华-事业单位",
+  "浙江衢州-事业单位",
+  "江苏徐州-事业单位",
+  "江苏南通-事业单位",
+  "上海-嘉定区-事业单位"
+ ],
+ "detail": [
+  {
+   "name": "国考-2027年度专题",
+   "region": "全国",
+   "verdict": "http_reachable_but_0",
+   "bytes": 292,
+   "raw": 0,
+   "count": 0,
+   "seconds": 6.0
+  },
+  {
+   "name": "吉林-省考",
+   "region": "吉林",
+   "verdict": "http_reachable_but_0",
+   "bytes": 29157,
+   "raw": 0,
+   "count": 0,
+   "seconds": 2.6
+  },
+  {
+   "name": "江西-省考",
+   "region": "江西",
+   "verdict": "http_unreachable",
+   "error": "<urlopen error timed out>",
+   "seconds": 21.7
+  },
+  {
+   "name": "山东-省考",
+   "region": "山东",
+   "verdict": "http_unreachable",
+   "error": "HTTP Error 403: Forbidden",
+   "seconds": 1.8
+  },
+  {
+   "name": "四川-省考",
+   "region": "四川",
+   "verdict": "http_unreachable",
+   "error": "<urlopen error timed out>",
+   "seconds": 26.5
+  },
+  {
+   "name": "西藏-省考",
+   "region": "西藏",
+   "verdict": "http_unreachable",
+   "error": "<urlopen error timed out>",
+   "seconds": 22.0
+  },
+  {
+   "name": "浙江杭州-事业单位",
+   "region": "浙江",
+   "verdict": "http_unreachable",
+   "error": "<urlopen error _ssl.c:999: The handshake operation timed out>",
+   "seconds": 22.0
+  },
+  {
+   "name": "浙江湖州-事业单位",
+   "region": "浙江",
+   "verdict": "http_unreachable",
+   "error": "<urlopen error _ssl.c:999: The handshake operation timed out>",
+   "seconds": 24.1
+  },
+  {
+   "name": "浙江绍兴-事业单位",
+   "region": "浙江",
+   "verdict": "http_unreachable",
+   "error": "timed out",
+   "seconds": 22.0
+  },
+  {
+   "name": "浙江台州-事业单位",
+   "region": "浙江",
+   "verdict": "http_unreachable",
+   "error": "<urlopen error _ssl.c:999: The handshake operation timed out>",
+   "seconds": 23.2
+  },
+  {
+   "name": "浙江宁波-事业单位",
+   "region": "浙江",
+   "verdict": "http_unreachable",
+   "error": "timed out",
+   "seconds": 22.0
+  },
+  {
+   "name": "浙江金华-事业单位",
+   "region": "浙江",
+   "verdict": "http_unreachable",
+   "error": "<urlopen error _ssl.c:999: The handshake operation timed out>",
+   "seconds": 24.9
+  },
+  {
+   "name": "浙江衢州-事业单位",
+   "region": "浙江",
+   "verdict": "http_unreachable",
+   "error": "timed out",
+   "seconds": 22.2
+  },
+  {
+   "name": "江苏徐州-事业单位",
+   "region": "江苏",
+   "verdict": "http_unreachable",
+   "error": "<urlopen error timed out>",
+   "seconds": 21.8
+  },
+  {
+   "name": "江苏南通-事业单位",
+   "region": "江苏",
+   "verdict": "http_unreachable",
+   "error": "HTTP Error 403: Forbidden",
+   "seconds": 2.8
+  },
+  {
+   "name": "上海-浦东区-事业单位",
+   "region": "上海",
+   "verdict": "http_reachable_but_0",
+   "bytes": 336536,
+   "raw": 1,
+   "count": 0,
+   "seconds": 1.6
+  },
+  {
+   "name": "上海-黄浦区-事业单位",
+   "region": "上海",
+   "verdict": "http_reachable_but_0",
+   "bytes": 29793,
+   "raw": 0,
+   "count": 0,
+   "seconds": 1.5
+  },
+  {
+   "name": "上海-杨浦区-事业单位",
+   "region": "上海",
+   "verdict": "http_reachable_but_0",
+   "bytes": 342,
+   "raw": 0,
+   "count": 0,
+   "seconds": 2.5
+  },
+  {
+   "name": "上海-嘉定区-事业单位",
+   "region": "上海",
+   "verdict": "http_unreachable",
+   "error": "<urlopen error timed out>",
+   "seconds": 22.0
+  },
+  {
+   "name": "上海-青浦区-事业单位",
+   "region": "上海",
+   "verdict": "http_reachable_but_0",
+   "bytes": 108,
+   "raw": 0,
+   "count": 0,
+   "seconds": 1.6
+  }
+ ]
+}
