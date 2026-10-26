@@ -144,6 +144,37 @@ def _decode_response(r, encoding):
     return raw.decode(cs, errors="ignore")
 
 
+_PROXY_STATE = {"fails": 0, "dead": False, "warned": False}
+_PROXY_BREAK_AFTER = 3      # 连续失败几次就熔断（本轮不再尝试代理）
+
+
+def _proxy_disabled():
+    """本轮是否已把代理判死。
+
+    为什么需要熔断：SCRAPE_PROXY 配了但值是坏的（很常见：IP 换了、过期、账号停用）
+    时，每个源都要「直连 15s + 代理 2×15s」= 45s。90 个源里只要 30 个连不上，
+    整轮就凭空多出二十分钟，而且日志里看不出是代理在拖。实测 2026-10-26 的云端
+    普查就是这个状态：普查二（20 个浏览器源）跑了 20 分钟才收尾。
+    连续失败 3 次基本可以断定「这个代理在这台机器上不可用」，此时继续尝试只是在
+    给自己加刑。熔断只作用于本轮进程，下一轮重新从 0 计数。
+    """
+    return _PROXY_STATE["dead"]
+
+
+def _proxy_mark(ok):
+    if ok:
+        _PROXY_STATE["fails"] = 0
+        return
+    _PROXY_STATE["fails"] += 1
+    if not _PROXY_STATE["dead"] and _PROXY_STATE["fails"] >= _PROXY_BREAK_AFTER:
+        _PROXY_STATE["dead"] = True
+        if not _PROXY_STATE["warned"]:
+            _PROXY_STATE["warned"] = True
+            print(f"[代理] 连续 {_PROXY_BREAK_AFTER} 次失败，判定 SCRAPE_PROXY 本轮不可用 → "
+                  f"后续源不再尝试代理（否则每个源白等 30s）。"
+                  f"请跑 agent 里的 tools/check_proxy.py 确认代理是否还有效。")
+
+
 def _proxy_fetch_text(url, headers=None, data=None, method=None, timeout=30,
                       encoding=None, tries=2):
     """经 SCRAPE_PROXY 取一次内容，返回已解码文本。未配置代理时抛异常。
@@ -165,6 +196,8 @@ def _proxy_fetch_text(url, headers=None, data=None, method=None, timeout=30,
     proxy = os.environ.get("SCRAPE_PROXY", "").strip()
     if not proxy:
         raise RuntimeError("未配置 SCRAPE_PROXY（本次不走代理）")
+    if _proxy_disabled():
+        raise RuntimeError("SCRAPE_PROXY 本轮已熔断（连续多次失败，判定不可用）")
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
@@ -185,10 +218,14 @@ def _proxy_fetch_text(url, headers=None, data=None, method=None, timeout=30,
             req = urllib.request.Request(url, data=data,
                                          headers=headers or {}, method=method)
             with opener.open(req, timeout=timeout) as r:
+                _proxy_mark(True)
                 return _decode_response(r, encoding)
         except Exception as e:
             last = e
             time.sleep(1.0)
+    # 按「源」计数而不是按「次」：一次调用内部重试 2 次全挂，只算这个源失败 1 次，
+    # 否则熔断阈值 3 意味着一两个源就触发了，太容易误伤。
+    _proxy_mark(False)
     raise last
 
 
@@ -242,7 +279,7 @@ def fetch_http(url, timeout=30, retries=2, encoding=None, ip_family=None):
     # **配了代理时直连只试 1 次**：直连失败就交给代理，没必要把同一个超时连付三遍。
     # 对镇江/宿迁这种整个域名被海外 IP 封死的站，原来是 15s×3+退避=31.5s 才轮到代理；
     # 现在 15s 就切过去。没配代理时保持原样（那时直连是唯一路径，重试是必要的）。
-    _direct_tries = 1 if proxy else (retries + 1)
+    _direct_tries = 1 if (proxy and not _proxy_disabled()) else (retries + 1)
     for pi, pf in enumerate(fams):
         for _ in range(_direct_tries if pi == 0 else 1):
             try:
@@ -256,7 +293,8 @@ def fetch_http(url, timeout=30, retries=2, encoding=None, ip_family=None):
             finally:
                 _socket_mod.getaddrinfo = _orig_gai
     # 第二轮：直连全失败且配置了代理 → 回退走国内代理（代理是 IPv4 出口）
-    if proxy:
+    # 熔断后不再尝试代理：此时直接抛直连的真实错误，比抛「已熔断」有用
+    if proxy and not _proxy_disabled():
         try:
             return _proxy_fetch_text(url, headers=headers, timeout=timeout,
                                      encoding=encoding, tries=2)
@@ -286,7 +324,7 @@ def _http_post_json(url, payload, timeout=30, retries=2):
         return _orig_gai(host, port, _socket_mod.AF_INET if family == 0 else family, *a, **kw)
     last = None
     # 配了代理时直连只试 1 次（失败就交给代理），理由见 fetch_http 里的同款说明
-    for _ in range(1 if proxy else retries + 1):
+    for _ in range(1 if (proxy and not _proxy_disabled()) else retries + 1):
         try:
             _socket_mod.getaddrinfo = _ipv4_only
             req = urllib.request.Request(url, data=data, headers=headers, method="POST")
@@ -297,7 +335,8 @@ def _http_post_json(url, payload, timeout=30, retries=2):
             _socket_mod.getaddrinfo = _orig_gai
             last = e
             time.sleep(1.0)
-    if proxy:
+    # 熔断后不再尝试代理：此时直接抛直连的真实错误，比抛「已熔断」有用
+    if proxy and not _proxy_disabled():
         try:
             return _json.loads(_proxy_fetch_text(url, headers=headers, data=data,
                                                  method="POST", timeout=timeout, tries=2))
@@ -327,7 +366,7 @@ def _http_get_json(url, referer=None, timeout=20, retries=2):
         return _orig_gai(host, port, _socket_mod.AF_INET if family == 0 else family, *a, **kw)
     last = None
     # 配了代理时直连只试 1 次（失败就交给代理），理由见 fetch_http 里的同款说明
-    for _ in range(1 if proxy else retries + 1):
+    for _ in range(1 if (proxy and not _proxy_disabled()) else retries + 1):
         try:
             _socket_mod.getaddrinfo = _ipv4_only
             req = urllib.request.Request(url, headers=headers)
@@ -338,7 +377,8 @@ def _http_get_json(url, referer=None, timeout=20, retries=2):
             _socket_mod.getaddrinfo = _orig_gai
             last = e
             time.sleep(1.0)
-    if proxy:
+    # 熔断后不再尝试代理：此时直接抛直连的真实错误，比抛「已熔断」有用
+    if proxy and not _proxy_disabled():
         try:
             return _json.loads(_proxy_fetch_text(url, headers=headers,
                                                  timeout=timeout, tries=2))
@@ -431,7 +471,7 @@ def _http_post_form(url, data, headers=None, timeout=25, retries=1):
         return _orig_gai(host, port, _socket_mod.AF_INET if family == 0 else family, *a, **kw)
     last = None
     # 配了代理时直连只试 1 次（失败就交给代理），理由见 fetch_http 里的同款说明
-    for _ in range(1 if proxy else retries + 1):
+    for _ in range(1 if (proxy and not _proxy_disabled()) else retries + 1):
         try:
             _socket_mod.getaddrinfo = _ipv4_only
             req = urllib.request.Request(url, data=body, headers=hdr, method="POST")
@@ -442,7 +482,8 @@ def _http_post_form(url, data, headers=None, timeout=25, retries=1):
             _socket_mod.getaddrinfo = _orig_gai
             last = e
             time.sleep(1.0)
-    if proxy:
+    # 熔断后不再尝试代理：此时直接抛直连的真实错误，比抛「已熔断」有用
+    if proxy and not _proxy_disabled():
         try:
             return _json.loads(_proxy_fetch_text(url, headers=hdr, data=body,
                                                  method="POST", timeout=timeout, tries=2))
@@ -874,7 +915,8 @@ def _get_browser():
             "--disable-ipv6",
             "--ignore-certificate-errors",
         ]
-        if not os.environ.get("SCRAPE_PROXY", "").strip():
+        if not (os.environ.get("SCRAPE_PROXY", "").strip() and not _proxy_disabled()):
+            # 没配代理、或代理已被熔断 → 明确告诉 Chromium 别去猜系统代理
             args.append("--no-proxy-server")
         _browser = p.chromium.launch(headless=True, args=args)
         _browser_tid = tid
@@ -976,7 +1018,7 @@ def fetch_browser(url, timeout=90000, wait=3000, wait_until="domcontentloaded", 
             last = e
             if attempt < retries:
                 time.sleep(2 * (attempt + 1))
-    if proxy:
+    if proxy and not _proxy_disabled():
         try:
             browser = _get_browser()
             ctx = _new_context(browser, proxy=proxy)
@@ -984,8 +1026,13 @@ def fetch_browser(url, timeout=90000, wait=3000, wait_until="domcontentloaded", 
                 ctx.route("**/*", route_handler)
             except Exception:
                 pass
-            return _browse(ctx, url, timeout, wait, wait_until)
+            html = _browse(ctx, url, timeout, wait, wait_until)
+            _proxy_mark(True)
+            return html
         except Exception as e:
+            # 浏览器代理这一发最贵：browser_timeout 常配 90s，一个死代理能让单个源
+            # 白烧一分半。所以这里也计入熔断，让第 4 个源起直接走直连。
+            _proxy_mark(False)
             last = e
     raise last
 
@@ -1196,7 +1243,7 @@ def _reach_gate(url, timeout=6, ip_family=None):
     pp = urllib.parse.urlsplit(url)
     if not pp.hostname:
         return
-    if os.environ.get("SCRAPE_PROXY", "").strip():
+    if os.environ.get("SCRAPE_PROXY", "").strip() and not _proxy_disabled():
         return
     is_tls = pp.scheme == "https"
     port = pp.port or (443 if is_tls else 80)
