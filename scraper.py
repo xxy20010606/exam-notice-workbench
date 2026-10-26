@@ -1865,6 +1865,21 @@ def parse_source(source, html, stats=None):
             if 1 <= _dd <= 31:
                 glued_date = f"{_yy}-{_mo:02d}-{_dd:02d}"
                 title = title[gm.end():]
+        # 同上，但日期是**独立 span**、get_text(" ") 拼成了「01 2026年度…公告」：
+        # 前 1~2 位是日号、后面隔着空格才是真标题（吉林 www.jlgwyks.cn 就是这个结构）。
+        # 只认「1~2 位数字 + 空格 + 20xx年」，且要求剥完还剩足够长度，
+        # 避免误伤正文本身以数字开头的标题（如「2026 年度…」这种四位年号不会被 \d{1,2} 命中）。
+        gm2 = re.match(r"^(\d{1,2})\s+(?=20\d{2}年)", title)
+        if gm2 and len(title) > 12 and 1 <= int(gm2.group(1)) <= 31:
+            title = title[gm2.end():]
+        # 第三种：日号与年份**无空格**黏连，且年份后面直接跟「年」而非月份
+        # （吉林首页 27 个 <a> 里就是这样拼出「012026年度吉林省…公告」）。
+        # 剥掉日号、把年份原样留下，否则标题开头会变成「年度…」缺了年号。
+        # 安全性：真标题「2026年度…」不会命中 —— \d{1,2} 吃掉 "20" 后要求紧跟
+        # 形如 20xx 的四位年份，剩下的 "26年" 不满足。
+        gm3 = re.match(r"^(\d{1,2})(20\d{2})年", title)
+        if gm3 and len(title) > 12 and 1 <= int(gm3.group(1)) <= 31:
+            title = gm3.group(2) + "年" + title[gm3.end():]
         if not title:
             continue
         # 列表项目符号剥离：部分站标题前带圆点（如淮安「· 2025年…公开招聘」）
