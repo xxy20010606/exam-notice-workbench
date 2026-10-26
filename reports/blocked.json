@@ -1,0 +1,886 @@
+{
+ "mode": "blocked_diagnose",
+ "run_at": "2026-10-26 09:48:24",
+ "sources": [
+  {
+   "name": "云南-省考",
+   "url": "https://ylxf.1237125.cn/TopicWeb/ynskslygwy/index.html",
+   "method": "http",
+   "verdict": "所有变体都被拦（403/493）→ 大概率按 IP 段封",
+   "usable_variants": [],
+   "usable_api_variants": [],
+   "variants": [
+    {
+     "variant": "v0 现状(scraper UA)",
+     "status": 403,
+     "bytes": 552,
+     "seconds": 1.3,
+     "ok": false,
+     "snip": "<html> <head><title>403 Forbidden</title></head> <body> <center><h1>403 Forbidden</h1></center> <hr><center>openresty</center> </body> </html> <!-- a padding to"
+    },
+    {
+     "variant": "v1 Chrome 全头",
+     "status": 403,
+     "bytes": 552,
+     "seconds": 2.6,
+     "ok": false,
+     "snip": "<html> <head><title>403 Forbidden</title></head> <body> <center><h1>403 Forbidden</h1></center> <hr><center>openresty</center> </body> </html> <!-- a padding to"
+    },
+    {
+     "variant": "v2 Chrome + Referer 自身",
+     "status": 403,
+     "bytes": 552,
+     "seconds": 0.8,
+     "ok": false,
+     "snip": "<html> <head><title>403 Forbidden</title></head> <body> <center><h1>403 Forbidden</h1></center> <hr><center>openresty</center> </body> </html> <!-- a padding to"
+    },
+    {
+     "variant": "v3 Chrome + Referer 百度",
+     "status": 403,
+     "bytes": 552,
+     "seconds": 1.6,
+     "ok": false,
+     "snip": "<html> <head><title>403 Forbidden</title></head> <body> <center><h1>403 Forbidden</h1></center> <hr><center>openresty</center> </body> </html> <!-- a padding to"
+    },
+    {
+     "variant": "v4 移动 Chrome",
+     "status": 403,
+     "bytes": 552,
+     "seconds": 0.6,
+     "ok": false,
+     "snip": "<html> <head><title>403 Forbidden</title></head> <body> <center><h1>403 Forbidden</h1></center> <hr><center>openresty</center> </body> </html> <!-- a padding to"
+    },
+    {
+     "variant": "v5 微信内置",
+     "status": 403,
+     "bytes": 150,
+     "seconds": 0.8,
+     "ok": false,
+     "snip": "<html> <head><title>403 Forbidden</title></head> <body> <center><h1>403 Forbidden</h1></center> <hr><center>openresty</center> </body> </html>"
+    },
+    {
+     "variant": "v6 裸 curl",
+     "status": 403,
+     "bytes": 150,
+     "seconds": 0.6,
+     "ok": false,
+     "snip": "<html> <head><title>403 Forbidden</title></head> <body> <center><h1>403 Forbidden</h1></center> <hr><center>openresty</center> </body> </html>"
+    },
+    {
+     "variant": "v7 不带 UA",
+     "status": 403,
+     "bytes": 150,
+     "seconds": 1.3,
+     "ok": false,
+     "snip": "<html> <head><title>403 Forbidden</title></head> <body> <center><h1>403 Forbidden</h1></center> <hr><center>openresty</center> </body> </html>"
+    }
+   ],
+   "api_variants": []
+  },
+  {
+   "name": "安徽-省考",
+   "url": "http://www.apta.gov.cn/Officer",
+   "method": "http",
+   "verdict": "所有变体都被拦（403/493）→ 大概率按 IP 段封",
+   "usable_variants": [],
+   "usable_api_variants": [],
+   "variants": [
+    {
+     "variant": "v0 现状(scraper UA)",
+     "status": 403,
+     "bytes": 7385,
+     "seconds": 1.4,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head> <meta charset=\"utf-8\" /> <style> body{ background:#fff; font-family: microsoft yahei; color:#969696; font-size:14px;} .online-desc"
+    },
+    {
+     "variant": "v1 Chrome 全头",
+     "status": 403,
+     "bytes": 7385,
+     "seconds": 0.7,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head> <meta charset=\"utf-8\" /> <style> body{ background:#fff; font-family: microsoft yahei; color:#969696; font-size:14px;} .online-desc"
+    },
+    {
+     "variant": "v2 Chrome + Referer 自身",
+     "status": 403,
+     "bytes": 7385,
+     "seconds": 0.7,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head> <meta charset=\"utf-8\" /> <style> body{ background:#fff; font-family: microsoft yahei; color:#969696; font-size:14px;} .online-desc"
+    },
+    {
+     "variant": "v3 Chrome + Referer 百度",
+     "status": 403,
+     "bytes": 7385,
+     "seconds": 1.0,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head> <meta charset=\"utf-8\" /> <style> body{ background:#fff; font-family: microsoft yahei; color:#969696; font-size:14px;} .online-desc"
+    },
+    {
+     "variant": "v4 移动 Chrome",
+     "status": 403,
+     "bytes": 7385,
+     "seconds": 0.9,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head> <meta charset=\"utf-8\" /> <style> body{ background:#fff; font-family: microsoft yahei; color:#969696; font-size:14px;} .online-desc"
+    },
+    {
+     "variant": "v5 微信内置",
+     "status": 403,
+     "bytes": 7385,
+     "seconds": 0.5,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head> <meta charset=\"utf-8\" /> <style> body{ background:#fff; font-family: microsoft yahei; color:#969696; font-size:14px;} .online-desc"
+    },
+    {
+     "variant": "v6 裸 curl",
+     "status": 403,
+     "bytes": 7385,
+     "seconds": 0.5,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head> <meta charset=\"utf-8\" /> <style> body{ background:#fff; font-family: microsoft yahei; color:#969696; font-size:14px;} .online-desc"
+    },
+    {
+     "variant": "v7 不带 UA",
+     "status": 403,
+     "bytes": 7385,
+     "seconds": 0.5,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head> <meta charset=\"utf-8\" /> <style> body{ background:#fff; font-family: microsoft yahei; color:#969696; font-size:14px;} .online-desc"
+    }
+   ],
+   "api_variants": []
+  },
+  {
+   "name": "河南-省考",
+   "url": "https://www.henan.gov.cn/zwgk/zfxxgk/fdzdgknr/gwyzl/?itemscode=150",
+   "method": "http",
+   "verdict": "所有变体都被拦（403/493）→ 大概率按 IP 段封",
+   "usable_variants": [],
+   "usable_api_variants": [],
+   "variants": [
+    {
+     "variant": "v0 现状(scraper UA)",
+     "status": 403,
+     "bytes": 1662,
+     "seconds": 0.6,
+     "ok": false,
+     "snip": "<!doctype html><html><head><meta charset=utf-8><title>403 Forbidden</title><style>.ec{font-size:16px}.et{text-align:left;color:#333;font-size:28px;margin-bottom"
+    },
+    {
+     "variant": "v1 Chrome 全头",
+     "status": 403,
+     "bytes": 1662,
+     "seconds": 0.2,
+     "ok": false,
+     "snip": "<!doctype html><html><head><meta charset=utf-8><title>403 Forbidden</title><style>.ec{font-size:16px}.et{text-align:left;color:#333;font-size:28px;margin-bottom"
+    },
+    {
+     "variant": "v2 Chrome + Referer 自身",
+     "status": 403,
+     "bytes": 1662,
+     "seconds": 0.2,
+     "ok": false,
+     "snip": "<!doctype html><html><head><meta charset=utf-8><title>403 Forbidden</title><style>.ec{font-size:16px}.et{text-align:left;color:#333;font-size:28px;margin-bottom"
+    },
+    {
+     "variant": "v3 Chrome + Referer 百度",
+     "status": 403,
+     "bytes": 1662,
+     "seconds": 0.2,
+     "ok": false,
+     "snip": "<!doctype html><html><head><meta charset=utf-8><title>403 Forbidden</title><style>.ec{font-size:16px}.et{text-align:left;color:#333;font-size:28px;margin-bottom"
+    },
+    {
+     "variant": "v4 移动 Chrome",
+     "status": 403,
+     "bytes": 1662,
+     "seconds": 0.2,
+     "ok": false,
+     "snip": "<!doctype html><html><head><meta charset=utf-8><title>403 Forbidden</title><style>.ec{font-size:16px}.et{text-align:left;color:#333;font-size:28px;margin-bottom"
+    },
+    {
+     "variant": "v5 微信内置",
+     "status": 403,
+     "bytes": 1662,
+     "seconds": 0.2,
+     "ok": false,
+     "snip": "<!doctype html><html><head><meta charset=utf-8><title>403 Forbidden</title><style>.ec{font-size:16px}.et{text-align:left;color:#333;font-size:28px;margin-bottom"
+    },
+    {
+     "variant": "v6 裸 curl",
+     "status": 403,
+     "bytes": 1662,
+     "seconds": 0.2,
+     "ok": false,
+     "snip": "<!doctype html><html><head><meta charset=utf-8><title>403 Forbidden</title><style>.ec{font-size:16px}.et{text-align:left;color:#333;font-size:28px;margin-bottom"
+    },
+    {
+     "variant": "v7 不带 UA",
+     "status": 403,
+     "bytes": 1661,
+     "seconds": 0.2,
+     "ok": false,
+     "snip": "<!doctype html><html><head><meta charset=utf-8><title>403 Forbidden</title><style>.ec{font-size:16px}.et{text-align:left;color:#333;font-size:28px;margin-bottom"
+    }
+   ],
+   "api_variants": []
+  },
+  {
+   "name": "江苏扬州-事业单位",
+   "url": "https://hrss.yangzhou.gov.cn/ztzl/zlzp/index.html",
+   "method": "jpaas",
+   "verdict": "所有变体都被拦（403/493）→ 大概率按 IP 段封",
+   "usable_variants": [],
+   "usable_api_variants": [],
+   "variants": [
+    {
+     "variant": "v0 现状(scraper UA)",
+     "status": 403,
+     "bytes": 289,
+     "seconds": 2.8,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head><title>403 Forbidden</title></head> <body bgcolor=\"white\"> <center style=\"margin-top: 100px;\"><h1>403 Forbidden</h1></center> <hr> "
+    },
+    {
+     "variant": "v1 Chrome 全头",
+     "status": 403,
+     "bytes": 289,
+     "seconds": 0.6,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head><title>403 Forbidden</title></head> <body bgcolor=\"white\"> <center style=\"margin-top: 100px;\"><h1>403 Forbidden</h1></center> <hr> "
+    },
+    {
+     "variant": "v2 Chrome + Referer 自身",
+     "status": 403,
+     "bytes": 289,
+     "seconds": 1.6,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head><title>403 Forbidden</title></head> <body bgcolor=\"white\"> <center style=\"margin-top: 100px;\"><h1>403 Forbidden</h1></center> <hr> "
+    },
+    {
+     "variant": "v3 Chrome + Referer 百度",
+     "status": 403,
+     "bytes": 289,
+     "seconds": 0.6,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head><title>403 Forbidden</title></head> <body bgcolor=\"white\"> <center style=\"margin-top: 100px;\"><h1>403 Forbidden</h1></center> <hr> "
+    },
+    {
+     "variant": "v4 移动 Chrome",
+     "status": 403,
+     "bytes": 289,
+     "seconds": 0.6,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head><title>403 Forbidden</title></head> <body bgcolor=\"white\"> <center style=\"margin-top: 100px;\"><h1>403 Forbidden</h1></center> <hr> "
+    },
+    {
+     "variant": "v5 微信内置",
+     "status": 403,
+     "bytes": 289,
+     "seconds": 0.6,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head><title>403 Forbidden</title></head> <body bgcolor=\"white\"> <center style=\"margin-top: 100px;\"><h1>403 Forbidden</h1></center> <hr> "
+    },
+    {
+     "variant": "v6 裸 curl",
+     "status": 403,
+     "bytes": 289,
+     "seconds": 4.3,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head><title>403 Forbidden</title></head> <body bgcolor=\"white\"> <center style=\"margin-top: 100px;\"><h1>403 Forbidden</h1></center> <hr> "
+    },
+    {
+     "variant": "v7 不带 UA",
+     "status": 403,
+     "bytes": 289,
+     "seconds": 0.6,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head><title>403 Forbidden</title></head> <body bgcolor=\"white\"> <center style=\"margin-top: 100px;\"><h1>403 Forbidden</h1></center> <hr> "
+    }
+   ],
+   "api_variants": []
+  },
+  {
+   "name": "山东-省考",
+   "url": "https://www.dtdjzx.gov.cn/web/dtdjzx/lygwyzkgg.html",
+   "method": "browser",
+   "verdict": "所有变体都被拦（403/493）→ 大概率按 IP 段封",
+   "usable_variants": [],
+   "usable_api_variants": [],
+   "variants": [
+    {
+     "variant": "v0 现状(scraper UA)",
+     "status": 403,
+     "bytes": 2025,
+     "seconds": 0.8,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head> <meta charset=\"utf-8\"> <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\"> <meta name=\"viewport\" content=\"width=device-width, in"
+    },
+    {
+     "variant": "v1 Chrome 全头",
+     "status": 403,
+     "bytes": 2025,
+     "seconds": 0.1,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head> <meta charset=\"utf-8\"> <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\"> <meta name=\"viewport\" content=\"width=device-width, in"
+    },
+    {
+     "variant": "v2 Chrome + Referer 自身",
+     "status": 403,
+     "bytes": 2025,
+     "seconds": 0.1,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head> <meta charset=\"utf-8\"> <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\"> <meta name=\"viewport\" content=\"width=device-width, in"
+    },
+    {
+     "variant": "v3 Chrome + Referer 百度",
+     "status": 403,
+     "bytes": 2024,
+     "seconds": 0.1,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head> <meta charset=\"utf-8\"> <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\"> <meta name=\"viewport\" content=\"width=device-width, in"
+    },
+    {
+     "variant": "v4 移动 Chrome",
+     "status": 403,
+     "bytes": 2025,
+     "seconds": 0.1,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head> <meta charset=\"utf-8\"> <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\"> <meta name=\"viewport\" content=\"width=device-width, in"
+    },
+    {
+     "variant": "v5 微信内置",
+     "status": 403,
+     "bytes": 2025,
+     "seconds": 0.1,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head> <meta charset=\"utf-8\"> <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\"> <meta name=\"viewport\" content=\"width=device-width, in"
+    },
+    {
+     "variant": "v6 裸 curl",
+     "status": 403,
+     "bytes": 2025,
+     "seconds": 0.2,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head> <meta charset=\"utf-8\"> <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\"> <meta name=\"viewport\" content=\"width=device-width, in"
+    },
+    {
+     "variant": "v7 不带 UA",
+     "status": 403,
+     "bytes": 2025,
+     "seconds": 0.1,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html> <head> <meta charset=\"utf-8\"> <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\"> <meta name=\"viewport\" content=\"width=device-width, in"
+    }
+   ],
+   "api_variants": []
+  },
+  {
+   "name": "江苏南通-事业单位",
+   "url": "https://rsj.nantong.gov.cn/ntsrsj/ntszsydwzk/ntszsydwzk.html",
+   "method": "browser",
+   "verdict": "所有变体都被拦（403/493）→ 大概率按 IP 段封",
+   "usable_variants": [],
+   "usable_api_variants": [],
+   "variants": [
+    {
+     "variant": "v0 现状(scraper UA)",
+     "status": 403,
+     "bytes": 7736,
+     "seconds": 2.0,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html lang=\"zh\"> <head> <meta charset=\"utf-8\" /> <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" /> <meta name=\"viewport\" content=\"width=de"
+    },
+    {
+     "variant": "v1 Chrome 全头",
+     "status": 403,
+     "bytes": 7736,
+     "seconds": 0.9,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html lang=\"zh\"> <head> <meta charset=\"utf-8\" /> <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" /> <meta name=\"viewport\" content=\"width=de"
+    },
+    {
+     "variant": "v2 Chrome + Referer 自身",
+     "status": 403,
+     "bytes": 7736,
+     "seconds": 0.9,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html lang=\"zh\"> <head> <meta charset=\"utf-8\" /> <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" /> <meta name=\"viewport\" content=\"width=de"
+    },
+    {
+     "variant": "v3 Chrome + Referer 百度",
+     "status": 403,
+     "bytes": 7736,
+     "seconds": 0.9,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html lang=\"zh\"> <head> <meta charset=\"utf-8\" /> <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" /> <meta name=\"viewport\" content=\"width=de"
+    },
+    {
+     "variant": "v4 移动 Chrome",
+     "status": 403,
+     "bytes": 7736,
+     "seconds": 0.9,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html lang=\"zh\"> <head> <meta charset=\"utf-8\" /> <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" /> <meta name=\"viewport\" content=\"width=de"
+    },
+    {
+     "variant": "v5 微信内置",
+     "status": 403,
+     "bytes": 7736,
+     "seconds": 0.7,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html lang=\"zh\"> <head> <meta charset=\"utf-8\" /> <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" /> <meta name=\"viewport\" content=\"width=de"
+    },
+    {
+     "variant": "v6 裸 curl",
+     "status": 403,
+     "bytes": 7736,
+     "seconds": 0.7,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html lang=\"zh\"> <head> <meta charset=\"utf-8\" /> <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" /> <meta name=\"viewport\" content=\"width=de"
+    },
+    {
+     "variant": "v7 不带 UA",
+     "status": 403,
+     "bytes": 7736,
+     "seconds": 0.9,
+     "ok": false,
+     "snip": "<!DOCTYPE html> <html lang=\"zh\"> <head> <meta charset=\"utf-8\" /> <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\" /> <meta name=\"viewport\" content=\"width=de"
+    }
+   ],
+   "api_variants": []
+  },
+  {
+   "name": "江苏宿迁-事业单位",
+   "url": "https://sqhrss.suqian.gov.cn/rlzyj/rsxx/xxgk_list.shtml",
+   "method": "http",
+   "verdict": "所有变体都被拦（403/493）→ 大概率按 IP 段封",
+   "usable_variants": [],
+   "usable_api_variants": [],
+   "variants": [
+    {
+     "variant": "v0 现状(scraper UA)",
+     "status": 493,
+     "bytes": 219,
+     "seconds": 1.1,
+     "ok": false,
+     "snip": "<html><head><title>493 JFE Forbidden</title></head> <body bgcolor=\"white\"><center><h1>493 JFE Forbidden</h1></center><center><i>1defe63ad504c60ee0102ee8fce3cf41"
+    },
+    {
+     "variant": "v1 Chrome 全头",
+     "status": 493,
+     "bytes": 219,
+     "seconds": 0.6,
+     "ok": false,
+     "snip": "<html><head><title>493 JFE Forbidden</title></head> <body bgcolor=\"white\"><center><h1>493 JFE Forbidden</h1></center><center><i>072ed0b66006a96a863810c019728b55"
+    },
+    {
+     "variant": "v2 Chrome + Referer 自身",
+     "status": 493,
+     "bytes": 219,
+     "seconds": 0.6,
+     "ok": false,
+     "snip": "<html><head><title>493 JFE Forbidden</title></head> <body bgcolor=\"white\"><center><h1>493 JFE Forbidden</h1></center><center><i>4f08453bd12dde62a996c36365860002"
+    },
+    {
+     "variant": "v3 Chrome + Referer 百度",
+     "status": 493,
+     "bytes": 219,
+     "seconds": 0.6,
+     "ok": false,
+     "snip": "<html><head><title>493 JFE Forbidden</title></head> <body bgcolor=\"white\"><center><h1>493 JFE Forbidden</h1></center><center><i>572eea02d0a83d0b3bc555688340c51e"
+    },
+    {
+     "variant": "v4 移动 Chrome",
+     "status": 493,
+     "bytes": 219,
+     "seconds": 0.6,
+     "ok": false,
+     "snip": "<html><head><title>493 JFE Forbidden</title></head> <body bgcolor=\"white\"><center><h1>493 JFE Forbidden</h1></center><center><i>5537f1421f723b1e348b4dca43cdb105"
+    },
+    {
+     "variant": "v5 微信内置",
+     "status": 493,
+     "bytes": 219,
+     "seconds": 0.6,
+     "ok": false,
+     "snip": "<html><head><title>493 JFE Forbidden</title></head> <body bgcolor=\"white\"><center><h1>493 JFE Forbidden</h1></center><center><i>6de53acc9040ef162ec8e75cb0e09019"
+    },
+    {
+     "variant": "v6 裸 curl",
+     "status": 493,
+     "bytes": 219,
+     "seconds": 0.6,
+     "ok": false,
+     "snip": "<html><head><title>493 JFE Forbidden</title></head> <body bgcolor=\"white\"><center><h1>493 JFE Forbidden</h1></center><center><i>345807c25141d95cbbaa62653af219ee"
+    },
+    {
+     "variant": "v7 不带 UA",
+     "status": 493,
+     "bytes": 219,
+     "seconds": 0.6,
+     "ok": false,
+     "snip": "<html><head><title>493 JFE Forbidden</title></head> <body bgcolor=\"white\"><center><h1>493 JFE Forbidden</h1></center><center><i>9e2c1e5c6aad97129d733bcd38c15b81"
+    }
+   ],
+   "api_variants": []
+  },
+  {
+   "name": "河北-省考",
+   "url": "https://www.hebpta.com.cn/notice?id=303",
+   "method": "jsonapi",
+   "verdict": "非 403 类失败，需要看具体报错",
+   "usable_variants": [],
+   "usable_api_variants": [],
+   "variants": [
+    {
+     "variant": "v0 现状(scraper UA)",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.4,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v1 Chrome 全头",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.0,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v2 Chrome + Referer 自身",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.3,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v3 Chrome + Referer 百度",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.4,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v4 移动 Chrome",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.2,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v5 微信内置",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.7,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v6 裸 curl",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.5,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v7 不带 UA",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.3,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    }
+   ],
+   "api_variants": [
+    {
+     "variant": "v0 现状(scraper UA)",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.4,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v1 Chrome 全头",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.0,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v2 Chrome + Referer 自身",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.0,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v3 Chrome + Referer 百度",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.3,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v4 移动 Chrome",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.4,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v5 微信内置",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.6,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v6 裸 curl",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.3,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v7 不带 UA",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.5,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    }
+   ]
+  },
+  {
+   "name": "河北-省直事业单位",
+   "url": "https://www.hebpta.com.cn/notice?id=304",
+   "method": "jsonapi",
+   "verdict": "非 403 类失败，需要看具体报错",
+   "usable_variants": [],
+   "usable_api_variants": [],
+   "variants": [
+    {
+     "variant": "v0 现状(scraper UA)",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.0,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v1 Chrome 全头",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.0,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v2 Chrome + Referer 自身",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.0,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v3 Chrome + Referer 百度",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.3,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v4 移动 Chrome",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.3,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v5 微信内置",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.4,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v6 裸 curl",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.0,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v7 不带 UA",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.0,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    }
+   ],
+   "api_variants": [
+    {
+     "variant": "v0 现状(scraper UA)",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.5,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v1 Chrome 全头",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.0,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v2 Chrome + Referer 自身",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.0,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v3 Chrome + Referer 百度",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.3,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v4 移动 Chrome",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.3,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v5 微信内置",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.0,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v6 裸 curl",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.0,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    },
+    {
+     "variant": "v7 不带 UA",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.0,
+     "ok": false,
+     "snip": "URLError: <urlopen error timed out>"
+    }
+   ]
+  },
+  {
+   "name": "龙岩-事业单位招聘",
+   "url": "https://rsj.longyan.gov.cn/zwgk/gggs/",
+   "method": "http",
+   "verdict": "非 403 类失败，需要看具体报错",
+   "usable_variants": [],
+   "usable_api_variants": [],
+   "variants": [
+    {
+     "variant": "v0 现状(scraper UA)",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 1.5,
+     "ok": false,
+     "snip": "RemoteDisconnected: Remote end closed connection without response"
+    },
+    {
+     "variant": "v1 Chrome 全头",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 0.6,
+     "ok": false,
+     "snip": "RemoteDisconnected: Remote end closed connection without response"
+    },
+    {
+     "variant": "v2 Chrome + Referer 自身",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 0.6,
+     "ok": false,
+     "snip": "RemoteDisconnected: Remote end closed connection without response"
+    },
+    {
+     "variant": "v3 Chrome + Referer 百度",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 0.6,
+     "ok": false,
+     "snip": "RemoteDisconnected: Remote end closed connection without response"
+    },
+    {
+     "variant": "v4 移动 Chrome",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 0.7,
+     "ok": false,
+     "snip": "RemoteDisconnected: Remote end closed connection without response"
+    },
+    {
+     "variant": "v5 微信内置",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 12.2,
+     "ok": false,
+     "snip": "URLError: <urlopen error _ssl.c:999: The handshake operation timed out>"
+    },
+    {
+     "variant": "v6 裸 curl",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 0.6,
+     "ok": false,
+     "snip": "RemoteDisconnected: Remote end closed connection without response"
+    },
+    {
+     "variant": "v7 不带 UA",
+     "status": 0,
+     "bytes": 0,
+     "seconds": 0.9,
+     "ok": false,
+     "snip": "RemoteDisconnected: Remote end closed connection without response"
+    }
+   ],
+   "api_variants": []
+  }
+ ]
+}
