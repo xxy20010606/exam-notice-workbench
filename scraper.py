@@ -10,6 +10,15 @@
                     源需含 api_url(可用 {pageNum} 占位)；返回 title/url/date 的 items。
 - method="jsonapi" : 通用后台 JSON 接口(POST 表单 + 可选签名头)，适用于列表页是
                     SPA 壳、数据靠 XHR 拉取的站（如宁波人才网 网上招考 10500+ 条）。
+- method="jpage"   : 江苏政务网统一 CMS 的 jpage 组件接口（/module/web/jpage/
+                    dataproxy.jsp）。栏目页 HTML 里只有一个壳 + 一段
+                    `var param_NNNNN = {webid:..,columnid:..,unitid:..}`，
+                    真正的列表靠这个接口按页返回 XML。纯 http 可直取，
+                    不需要浏览器，也不受「点 8 页」这种本地专属方案的限制。
+- method="jpaas"   : 汉王 CMS（jpaas-publish-server）的栏目列表接口，江苏部分市级站
+                    （泰州等）在用。栏目页只有壳，列表由
+                    /api-gateway/jpaas-publish-server/front/page/build/unit 返回 JSON，
+                    分页靠 paramJson={"pageNo":N,"pageSize":M} 这个 JSON 字符串参数。
 """
 import json, os, sqlite3, hashlib, re, time, datetime, threading
 import urllib.parse
@@ -1128,6 +1137,198 @@ def _raw_fetch(url, method, encoding=None, browser_wait=3000, browser_wait_until
     return fetch_http(url, encoding=encoding, timeout=http_timeout, ip_family=ip_family)
 
 
+# ---------------- 江苏政务网 jpage 列表接口 ----------------
+# 江苏（以及不少同源 CMS 的市局站）栏目页长这样：
+#   <div id="325517"><script type="text/xml"><datastore>...</datastore></script></div>
+#   var param_325517 = {col:1,appid:'1',webid:67,path:'/',columnid:78506,
+#                       sourceContentType:3,unitid:'325517',webname:'江苏省人力资源…'}
+#   $('#325517').jpage({..., totalRecord:2813, perPage:20,
+#                       proxyUrl:'/module/web/jpage/dataproxy.jsp', ajaxParam:param_325517});
+# 首屏那 20 条是服务端嵌在 datastore 里的，之后每页都靠 proxyUrl 拿 XML：
+#   <datastore><totalrecord>2814</totalrecord><totalpage>29</totalpage>
+#   <recordset><record><![CDATA[ <li><a href="/art/...">标题</a><i>日期</i></li> ]]></record>...
+# 两个关键实测结论：
+#   1) proxyUrl **不认 perPage/perpage**，无论怎么传，一次固定回约 300 条
+#      （jpage 的 groupSize:3 × perPage:100）。所以「抓 3 页」就够回溯大半年的量。
+#   2) 必填参数只有 page/appid/webid/path/columnid/unitid；webname 可以不传
+#      （传了也不会报错，只是 nextgroup 链接里会多一串 URL 编码）。
+# 所以这里**不硬编码 columnid/unitid**，而是从栏目页里现场扒 param_XXX：
+# 栏目一旦改版换了 columnid，硬编码的源会静默失效，现场扒的不会。
+JPAGE_PARAM_RE = re.compile(r"var\s+param_\d+\s*=\s*\{([^}]*)\}")
+JPAGE_PROXY_PATH = "/module/web/jpage/dataproxy.jsp"
+
+
+def fetch_jpage(url, pages=3, timeout=20, ip_family=None, proxy_path=None):
+    """抓江苏政务网 jpage 栏目的列表，返回可直接喂给 parse_source 的 HTML 片段。
+
+    返回的是所有 <record> 里的内容拼起来的普通 HTML（CDATA 壳已剥），
+    里面就是平常的 <li><a href="/art/...">标题</a><i>日期</i></li> / <tr>…</tr>，
+    所以复用现有解析器即可，不用另写一套。
+
+    退化策略：扒不到 param 或接口不通时，直接返回栏目页原始 HTML ——
+    至少保住首屏那 20 条静态条目，不会因为接口改版把整个源打成 0 条。
+    """
+    index_html = fetch_http(url, timeout=timeout, ip_family=ip_family)
+    m = re.search(r"/col/(col)?(\d+)", url)
+    want_col = m.group(2) if m else ""
+    params = []
+    for pm in JPAGE_PARAM_RE.finditer(index_html):
+        body = pm.group(1)
+        d = {}
+        # 值有三种写法：'单引号串'、"双引号串"、裸数字。用 finditer 逐对取，
+        # 别用 findall + 多分组——那样每组会返回 5 元组，解包直接炸。
+        for kv in re.finditer(r"(\w+)\s*:\s*(?:'([^']*)'|\"([^\"]*)\"|(\d+))", body):
+            val = kv.group(2)
+            if val is None:
+                val = kv.group(3)
+            if val is None:
+                val = kv.group(4)
+            d[kv.group(1)] = val
+        if d.get("columnid"):
+            params.append(d)
+    if not params:
+        print(f"[jpage] 没扒到 param 配置，退回静态页：{url}")
+        return index_html
+    # 优先选 columnid 与 URL 里 colNNNN 对上的那个；对不上就取第一个
+    pick = None
+    for d in params:
+        if want_col and d.get("columnid") == want_col:
+            pick = d
+            break
+    pick = pick or params[0]
+    columnid, unitid = pick.get("columnid", ""), pick.get("unitid", "")
+    webid, appid = pick.get("webid", "1"), pick.get("appid", "1")
+    if not unitid:
+        print(f"[jpage] param 里缺 unitid，退回静态页：{url}")
+        return index_html
+    pp = urllib.parse.urlsplit(url)
+    base = f"{pp.scheme}://{pp.netloc}"
+    proxy_url = base + (proxy_path or JPAGE_PROXY_PATH)
+    q = (f"page={{page}}&appid={appid}&webid={webid}&path=/"
+         f"&columnid={columnid}&unitid={unitid}")
+    chunks, seen = [], set()
+    ok_pages = 0
+    for p in range(1, int(pages) + 1):
+        try:
+            xml = fetch_http(proxy_url + "?" + q.format(page=p),
+                             timeout=timeout, ip_family=ip_family, retries=1)
+        except Exception as e:
+            print(f"[jpage] 第 {p} 页请求失败：{str(e)[:80]}")
+            break
+        recs = re.findall(r"<record>\s*(?:<!\[CDATA\[)?(.*?)(?:\]\]>)?\s*</record>",
+                          xml, re.S)
+        fresh = [r for r in recs if r.strip() and r.strip() not in seen]
+        for r in fresh:
+            seen.add(r.strip())
+        if not fresh:
+            # 首屏那 20 条与 page=1 是重叠的，真正的「没新内容」用全新条目数为 0 判断
+            break
+        chunks.extend(fresh)
+        ok_pages += 1
+        if len(recs) < 50:      # 末页（条目数突然变少）→ 不用再往后要
+            break
+    if not chunks:
+        print(f"[jpage] 接口返回 0 条，退回静态页：{url}")
+        return index_html
+    print(f"[jpage] {url} 抓 {ok_pages} 页 / {len(chunks)} 条原始条目")
+    # 和静态首屏合并：静态页里那 20 条是最新的，接口偶发缓存落后时能兜一层
+    return index_html + "\n" + "\n".join(chunks)
+
+
+# ---------------- 汉王 jpaas CMS 列表接口 ----------------
+# 江苏不少市级站（泰州 rsj.taizhou.gov.cn 等）用的是汉王 CMS（jpaas-publish-server）。
+# 栏目页 HTML 里列表位置只有一个占位 div + 一个负责「拉列表」的 script：
+#   <script id="002f28..." src="/cms_files/default/script/AuthorizedRead/unitbuild.js"
+#           webId="fe9a0be09fde4df6a7488a492ee250cc" parseType="bulidstatic"
+#           url="/api-gateway/jpaas-publish-server/front/page/build/unit"
+#           queryData="{'parseType':'bulidstatic','webId':'...','tplSetId':'...',
+#                       'pageType':'column','tagId':'当前栏目信息列表',
+#                       'editType':'null','pageId':'8ed84071...'}"></script>
+# 请求该 url（**必须 GET**，POST 会返回「不支持的HTTP方法」）带上 queryData 的字段，
+# 返回 {"success":true,"data":{"html":"<div id=\"当前栏目信息列表\">...列表...</div>"}}。
+# 分页不是独立参数，而是塞一个 JSON 字符串进去：
+#   paramJson={"pageNo":2,"pageSize":15}
+# 实测 pageSize 可放大到 100（传 200 会被服务端压回 99），一页就能覆盖大半年。
+# 分页信息（rows/count/pageNo）挂在返回 HTML 里的 <div class="pagination" ...> 上。
+JPAAS_SCRIPT_RE = re.compile(r"<script\b([^>]*\bqueryData\s*=\s*[^>]*?)>\s*</script>", re.I)
+JPAAS_ATTR_RE = re.compile(r"([\w-]+)\s*=\s*\"([^\"]*)\"")
+
+
+def _jpaas_parse_querydata(raw):
+    """queryData 是「用单引号写的 JSON」，转成 dict。"""
+    s = (raw or "").strip()
+    if not s:
+        return {}
+    try:
+        return json.loads(s.replace("'", '"'))
+    except Exception:
+        # 兜底：逐对抠 key:'value'，避免某个值里混了引号就整段解析失败
+        d = {}
+        for m in re.finditer(r"'?(\w+)'?\s*:\s*'([^']*)'", s):
+            d[m.group(1)] = m.group(2)
+        return d
+
+
+def fetch_jpaas(url, pages=2, page_size=100, timeout=20, ip_family=None):
+    """抓汉王 jpaas CMS 栏目的列表，返回可喂 parse_source 的 HTML。
+
+    自动从栏目页里找「带 queryData 的 script」拿到接口地址与栏目参数，
+    不硬编码 webId/pageId —— 站点换模板换了 id 也不会静默失效。
+    """
+    index_html = fetch_http(url, timeout=timeout, ip_family=ip_family)
+    api_url, qd = "", {}
+    for sm in JPAAS_SCRIPT_RE.finditer(index_html):
+        attrs = dict(JPAAS_ATTR_RE.findall(sm.group(1)))
+        if not attrs.get("url") or not attrs.get("queryData"):
+            continue
+        cand = _jpaas_parse_querydata(attrs["queryData"])
+        if not cand.get("webId") and not attrs.get("webId"):
+            continue
+        if attrs.get("webId") and not cand.get("webId"):
+            cand["webId"] = attrs["webId"]
+        api_url, qd = urljoin(url, attrs["url"]), cand
+        break
+    if not api_url:
+        print(f"[jpaas] 没找到 queryData 组件，退回静态页：{url}")
+        return index_html
+    total, chunks, got = -1, [], 0
+    for p in range(1, int(pages) + 1):
+        q = dict(qd)
+        q["paramJson"] = json.dumps({"pageNo": p, "pageSize": int(page_size)},
+                                    separators=(",", ":"))
+        try:
+            raw = fetch_http(api_url + "?" + urllib.parse.urlencode(q),
+                             timeout=timeout, ip_family=ip_family, retries=1)
+        except Exception as e:
+            print(f"[jpaas] 第 {p} 页请求失败：{str(e)[:80]}")
+            break
+        try:
+            body = json.loads(raw)
+        except Exception:
+            print(f"[jpaas] 第 {p} 页返回不是 JSON（前 80 字：{raw[:80]!r}）")
+            break
+        if not body.get("success"):
+            print(f"[jpaas] 第 {p} 页接口报错：{str(body.get('message'))[:80]}")
+            break
+        html = ((body.get("data") or {}).get("html") or "")
+        if not html.strip():
+            break
+        chunks.append(html)
+        got += 1
+        if total < 0:
+            m = re.search(r'class="pagination"[^>]*\bcount="(\d+)"', html)
+            total = int(m.group(1)) if m else -1
+        if total > 0 and got * int(page_size) >= total:
+            break
+        if len(re.findall(r"<li\b", html)) < int(page_size) * 0.8 and total < 0:
+            break
+    if not chunks:
+        print(f"[jpaas] 接口返回 0 条，退回静态页：{url}")
+        return index_html
+    print(f"[jpaas] {url} 抓 {got} 页" + (f"（共 {total} 条）" if total > 0 else ""))
+    return index_html + "\n" + "\n".join(chunks)
+
+
 def fetch(source):
     """抓取入口：支持先抓首页、再自动跟进“公务员/省考专栏”仅一层。"""
     method = source.get("method", "http")
@@ -1138,6 +1339,29 @@ def fetch(source):
     http_timeout = source.get("http_timeout", 15)
     block_external = source.get("block_external", False)
     ip_family = source.get("ip_family")
+    # jpage：江苏政务网统一 CMS 的列表接口。走独立抓取路径，不进下面的
+    # follow_pages / page_url_template / browser_click_pages 那些分支——
+    # 那些都是为「HTML 里没有可用链接或页码」的站准备的补丁，jpage 有正经接口，
+    # 一个请求拿 300 条，比点 8 页又快又全，而且云端也能跑。
+    if method == "jpage":
+        try:
+            return fetch_jpage(source["url"], pages=int(source.get("jpage_pages", 3)),
+                               timeout=http_timeout, ip_family=ip_family,
+                               proxy_path=source.get("jpage_proxy_path"))
+        except Exception as e:
+            # 接口整个不通 → 退回普通 http，保住首屏静态条目，别让源直接归零
+            print(f"[jpage] 接口不可用（{str(e)[:80]}），改走普通 http")
+            return _raw_fetch(source["url"], "http", encoding=encoding, ip_family=ip_family)
+    # jpaas：汉王 CMS（泰州等江苏市级站）。同 jpage，也是「栏目页只有壳，
+    # 列表靠接口」的站，但接口与分页方式完全不同，故单独一条路径。
+    if method == "jpaas":
+        try:
+            return fetch_jpaas(source["url"], pages=int(source.get("jpaas_pages", 2)),
+                               page_size=int(source.get("jpaas_page_size", 100)),
+                               timeout=http_timeout, ip_family=ip_family)
+        except Exception as e:
+            print(f"[jpaas] 接口不可用（{str(e)[:80]}），改走普通 http")
+            return _raw_fetch(source["url"], "http", encoding=encoding, ip_family=ip_family)
     html = _raw_fetch(source["url"], method, encoding=encoding,
                       browser_wait=browser_wait, browser_wait_until=browser_wait_until,
                       browser_timeout=browser_timeout, http_timeout=http_timeout,

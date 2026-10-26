@@ -675,13 +675,11 @@
     "category": "事业编",
     "region": "江苏",
     "url": "http://jshrss.jiangsu.gov.cn/col/col78506/index.html",
-    "method": "browser",
-    "browser_wait": 6000,
-    "browser_click_pages": 8,
-    "page_wait": 4000,
+    "method": "jpage",
     "title_include": "招聘|招考|招录|引进|遴选|选调|公告|简章|通知|方案",
     "title_exclude": "公示|拟聘|拟录|笔试|面试|资格|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|开考|有关事项|招聘方案$|高层次人才招聘方案$",
-    "note": "col93339 是「2026年省属事业单位统一公开招聘」年度专题页（一年一次统考，只有公告+大纲+办法，7个月不动属正常，库内仅2条就是它）。真正的滚动栏目是 col78506「省属事业单位招聘」，共141页。http 直取固定回 37653 字节（列表由 CMS 接口渲染），必须 browser + 点击翻页。噪声密度极高：第1页 20 条里 19 条是拟聘公示，10 页 200 条里仅 23 条是真招聘公告，故 title_exclude 收紧；「关闭/重启报名系统公告」也会被「报名」滤掉，属预期。"
+    "note": "2026-10-26 修复（第三次）：弃用 browser + browser_click_pages=8，改走站点的 jpage 列表接口。栏目页里只有 <script type=\"text/xml\"><datastore> 的首屏 20 条，其余全靠 /module/web/jpage/dataproxy.jsp 按页取 XML；该接口纯 http 可直取，一次固定回约 300 条（jpage 的 groupSize:3 × perPage:100，perPage 参数无效），实测 page=1 覆盖 2026-10-26 回溯到 2026-06-15。scraper 会自动从栏目页扒 param_XXX 拿到 webid/columnid/unitid，不硬编码——原先的 browser 方案只有本地通道能跑，云端一直是 0 条。噪声密度仍高（第 1 页 301 条里约 9 成是拟聘公示），title_exclude 保留。",
+    "jpage_pages": 3
   },
   {
     "name": "江苏南京-事业单位",
@@ -798,11 +796,11 @@
     "category": "事业编",
     "region": "江苏",
     "url": "https://jsychrss.yancheng.gov.cn/col/col3431/index.html",
-    "method": "browser",
+    "method": "jpage",
     "title_include": "招聘|招考|招录|引进|遴选|选调|招募",
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|未达开考|开考比例|达不到开考|取消开考|岗位未达开考|开考比例|达不到开考|取消开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$|送达|劳动保障监察|监察文书|认定|产业园|培训班|稳岗返还|补贴|补助|仲裁|年度报表|置顶",
-    "browser_wait": 6000,
-    "note": "2026-10-22 修复：原 method=http，但 col3431 是 JS 动态渲染的框架页，http 直取只拿到「部门资讯/要闻动态」等栏目导航（5 条，招聘 0）。改 browser + 等待 6s 后可解析出真公告（如「盐城广播电视总台公开选调广播电视节目主持人公告」）。"
+    "note": "2026-10-26 修复：同属江苏政务网 jpage CMS（webid=43/columnid=3431/unitid=11112，totalRecord=534），改走 dataproxy 接口，纯 http 即可。原 browser 方案云端跑不了。注意该站列表项的 <a> 带 title 属性（完整标题），可见文本被截断成「…公...」，解析器优先取 title 属性正好合适；日期在相邻的 <td class=\"bt_time\">。",
+    "jpage_pages": 2
   },
   {
     "name": "江苏扬州-事业单位",
@@ -833,12 +831,12 @@
     "category": "事业编",
     "region": "江苏",
     "url": "https://rsj.taizhou.gov.cn/xwzx/gsgg/index.html",
-    "method": "browser",
+    "method": "jpaas",
     "title_include": "招聘|招考|招录|招募|选调|遴选|选聘|引进",
     "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|未达开考|开考比例|达不到开考|取消开考|岗位未达开考|开考比例|达不到开考|取消开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$|参考文本|转发|招聘会|招聘季|活动预告|预告|岗位表|结果|入围|三支一扶|笔试温馨|温馨提示",
-    "browser_click_pages": 15,
-    "page_wait": 4500,
-    "note": "2026-10-24：本站没有独立招聘专栏，唯一相关入口是「新闻中心/公示公告」，115 页 3000+ 条新闻里招聘公告是极少数，第 1 页只有 1 条笔试温馨提示。分页 href=\"javascript:;\"，列表由 jpaas-publish-server 接口动态重建，拿不到任何可请求的分页 URL。已加 browser_click_pages=15 + page_wait=4500，实测捞回 73 条真公告（市直/海陵/靖江/姜堰/人民医院等）。tzrsks.com 已废弃（返回 100 字节空壳），不要再接。 2026-10-24 二次修复：原 href_include=\"gsgg\" 会把该栏目里的跨站链接全砍掉——海陵/靖江/姜堰/卫健委/市场监管等子站用的是 /tzgg/、/gggs/、/bmgg/、/bmgg/ 路径，72 条真公告里 67 条因此被丢弃（只剩 5 条）。该站信息是按「各市区子站聚合」发布到这一个栏目的，跨站链接正是它的价值所在，故移除 href_include，改由 title_include 只认招聘动词来挡导航噪声。"
+    "note": "2026-10-26 修复（第三次，终于通了）：本站是**汉王 jpaas CMS**，与江苏政务网那套 jpage 不是一回事。栏目页只有壳，列表由 /api-gateway/jpaas-publish-server/front/page/build/unit 返回 JSON。三个关键点：① 必须 GET，POST 会回「不支持的HTTP方法」；② 分页不是独立参数，要塞 paramJson={\"pageNo\":2,\"pageSize\":15} 这个 JSON 字符串；③ pageSize 可放大到 100（传 200 会被压回 99），一页覆盖约 8 个月，两页够回溯一年半。原方案 browser_click_pages=15 只能在本地跑，云端长期 0 条。注意页码不严格按日期倒序：顶部有「政府网站年度报表」「农民工欠薪维权通道」两条置顶。",
+    "jpaas_pages": 2,
+    "jpaas_page_size": 100
   },
   {
     "name": "江苏宿迁-事业单位",
