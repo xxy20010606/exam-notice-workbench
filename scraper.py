@@ -2027,6 +2027,30 @@ def _work(s, limit_per_source=40):
         html = fetch(s)
         stats = {}
         items = parse_source(s, html, stats)
+        # 接口源的浏览器兜底：jpage / jpaas 解析出 0 条候选（raw 也是 0）时，
+        # 说明要么接口改结构了、要么返回的列表标记换了。这些源在改接口之前
+        # 本来就是 browser 源，能跑通；有 playwright 就再试一次浏览器，
+        # 宁可慢一轮也不要静默归零。没装 playwright（lite 通道）时直接跳过这条。
+        # 只在 raw==0 时兜底：raw>0 但 items==0 是「读到了但被 include/exclude 全滤掉」，
+        # 那是内容空窗或过滤太严，浏览器取同一份列表也救不了，白花 5-10 秒。
+        if (not items and not stats.get("raw")
+                and s.get("method") in ("jpage", "jpaas")
+                and not s.get("no_browser_fallback")):
+            try:
+                h2 = _raw_fetch(s["url"], "browser",
+                                browser_wait=s.get("browser_wait", 3000),
+                                browser_wait_until=s.get("browser_wait_until", "domcontentloaded"),
+                                browser_timeout=s.get("browser_timeout", 90000),
+                                block_external=s.get("block_external", False))
+                st2 = {}
+                it2 = parse_source(s, h2, st2)
+                if it2:
+                    print(f"[兜底] {s['name']} 接口解析 0 条，改用浏览器取到 {len(it2)} 条")
+                    items, stats = it2, st2
+                else:
+                    print(f"[兜底] {s['name']} 接口解析 0 条，浏览器也是 0 条")
+            except Exception as _e:
+                print(f"[兜底] {s['name']} 接口解析 0 条，浏览器兜底不可用：{str(_e)[:60]}")
         # extra_urls：同一专题的信息常分散在多个栏目。典型是江苏省考——
         # col92917「招考公告」只放公告+大纲两条，职位表在 col92919「岗位信息」，
         # 各种简章/专业目录/技能测试大纲在 col92920「相关文件」。只抓第一个栏目
