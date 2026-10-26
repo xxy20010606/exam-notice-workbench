@@ -188,13 +188,14 @@
     "category": "省考",
     "region": "黑龙江",
     "url": "https://www.hljsgwy.org.cn/tyzpwb/website/queryMore.htm?mkxh=2",
-    "method": "browser",
+    "method": "http",
     "column_link_regex": null,
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告",
     "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考",
     "container": null,
     "onclick_regex": "queryDetail\\(\\s*'(\\d+)'\\s*,\\s*'(\\d+)'\\s*\\)",
-    "onclick_url_template": "https://www.hljsgwy.org.cn/tyzpwb/website/queryDetail.htm?mkxh={0}&tzid={1}"
+    "onclick_url_template": "https://www.hljsgwy.org.cn/tyzpwb/website/queryDetail.htm?mkxh={0}&tzid={1}",
+    "note": "2026-10-26 从 browser 改回 http：云端探针实测纯 http 直取就能解析出条目（命中 2 条）。该站列表用的是 onclick=\"queryDetail('x','y')\"，onclick_regex 在原始 HTML 里就能匹配，根本不需要渲染。原先设 browser 纯属浪费——云端 34 个 browser 源因海外 IP 被封全部超时，这一改让它重新可用。"
   },
   {
     "name": "江苏-省考",
@@ -775,13 +776,10 @@
     "category": "事业编",
     "region": "江苏",
     "url": "http://rsj.lyg.gov.cn/hrzxzx/sydwzp/sydwzp.html",
-    "method": "browser",
+    "method": "http",
     "title_include": "招聘|招考|招录|引进|遴选|选调",
     "title_exclude": "拟聘|拟录|公示|名单|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|有关事项|延长|申诉|未达开考|开考比例|达不到开考|取消开考|准考证|报名入口|报考指南|专业科目|考场|防疫|成绩|体检|考察|资格复审|复审|递补|加分",
-    "browser_wait": 10000,
-    "browser_wait_until": "domcontentloaded",
-    "note": "原rsj.lyg.gov.cn被WAF封锁；改用市政府门户事业单位招聘栏目(gbxbjgwysydwzlxx)。列表索引简单请求返403，依赖云端浏览器实测；若持续失败建议移除本源",
-    "browser_timeout": 30000,
+    "note": "2026-10-26 从 browser 改回 http：云端探针实测纯 http 直取解析出 10 条，且海外 IP 访问该站不超时。原 note 说「简单请求返 403、依赖云端浏览器」是当时的 WAF 行为，现已不拦普通请求。",
     "enabled": true
   },
   {
