@@ -1521,6 +1521,13 @@ def fetch(source):
         except Exception as e:
             print(f"[jpaas] 接口不可用（{str(e)[:80]}）→ 不再重试同域名的普通 http")
             raise
+    if method == "browser":
+        # 浏览器源在云端是最贵的一档：一个连不上的域要走 3 次重试 × browser_timeout
+        # （常见 90s）≈ 4.5 分钟，而且这 4.5 分钟里 Chromium 只是对着一个握手都
+        # 完不成的地址干等。实测 2026-10-26 云端普查：20 个浏览器源里 13 个属于
+        # 这种情况（海外 IP 层面就不通），一轮下来光这里就能吃掉大半小时。
+        # 先用 6s 判一次网络，通不了就立刻放弃 —— 与 jpage/jpaas 同一套闸门。
+        _reach_gate(source["url"], ip_family=ip_family)
     html = _raw_fetch(source["url"], method, encoding=encoding,
                       browser_wait=browser_wait, browser_wait_until=browser_wait_until,
                       browser_timeout=browser_timeout, http_timeout=http_timeout,
