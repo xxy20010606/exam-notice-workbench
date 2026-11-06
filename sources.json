@@ -3,11 +3,11 @@
     "name": "国考-2027年度专题",
     "category": "国考",
     "region": "全国",
-    "url": "http://bm.scs.gov.cn/kl2027",
+    "url": "http://bm.scs.gov.cn/pp/gkweb/core/web/ui/business/home/gkhome.html",
     "method": "browser",
     "title_include": "2027年度考试录用公务员|中央机关及其直属机构2027|公务员招录|招考公告",
     "title_exclude": "注意事项|温馨提示|须知|报到|身份核验|温.?提醒|政策|解读|征集|公示|体检|面试|复审|补录|调剂|准考证|成绩|报名入口|报考指南|专业科目|考场|防疫|拟录用",
-    "note": "2027国考专题。入口是 SPA，curl 直取仅 333 字节空壳，必须 method=browser(playwright)。2026-10-22 修复：公告标题虽在 HTML 里，但 <a href=\"javascript:void(0)\" onclick=\"showArticleDetail(ArticleId,eid,id,...)\"> 形式，parse_source 遇到 javascript: 前缀直接跳过且源未配 onclick_regex，导致 2026-10-13 已发布的《中央机关及其直属机构2027年度考试录用公务员公告》漏抓 9 天。已补 onclick_regex + onclick_url_template。",
+    "note": "[2026-11-06 修] 原 url kl2027 已变成一个 1186 字节的「引导页」（只剩两个图片链接：考务入口、专题入口），SPA 不再挂在那儿 → 浏览器渲染后 raw=0、health_check 报「解析器疑似失效」。改为直达专题页 gkhome.html 后 raw=53 / 4 条，还多补到一条 2026-10-26 的「网上报名与资格审查工作结束」（之前漏抓）。onclick_regex / onclick_url_template 仍有效，未动。下次若再空，先手动看一眼 kl2027 是不是又换引导页了。",
     "browser_timeout": 30000,
     "onclick_regex": "showArticleDetail\\('([^']+)',\\s*'([^']+)',\\s*'([^']+)'",
     "onclick_url_template": "http://bm.scs.gov.cn/pp/gkweb/core/web/ui/business/article/articledetail.html?ArticleId={0}&id={2}&eid={1}"
@@ -1081,7 +1081,8 @@
     "browser_wait": 10000,
     "browser_wait_until": "domcontentloaded",
     "browser_timeout": 30000,
-    "note": "2026-10-26 诊断：url 填的是区政府**首页**（不是栏目页），且站内静态导航里找不到事业单位招聘栏目（首页 107KB 但只有 3 个相关链接，其中「社会招聘」/mspd/shzp 是民生频道，与事业单位招聘无关；直连偶发 SSL UNEXPECTED_EOF），故本源源长期 0 条。上海事业单位招聘以全市统一平台为主（rsj.sh.gov.cn/tsydwgkzp_17406，已单独作为「上海-事业单位招聘」源覆盖，实测 264 条），区级源属补充。待找到正确栏目 URL 后替换即可。"
+    "note": "[2026-11-06 停用] 站点侧故障，不是我们的解析问题：① www.jiading.gov.cn 现在只解析到 IPv6（240e:688:400:3d8::88），没有 A 记录；② IPv6 上 TCP 443 能连（0.06s），但 TLS 握手一直挂住 → 抓取报「TLS 握手 6s 内未完成」，已连续失败 8 次；③ 走 http:// 直接 502 Bad Gateway，说明 IPv6 入口后端本身是坏的；④ www.shjd.gov.cn 有 IPv4（61.129.1.148）但返回的是 Vue 空壳 ztf-project-sh-site-web-vue，上海区级站点整体迁到统一 SPA 了，栏目路径得重新摸。恢复方式：确认 jiading.gov.cn 恢复 A 记录/正常响应后 enabled:true；或者照奉贤那套改成 manda 搜索源（但 manda_token 要在目标站自己抓，不能照抄）。",
+    "enabled": false
   },
   {
     "name": "上海-青浦区-事业单位",
