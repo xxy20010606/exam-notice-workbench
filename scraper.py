@@ -1882,6 +1882,18 @@ def parse_source(source, html, stats=None):
             title = gm3.group(2) + "年" + title[gm3.end():]
         if not title:
             continue
+        # 日期夹在标题中间的：不少 CMS 把整个条目（标题+日期+摘要）都包进 <a>，
+        # 而 <a> 没有 title 属性时 get_text 会把摘要一并拼进标题。典型是
+        # 江苏省委组织部省考专题：「…考试录用公务员公告 2026-10-30 根据《…》」。
+        # 这类标题有两个实际害处：看板上长得没法看；摘要更新一个字 title 就变，
+        # 去重失效 → 同一公告反复入库成多条。
+        # 从第一个「 20xx-xx-xx 」处截断，但要求日期前至少 6 个字 ——
+        # 「2026-10-30 关于…」这种以日期开头的标题前面为空，不会被误截。
+        _mid = re.search(r"\s+20\d{2}-\d{2}-\d{2}\s+", title)
+        if _mid and len(title[:_mid.start()].strip()) >= 6:
+            title = title[:_mid.start()].strip()
+        if not title:
+            continue
         # 列表项目符号剥离：部分站标题前带圆点（如淮安「· 2025年…公开招聘」）
         title = re.sub(r"^[·•∙‧⋅●○›»]+\s*", "", title).strip()
         # 尾部日期剥离：列表页常把日期放在 <i> 里（江苏人社厅
@@ -1897,7 +1909,16 @@ def parse_source(source, html, stats=None):
             stats["raw"] += 1
         if inc and not inc.search(title):
             continue
-        if (exc_src and exc_src.search(title)) or exc_glob.search(title):
+        # no_global_exclude：按源关掉全局噪声表。
+        # 为什么需要：GLOBAL_EXCLUDE 里有些词太宽，本意是滤导航项，却会误杀正当公告——
+        # 典型是裸 `指南`，本意挡「办事指南/服务指南」这类导航，结果把
+        # 「江苏省2027年度考试录用公务员报考指南」一起挡了（该条是省考核心文件）。
+        # 不动 GLOBAL_EXCLUDE 本身：它服务 100 个源，改一个词无法逐个回归；
+        # 需要豁免的源自己配这个开关，前提是它的 title_include 已经足够严
+        # （导航项过不了 include），否则会漏噪声。
+        if exc_src and exc_src.search(title):
+            continue
+        if exc_glob.search(title) and not source.get("no_global_exclude"):
             continue
         href = (a.get("href") or "").strip()
         # href_include：仅保留链接命中该正则的 <a>（如 JCMS 文章详情页 /art/，

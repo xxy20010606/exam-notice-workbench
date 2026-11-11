@@ -26,6 +26,10 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 SOURCES = os.path.join(ROOT, "sources.json")
 
 REGEX_KEY_RE = re.compile(r"(include|exclude|regex|_re|_pattern)$", re.IGNORECASE)
+# 布尔开关：名字里带 exclude/include 但值是 true/false，不是正则。
+# 加新的布尔字段必须同步登记到这里，否则会被下面的正则校验拦下
+# （no_global_exclude 第一次就是因此校验失败）。
+BOOL_KEYS = {"no_global_exclude"}
 # api 用于纯 HTTP JSON API 分页源（福建统一平台）；manda 用于上海站群站内搜索(POST JSON)
 # jsptsearch 用于江苏站群 search4 站内搜索(GET SSR, 如苏州市人社局招聘检索)
 # jpage 用于江苏政务网统一 CMS 的 dataproxy.jsp 列表接口（一个请求 300 条）
@@ -96,6 +100,10 @@ def main():
 
         # 正则类字段（值为 null/None 表示禁用，合法；非空字符串必须能编译）
         for k, v in s.items():
+            if k in BOOL_KEYS:
+                if not isinstance(v, bool):
+                    errors.append(f"{tag} 布尔开关 {k} 必须是 true/false（当前: {v!r}）")
+                continue
             if REGEX_KEY_RE.search(k):
                 if v is None:
                     continue  # 显式关闭，合法
