@@ -407,7 +407,7 @@
       "https://hrss.xizang.gov.cn/xwzx/tzgg/index_2.html",
       "https://hrss.xizang.gov.cn/xwzx/tzgg/index_3.html"
     ],
-    "note": "2026-11-11 改 browser → http。原 WARN 是 TLS 握手 [WinError 10054] 远程主机强迫关闭连接，排查结论：该域名 DNS 同时有 AAAA（240e:62c:100:3::4）和 A（220.182.56.98），且 IPv6 排在前面；playwright 走系统解析容易先撞 IPv6，西藏政务网的 IPv6 链路不稳会直接 RST。实测页面本身完全静态可读（21KB），列表和 index_2/index_3 分页都是静态 HTML，改 http 后 raw=171 / items=1，既去掉 playwright 依赖（国内 lite 通道也能跑），也绕开 IPv6——fetch_http 内部强制 IPv4 解析。 另加 browser_fallback=true：实测云端（海外 IP）这一轮没刷新到本源（last_seen 停在国内通道的时间），说明海外直取可能被挡；配了它之后，云端 raw=0 时会用 playwright 再试一次浏览器（海外通道有 playwright，国内 lite 通道没有就自动跳过），两边都拿不到也不会更差——只是多花 5–10 秒。",
+    "note": "2026-11-11 改 browser → http。原 WARN 是 TLS 握手 [WinError 10054] 远程主机强迫关闭连接，排查结论：该域名 DNS 同时有 AAAA（240e:62c:100:3::4）和 A（220.182.56.98），且 IPv6 排在前面；playwright 走系统解析容易先撞 IPv6，西藏政务网的 IPv6 链路不稳会直接 RST。实测页面本身完全静态可读（21KB），列表和 index_2/index_3 分页都是静态 HTML，改 http 后 raw=171 / items=1，既去掉 playwright 依赖（国内 lite 通道也能跑），也绕开 IPv6——fetch_http 内部强制 IPv4 解析。 另加 browser_fallback=true：实测云端（海外 IP）这一轮没刷新到本源（last_seen 停在国内通道的时间），说明海外直取可能被挡；配了它之后，云端 raw=0 时会用 playwright 再试一次浏览器（海外通道有 playwright，国内 lite 通道没有就自动跳过），两边都拿不到也不会更差——只是多花 5–10 秒。 【海外可达性实测 2026-11-11】云端两轮（06:51 / 07:16 UTC）都没刷到本源，而同轮上海/江苏-省考都刷到了 → 该域从 GHA 海外 IP 整域不可达（IP 层，不是 UA/TLS 问题：http 与 playwright 浏览器两条路都拿不到）。因此本源的数据实际由国内通道提供；海外抓取失败不写 sources_status（cloud_run --no-status），不会污染健康度。",
     "browser_fallback": true
   },
   {
@@ -845,7 +845,7 @@
     "title_include": "招聘|招考|招录|引进|遴选|选调",
     "title_exclude": "拟聘|拟录|公示|名单|成绩|笔试|面试|体检|考察|资格复审|复审|递补|核减|取消|开考|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|缴费|违纪|咨询|有关事项|延长|申诉|达到开考|开考比例|说明|参考文本|慰问|指导目录|岗位需求信息|交流大会|夜市|专场",
     "enabled": true,
-    "note": "2026-10-23 二次修复：镇江人社局没有独立招聘栏目，招聘公告发在「通知公示」（hrss/tzgg），但第 1 页常被补贴公示/拟聘公示占满。改用分页模板 list_{page}.shtml 抓前 6 页（≈60 条），实测 raw=174 → 9 条真公告，含「镇江市事业单位2026年集中公开招聘工作人员公告」（2026-03-19，年度主公告）。注：list_1.shtml 为空，首页必须是 list.shtml，模板从第 2 页起生效。"
+    "note": "2026-10-23 二次修复：镇江人社局没有独立招聘栏目，招聘公告发在「通知公示」（hrss/tzgg），但第 1 页常被补贴公示/拟聘公示占满。改用分页模板 list_{page}.shtml 抓前 6 页（≈60 条），实测 raw=174 → 9 条真公告，含「镇江市事业单位2026年集中公开招聘工作人员公告」（2026-03-19，年度主公告）。注：list_1.shtml 为空，首页必须是 list.shtml，模板从第 2 页起生效。 【海外可达性实测 2026-11-11】云端两轮（06:51 / 07:16 UTC）都没刷到本源，而同轮上海/江苏-省考都刷到了 → 该域从 GHA 海外 IP 整域不可达（IP 层，不是 UA/TLS 问题：http 与 playwright 浏览器两条路都拿不到）。因此本源的数据实际由国内通道提供；海外抓取失败不写 sources_status（cloud_run --no-status），不会污染健康度。"
   },
   {
     "name": "江苏泰州-事业单位",
@@ -1331,7 +1331,7 @@
     "title_exclude": "公示|拟录用|拟聘用|名单|公告发布|公示发布|审核备案|办事指南|如何|怎样|发布会|招聘会|政策|解读|问答|成绩|笔试|面试|资格审核|资格复审|取消|招聘报名|总成绩|排名",
     "jspt_pages": 3,
     "url_exclude": "jszwfw\\.gov\\.cn",
-    "note": "2026-11-11 修复。原配置 raw=20 但只出 1 条，看着像解析器坏了，实际是搜索结果被「政务服务事项」污染：20 条里 15 条是 *.jszwfw.gov.cn/jszwfw/bscx/itemlist/bszn.do 的办事指南，标题就叫「事业单位公开招聘公告发布」「招聘会展位预订」「单位网络招聘」，日期还被渲染成当天——与真公告在标题层面完全分不开，靠 title_exclude 硬凑关键词必然误杀真公告（比如「公告」二字）。改为加 URL 维度闸门 url_exclude=jszwfw\\.gov\\.cn（scraper 新增 url_include/url_exclude，manda/zwgk_es/jsptsearch 三条过滤链都生效），同时 jspt_pages=3 让每个关键词翻 3 页。修后 raw=55 / items=2（镇江市第一人民医院第二批公开招聘公告 2026-11-06、瀚瑞投资招聘公告 2026-09-09）。raw 高而 items 低是正常的：该站通知公示里拟聘名单/成绩公示占绝大多数，那些本来就该滤掉。"
+    "note": "2026-11-11 修复。原配置 raw=20 但只出 1 条，看着像解析器坏了，实际是搜索结果被「政务服务事项」污染：20 条里 15 条是 *.jszwfw.gov.cn/jszwfw/bscx/itemlist/bszn.do 的办事指南，标题就叫「事业单位公开招聘公告发布」「招聘会展位预订」「单位网络招聘」，日期还被渲染成当天——与真公告在标题层面完全分不开，靠 title_exclude 硬凑关键词必然误杀真公告（比如「公告」二字）。改为加 URL 维度闸门 url_exclude=jszwfw\\.gov\\.cn（scraper 新增 url_include/url_exclude，manda/zwgk_es/jsptsearch 三条过滤链都生效），同时 jspt_pages=3 让每个关键词翻 3 页。修后 raw=55 / items=2（镇江市第一人民医院第二批公开招聘公告 2026-11-06、瀚瑞投资招聘公告 2026-09-09）。raw 高而 items 低是正常的：该站通知公示里拟聘名单/成绩公示占绝大多数，那些本来就该滤掉。 【海外可达性实测 2026-11-11】云端两轮（06:51 / 07:16 UTC）都没刷到本源，而同轮上海/江苏-省考都刷到了 → 该域从 GHA 海外 IP 整域不可达（IP 层，不是 UA/TLS 问题：http 与 playwright 浏览器两条路都拿不到）。因此本源的数据实际由国内通道提供；海外抓取失败不写 sources_status（cloud_run --no-status），不会污染健康度。"
   },
   {
     "name": "江苏宿迁-人社招聘搜索",
