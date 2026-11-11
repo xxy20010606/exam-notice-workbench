@@ -212,7 +212,9 @@
     "title_exclude": "选调|遴选|公示|拟录用|拟聘|成绩|面试|体检|考察|递补|资格复审|准考证|作答须知|专业要求|专题$",
     "no_global_exclude": true,
     "note": "[2026-11-06 换源] 原 url 是省人社厅 jshrss.jiangsu.gov.cn 的 col92917「招考公告」，该站整体改成 JS 渲染后彻底失效：栏目页只剩 1265 字节、0 个链接；jpage 接口（dataproxy.jsp，columnid=92917/92919/92920/78503 全试过）一律返回 75 字节空 datastore；静态兜底页只剩站点导航，92 个「候选」全是要闻动态/就业创业这类菜单项，于是表现为 raw=92 / items=0，健康检查误判成「内容空窗」。实际库里最新停在 2025-11-04。2027 省考公告 2026-10-30 就已发布（8149 人），漏了 7 天。现改为省委组织部「江苏先锋」的 2027 省考专题招考公告栏目，浏览器渲染后稳定 16 条，本源解析出 9 条核心文件（公告/报考指南/大纲/专业参考目录/公安·司法·法检简章/职位简介表）。注意：①该专题 URL 带年份 2027ndkslygwyzt，2028 年度要换新专题路径；②no_global_exclude=true 是必需的 —— GLOBAL_EXCLUDE 里裸 \"指南\" 会把「报考指南」误杀；③「公告公示」子栏目只有 3 条且无标题属性，没带进来。 ④另配 skip_whitelist=true：全局招聘白名单要求标题含「公务员|招聘|招录…」，而「公安机关人民警察职位专业科目笔试考试大纲」和「人民法院法官助理、人民检察院检察官助理简章」标题里没有这些词，会被当 junk 丢掉，必须豁免。 [2026-11-11 再改：method browser → jpaas] 初版用 browser 能抓到，但代价是这条源只有本地/海外带 playwright 的通道会更新——国内 lite 通道会跳过全部 browser 源，等于把一个核心省考源降级成「看本地跑不跑」。查证发现该站是汉王 jpaas CMS：栏目页尾部有 <script url=\"/api-gateway/jpaas-publish-server/front/page/build/unit\" queryData=\"{'webId':…,'pageId':…,'tagId':'信息列表'}\">，fetch_jpaas 会自动从栏目页发现这个组件并拼参数、单次 GET 拿 data.html 静态片段。实测 raw=25 / items=9，与浏览器渲染结果逐条一致，且不需要 playwright。故改 jpaas、去掉 browser_wait/browser_timeout。",
-    "skip_whitelist": true
+    "skip_whitelist": true,
+    "discover_url": "https://www.jszzb.gov.cn/",
+    "discover_regex": "https://www\\.jszzb\\.gov\\.cn/(20\\d{2})[a-z]*/zkgg/index\\.html"
   },
   {
     "name": "浙江-省考",
@@ -396,17 +398,16 @@
     "category": "省考",
     "region": "西藏",
     "url": "https://hrss.xizang.gov.cn/xwzx/tzgg/",
-    "method": "browser",
-    "column_link_regex": null,
+    "method": "http",
     "title_include": "考试录用公务员|公务员招录|公务员招考|录用公务员公告|考录公务员|招录公务员",
     "title_exclude": "资格|职称|执业|技能|三支一扶|选调|遴选|温.?提醒|政策|解读|征集|准考证|成绩|报名入口|报考指南|注意事项|温馨提示|须知|报到|中央机关|国考|公示|拟录用|面试|体能",
-    "container": null,
     "follow_pages": "index_\\d+\\.html",
     "max_pages": 4,
     "page_urls": [
       "https://hrss.xizang.gov.cn/xwzx/tzgg/index_2.html",
       "https://hrss.xizang.gov.cn/xwzx/tzgg/index_3.html"
-    ]
+    ],
+    "note": "2026-11-11 改 browser → http。原 WARN 是 TLS 握手 [WinError 10054] 远程主机强迫关闭连接，排查结论：该域名 DNS 同时有 AAAA（240e:62c:100:3::4）和 A（220.182.56.98），且 IPv6 排在前面；playwright 走系统解析容易先撞 IPv6，西藏政务网的 IPv6 链路不稳会直接 RST。实测页面本身完全静态可读（21KB），列表和 index_2/index_3 分页都是静态 HTML，改 http 后 raw=171 / items=1，既去掉 playwright 依赖（国内 lite 通道也能跑），也绕开 IPv6——fetch_http 内部强制 IPv4 解析。"
   },
   {
     "name": "陕西-省考",
@@ -996,8 +997,9 @@
     "browser_wait": 8000,
     "browser_wait_until": "domcontentloaded",
     "browser_timeout": 45000,
-    "note": "2026-10-26 诊断：该页是**混淆 JS 反爬壳**——28KB HTML 里 <a> 标签数为 0，<body> 只有 <script>_$oK('LEA1')</script> 和 _$yV()，正文完全由混淆脚本生成。所以纯 http 直取永远 raw=0，必须真实浏览器执行 JS 才能出内容。method 维持 browser 不动（没在本地用真实浏览器验证，不盲调 browser_wait/wait_until，以免把本来能跑的源改坏）。若云端长期 0 条，优先把 browser_wait_until 改 networkidle + 等待加到 15s。",
-    "limit": 50
+    "note": "2026-11-11 停用。原 browser 源指向 /zw/009002/009002016/009002016004/listIndex2.html，实测 raw=156 / items=0，而那 156 条全是 ENGLISH/日本語/政务公开 这类导航项——该页 27KB 全是壳，正文由 JS 渲染；且黄浦站不提供任何可直取的列表接口（没有 cms-channel/jpaas，也没有 /front/api 或 /zwgk-search-api），站内搜索常见路径 /search/mhsearch.html、/search/、/hpssearch/ 等一律回落到同一个 27KB 软 404 页，拿不到 manda token。黄浦真正的招聘公告分散在 /fw/003001/（公示公告）、/xw/001015/（新闻）、/yqyw/010001/...（卫健系统）、/zw/009002/009002004/...（教育）等多个栏目，且同样 JS 渲染。当前覆盖由「上海-事业单位招聘」+「上海-事业单位统考公告」承担（黄浦岗位公告会同时发在市人社局平台），区级源暂缺。恢复路径：等黄浦换 CMS3（有 /front/api 接口）后改 method=zwgk_es；或找到站内搜索页取到 manda token 改 method=manda。",
+    "limit": 50,
+    "enabled": false
   },
   {
     "name": "上海-黄浦区-教育招聘",
@@ -1042,14 +1044,26 @@
     "name": "上海-杨浦区-事业单位",
     "category": "事业编",
     "region": "上海",
-    "url": "https://www.shyp.gov.cn/",
-    "method": "browser",
-    "title_include": "招聘|招考|招录|引进|遴选|选调",
-    "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|未达开考|开考比例|达不到开考|取消开考|岗位未达开考|开考比例|达不到开考|取消开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
+    "url": "https://www.shyp.gov.cn/zhengwu/rsj-sydwgkzp/index.html",
+    "method": "zwgk_es",
+    "title_include": "公开招聘|招录公告|招聘公告|选调|引进人才|招考|招录|(教师|社区工作者|编外|国企|事业单位|社工).{0,8}(公开招聘|招聘)|招聘启事",
+    "title_exclude": "公示|拟录用|拟聘用|拟招|拟录|成绩|名单|结果|已结束|发布会|如何|怎样|什么|为什么|区别|问答|查询|申报|批复|面试安排|面试相关|面试通知|资格审核|资格复审|培训会|新闻|促就业|招聘会|举办|补贴|见习|奖励|表彰|选树|通报|关于开展|关于印发|会议|工作要点|入围|调剂|啦$|来啦|推动|倒计时|今日截止|明起|消费券|促消费|遴选.{0,6}平台|平台.{0,4}遴选",
     "browser_wait": 10000,
     "browser_wait_until": "domcontentloaded",
     "browser_timeout": 30000,
-    "note": "2026-10-26 诊断：url 填的是区政府**首页**（不是栏目页），且站内静态导航里找不到事业单位招聘栏目（首页仅 342 字节，正文几乎为空），故本源源长期 0 条。上海事业单位招聘以全市统一平台为主（rsj.sh.gov.cn/tsydwgkzp_17406，已单独作为「上海-事业单位招聘」源覆盖，实测 264 条），区级源属补充。待找到正确栏目 URL 后替换即可。"
+    "note": "2026-11-11 换源。原 url 是区政府首页（342 字节空壳），长期 0 条。本次找到真实栏目并改用接口抓取：①区人社局「事业单位公开招聘」/zhengwu/rsj-sydwgkzp（CMS 栏目 id 488，内容是拟录用公示为主）；②区卫健委「高层次人才」/zhengwu/wjw-gzcy（id 720，卫健系统招聘公告在这里）；③区教育局「人事信息」/zhengwu/jyj-rsxx（id 203，教师招聘）。为什么走接口而不是浏览器：该站 2026 年换成 CMS3（cms-channel.js + /front/api/data/search），栏目页只有壳；且部署了 WAF，无头浏览器直连直接 403「当前访问疑似攻击行为」，只有带正常 UA 的浏览器才放行——国内 lite 通道本来就没有 playwright，走 browser 等于把这个源降级成只在本地跑。接口是 POST JSON（必须 Content-Type: application/json，text/plain 一律回 500），实测 raw=67 / items=3。产出偏少是真实情况：区级自己发的招聘公告不多，多数并入全市统考（已由「上海-事业单位招聘」覆盖）。",
+    "es_api": "https://www.shyp.gov.cn/front/api/data/search",
+    "es_channels": [
+      "488",
+      "720",
+      "203"
+    ],
+    "es_pages": 2,
+    "es_page_size": 50,
+    "es_extra_pages": [
+      "https://www.shyp.gov.cn/shypq/rcdw-jszp/index.html",
+      "https://www.shyp.gov.cn/shypq/ggfw-bmgg/index.html"
+    ]
   },
   {
     "name": "上海-闵行区-事业单位",
@@ -1085,14 +1099,21 @@
     "name": "上海-青浦区-事业单位",
     "category": "事业编",
     "region": "上海",
-    "url": "https://www.shqp.gov.cn/",
-    "method": "browser",
-    "title_include": "招聘|招考|招录|引进|遴选|选调",
-    "title_exclude": "公示|拟聘|拟录用|拟招|笔试|面试|资格复审|复审|体检|考察|考核|成绩|加分|递补|准考证|报名|须知|温馨提示|提醒|政策|解读|征集|意见|补充|调整|取消|核减|减少|缴费|违纪|咨询|名单|有关事宜|延长|申诉|未达开考|开考比例|达不到开考|取消开考|岗位未达开考|开考比例|达不到开考|取消开考|有关事项|补充通知|招聘方案$|高层次人才招聘方案$",
+    "url": "https://www.shqp.gov.cn/zhengwu/eduzwgk/gg/index.html",
+    "method": "zwgk_es",
+    "title_include": "公开招聘|招录公告|招聘公告|选调|引进人才|招考|招录|(教师|社区工作者|编外|国企|事业单位|社工).{0,8}(公开招聘|招聘)|招聘启事",
+    "title_exclude": "公示|拟录用|拟聘用|拟招|拟录|成绩|名单|结果|已结束|发布会|如何|怎样|什么|为什么|区别|问答|查询|申报|批复|面试安排|面试相关|面试通知|资格审核|资格复审|培训会|新闻|促就业|招聘会|举办|补贴|见习|奖励|表彰|选树|通报|关于开展|关于印发|会议|工作要点|入围|调剂|啦$|来啦|推动|倒计时|今日截止|明起",
     "browser_wait": 10000,
     "browser_wait_until": "domcontentloaded",
     "browser_timeout": 30000,
-    "note": "2026-10-26 诊断：url 填的是区政府**首页**（不是栏目页），且站内静态导航里找不到事业单位招聘栏目（首页 108 字节，只有 meta refresh 跳到 /shqp/index.html，首页无招聘入口），故本源源长期 0 条。上海事业单位招聘以全市统一平台为主（rsj.sh.gov.cn/tsydwgkzp_17406，已单独作为「上海-事业单位招聘」源覆盖，实测 264 条），区级源属补充。待找到正确栏目 URL 后替换即可。"
+    "note": "2026-11-11 换源。原 url 是区政府首页（108 字节 meta refresh），长期 0 条。本次定位到两个真栏目：①区教育局「公告」/zhengwu/eduzwgk/gg（CMS id 1729）——青浦的教师招聘、储备人才、高端教育人才公告都在这里；②区人社局「重点工作」下的「事业单位招聘」（id 2805，内容是拟录用名单公示）。接口与杨浦不同：青浦这套 CMS 用 /zwgk-search-api/api/data/affair，同样 POST JSON + application/json，参数结构一致。另注意青浦证书链在 Python 默认校验下会 CERTIFICATE_VERIFY_FAILED，抓取器自带放宽的 SSL 上下文，直接走 _http_post_json 即可。实测 raw=100 / items=6（覆盖 2025-11 至今的 6 场招聘：教师/储备人才/高端人才三轮）。",
+    "es_api": "https://www.shqp.gov.cn/zwgk-search-api/api/data/affair",
+    "es_channels": [
+      "1729",
+      "2805"
+    ],
+    "es_pages": 2,
+    "es_page_size": 50
   },
   {
     "name": "上海-崇明区-事业单位",
@@ -1117,14 +1138,17 @@
     "manda_token": "17q2lm8",
     "manda_razor": "jamh_search",
     "manda_queries": [
-      "公开招聘",
-      "招聘公告",
-      "招录"
+      "静安区社区工作者公开招聘",
+      "静安区事业单位公开招聘",
+      "静安区教师招聘",
+      "静安区 招聘公告",
+      "静安区 招聘"
     ],
     "manda_size": 50,
-    "manda_days": 180,
+    "manda_days": 200,
     "title_include": "公开招聘|招录公告|招聘公告|选调|引进人才|(教师|社区工作者|编外|国企|事业单位|社工).{0,8}(公开招聘|招聘)|招聘启事",
-    "title_exclude": "公示|拟录用|拟聘用|拟招|拟录|成绩|名单|结果|已结束|发布会|专场|如何|怎样|什么|为什么|区别|问答|查询|申报|批复|笔试|面试安排|面试相关|面试通知|资格审核|资格复审|培训会|新闻|促就业|招聘会|举办|补贴|见习|奖励|表彰|选树|通报|关于开展|关于印发|会议|工作要点|干部公开选拔|入围|调剂|啦$|来啦|推动|跃升|全链赋能|倒计时|今日截止|明起|(20[0-1][0-9]|202[0-5])年$"
+    "title_exclude": "公示|拟录用|拟聘用|拟招|拟录|成绩|名单|结果|已结束|发布会|专场|如何|怎样|什么|为什么|区别|问答|查询|申报|批复|笔试|面试安排|面试相关|面试通知|资格审核|资格复审|培训会|新闻|促就业|招聘会|举办|补贴|见习|奖励|表彰|选树|通报|关于开展|关于印发|会议|工作要点|干部公开选拔|入围|调剂|啦$|来啦|推动|跃升|全链赋能|倒计时|今日截止|明起|(20[0-1][0-9]|202[0-5])年$",
+    "note": "2026-11-11 排查：原配置 raw=133 但 items=0，曾被健康检查报「内容空窗」。结论不是解析器坏了，是两件事叠加：①关键词太泛（公开招聘/招聘公告/招录），manda 按相关性排序，返回的全是 2017–2024 的老招聘，全部被 manda_days=180 的日期窗挡掉；②2026 年静安社工招聘公告（2026-05-27 报名）在站内索引里已查不到，只能查到 2026-08~09 的「拟聘用人员第 X 批公示（已结束）」——本案设计上就排除公示，所以这一轮 reality 就是 0 条。改为更具体的关键词（带区名）+ manda_days=200，让下一个招聘周期（每年 5 月）能被抓到。注意：这里的 0 条是真实空窗，不是故障，健康检查的 WARN 可以忽略。"
   },
   {
     "name": "上海-奉贤区-招聘搜索",
@@ -1303,7 +1327,10 @@
       "招聘"
     ],
     "title_include": "公开招聘|招聘公告|招聘启事|招录|引进|选调|遴选|(教师|卫技|医师|医技|高层次|紧缺|编外|后备).{0,10}(招聘|选拔|引进)",
-    "title_exclude": "公示|拟录用|拟聘用|名单|公告发布|公示发布|审核备案|办事指南|如何|怎样|发布会|招聘会|政策|解读|问答|成绩|笔试|面试|资格审核|资格复审|取消|招聘报名|总成绩|排名"
+    "title_exclude": "公示|拟录用|拟聘用|名单|公告发布|公示发布|审核备案|办事指南|如何|怎样|发布会|招聘会|政策|解读|问答|成绩|笔试|面试|资格审核|资格复审|取消|招聘报名|总成绩|排名",
+    "jspt_pages": 3,
+    "url_exclude": "jszwfw\\.gov\\.cn",
+    "note": "2026-11-11 修复。原配置 raw=20 但只出 1 条，看着像解析器坏了，实际是搜索结果被「政务服务事项」污染：20 条里 15 条是 *.jszwfw.gov.cn/jszwfw/bscx/itemlist/bszn.do 的办事指南，标题就叫「事业单位公开招聘公告发布」「招聘会展位预订」「单位网络招聘」，日期还被渲染成当天——与真公告在标题层面完全分不开，靠 title_exclude 硬凑关键词必然误杀真公告（比如「公告」二字）。改为加 URL 维度闸门 url_exclude=jszwfw\\.gov\\.cn（scraper 新增 url_include/url_exclude，manda/zwgk_es/jsptsearch 三条过滤链都生效），同时 jspt_pages=3 让每个关键词翻 3 页。修后 raw=55 / items=2（镇江市第一人民医院第二批公开招聘公告 2026-11-06、瀚瑞投资招聘公告 2026-09-09）。raw 高而 items 低是正常的：该站通知公示里拟聘名单/成绩公示占绝大多数，那些本来就该滤掉。"
   },
   {
     "name": "江苏宿迁-人社招聘搜索",

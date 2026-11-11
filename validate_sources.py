@@ -5,7 +5,7 @@ sources.json 推送前 / 抓取前自动校验（防呆）：
 
   - 顶层必须是 list（源数组）
   - 每条必填 name（非空字符串，且全局唯一） / url（非空、合法 http(s) 地址）
-  - method ∈ {http, browser, api, manda, jsptsearch, jsonapi, gwycolumn}
+  - method ∈ {http, browser, api, manda, jsptsearch, jsonapi, zwgk_es, gwycolumn, jpage, jpaas}
     （api=福建统一平台 JSON；jsonapi=通用后台 JSON 接口+签名头，如宁波人才网）
   - 所有 *_include / *_exclude / *_regex / *_re / *_pattern 字段必须是合法正则
   - browser_wait 必须是 >=0 的整数（若提供）
@@ -34,13 +34,16 @@ BOOL_KEYS = {"no_global_exclude"}
 # jsptsearch 用于江苏站群 search4 站内搜索(GET SSR, 如苏州市人社局招聘检索)
 # jpage 用于江苏政务网统一 CMS 的 dataproxy.jsp 列表接口（一个请求 300 条）
 # jpaas 用于汉王 jpaas-publish-server 列表接口（泰州/扬州/浙江多市）
+# zwgk_es 用于上海新版政务公开搜索接口（CMS3：杨浦 /front/api/data/search、
+#   青浦 /zwgk-search-api/api/data/affair；POST JSON 且必须 application/json）
 # ↑ 这两个是 2026-10-26 新增的。**加 method 必须同步改这里**：scrape.yml 第一件事
 #   就是跑本脚本，漏改会让整个云端抓取在校验步骤直接退出，一个源都不抓，
 #   而且报错藏在 workflow 的第一屏，很容易被当成「站点又改版了」去查源。
-VALID_METHODS = {"http", "browser", "api", "manda", "jsptsearch", "jsonapi",
+VALID_METHODS = {"http", "browser", "api", "manda", "jsptsearch", "jsonapi", "zwgk_es",
                  "gwycolumn", "jpage", "jpaas"}
 # 接口源的分页参数：正整数，有上限（jpaas 实测 pageSize 传 200 会被服务端压回 99）
-INT_OPTS = {"jpage_pages": (1, 20), "jpaas_pages": (1, 20), "jpaas_page_size": (1, 200)}
+INT_OPTS = {"jpage_pages": (1, 20), "jpaas_pages": (1, 20), "jpaas_page_size": (1, 200),
+            "jspt_pages": (1, 10), "es_pages": (1, 20), "es_page_size": (1, 200)}
 VALID_WAIT_UNTIL = {"load", "domcontentloaded", "networkidle"}
 VALID_URL_RE = re.compile(r"^https?://[^\s/]+", re.IGNORECASE)
 

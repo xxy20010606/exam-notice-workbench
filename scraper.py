@@ -320,9 +320,15 @@ def fetch_http(url, timeout=30, retries=2, encoding=None, ip_family=None):
     raise last
 
 
-def _http_post_json(url, payload, timeout=30, retries=2):
-    """POST JSON(body 以 text/plain 发送，兼容 manda 搜索接口)，强制 IPv4 + 代理回退。
-    返回解析后的 dict（JSON）。失败抛异常。
+def _http_post_json(url, payload, timeout=30, retries=2,
+                    content_type="text/plain", referer=None):
+    """POST JSON，强制 IPv4 + 代理回退。返回解析后的 dict（JSON）。失败抛异常。
+
+    content_type 默认 text/plain：manda 搜索接口（ss.shanghai.gov.cn）只吃这个，
+    发 application/json 会被它的网关直接挡掉。但上海新版政务公开的 ES 接口
+    （/front/api/data/search、/zwgk-search-api/api/data/affair）正相反——
+    text/plain 一律回 {"code":500,"message":"error"}，必须是 application/json，
+    所以做成参数而不是写死。
     """
     import urllib.request, ssl, socket as _socket_mod, json as _json
     ctx = ssl.create_default_context()
@@ -332,9 +338,9 @@ def _http_post_json(url, payload, timeout=30, retries=2):
     data = _json.dumps(payload).encode("utf-8")
     headers = {
         "User-Agent": DEFAULT_UA,
-        "Content-Type": "text/plain",
+        "Content-Type": content_type,
         "Accept": "application/json",
-        "Referer": "https://www.jingan.gov.cn/",
+        "Referer": referer or "https://www.jingan.gov.cn/",
     }
     _orig_gai = _socket_mod.getaddrinfo
     def _ipv4_only(host, port, family=0, *a, **kw):
@@ -777,6 +783,108 @@ def _manda_items(source):
     return items
 
 
+def _zwgk_es_items(source):
+    """上海新版政务公开搜索接口（CMS3：cms-channel.js + /api/data/*）列表抓取。
+
+    为什么单独一条路径：上海多区门户 2026 年陆续换成这套 CMS，栏目页只有壳，
+    列表全由 JS 调接口渲染（杨浦 /front/api/data/search、青浦
+    /zwgk-search-api/api/data/affair）。这类站的老办法是 browser 渲染，但
+    ① 国内 lite 通道没 playwright，会整源跳过；② 杨浦部署了 WAF，无头浏览器
+    直接 403「疑似攻击行为」。走接口则纯 http、两个通道都能跑，还快得多。
+
+    源需含：
+      es_api      : 完整接口 URL（栏目页里 `http: '...'` 那一行）
+      es_channels : 栏目 id 列表（页面里 new CMS('#columnlist', {ids: '488'})），
+                    可给多个，接口会合并返回；省略则整站（噪声极大，不建议）
+      es_pages    : 拉几页（默认 2）
+      es_page_size: 每页条数（默认 50）
+      url         : 栏目页地址，仅用作 Referer（部分站点校验 Referer）
+    返回 items 列表（title/url/date）。
+    """
+    import datetime as _dt
+    api = source["es_api"]
+    chans = [str(c) for c in (source.get("es_channels") or [])]
+    pages = int(source.get("es_pages", 2))
+    size = int(source.get("es_page_size", 50))
+    ref = source.get("url") or api
+    root = re.match(r"^(https?://[^/]+)", ref)
+    root = root.group(1) if root else ref
+    items, seen = [], set()
+    for p in range(1, pages + 1):
+        payload = {"orderFields": ["display_date", "id"],
+                   "orderTypes": ["desc", "desc"],
+                   "pageNo": p, "pageSize": size}
+        if chans:
+            payload["channelList"] = chans
+        try:
+            out = _http_post_json(api, payload, timeout=int(source.get("http_timeout", 20)),
+                                  retries=1, content_type="application/json", referer=ref)
+        except Exception as e:
+            print(f"[zwgk_es] {source['name']} 第 {p} 页请求失败：{str(e)[:80]}")
+            break
+        if out.get("code") not in (0, "0", None):
+            print(f"[zwgk_es] {source['name']} 第 {p} 页接口报错："
+                  f"code={out.get('code')} {str(out.get('message'))[:60]}")
+            break
+        data = out.get("data") or {}
+        lst = data.get("list") or []
+        if not lst:
+            break
+        for it in lst:
+            title = (it.get("title") or "").strip()
+            u = (it.get("url") or "").strip()
+            if not title or not u:
+                continue
+            if u.startswith("/"):
+                u = root + u
+            elif not u.lower().startswith("http"):
+                u = root + "/" + u.lstrip("./")
+            date = ""
+            ms = it.get("display_date")
+            if isinstance(ms, (int, float)) and ms > 0:
+                # 接口给的是毫秒时间戳，按北京时间换算（库内 date 一律是本地日历日）
+                date = (_dt.datetime.utcfromtimestamp(ms / 1000) +
+                        _dt.timedelta(hours=8)).strftime("%Y-%m-%d")
+            if not date:
+                date = extract_date(title + " " + u, u)
+            key = u.split("#")[0]
+            if key in seen:
+                continue
+            seen.add(key)
+            items.append({"title": title[:200], "url": u, "date": date})
+        total = data.get("totalCount") or 0
+        if total and p * size >= int(total):
+            break
+    # es_extra_pages：附带几个「静态栏目页」一起抓。
+    # 为什么需要：同一个区政府站往往并存两代模板——政务公开栏目是 CMS3（走接口），
+    # 而专题/频道栏目（如杨浦 /shypq/rcdw-jszp/ 教师招聘）还是纯静态 HTML 列表。
+    # 只走接口会漏掉后者，而后者恰恰是教师招聘这类高价值公告的唯一出口。
+    # 这里对每个附加页跑一遍标准 parse_source（沿用同一套 include/exclude），
+    # 再把结果并入 items，按 url 去重。
+    for purl in (source.get("es_extra_pages") or []):
+        try:
+            ph = fetch_http(purl, timeout=int(source.get("http_timeout", 20)), retries=0)
+        except Exception as e:
+            print(f"[zwgk_es] {source['name']} 附加栏目失败 {purl}：{str(e)[:60]}")
+            continue
+        sub = dict(source)
+        sub["url"] = purl
+        try:
+            extra = parse_source(sub, ph)
+        except Exception as e:
+            print(f"[zwgk_es] {source['name']} 附加栏目解析失败 {purl}：{str(e)[:60]}")
+            continue
+        for it in extra:
+            u = it.get("url") or ""
+            key = u.split("#")[0]
+            if not u or key in seen:
+                continue
+            seen.add(key)
+            items.append({"title": (it.get("title") or "")[:200], "url": u,
+                          "date": it.get("date") or ""})
+    return items
+
+
 def _filter_manda_items(source, items):
     """对 manda 搜索返回的 items 应用源的 include/exclude + 标题去重 + 日期窗口。
 
@@ -788,6 +896,7 @@ def _filter_manda_items(source, items):
     """
     inc = re.compile(source["title_include"]) if source.get("title_include") else None
     exc = re.compile(source["title_exclude"]) if source.get("title_exclude") else None
+    uinc, uexc = _url_gates(source)
     days = int(source.get("manda_days", 400))
     now = datetime.date.today()
     seen = set()
@@ -795,6 +904,10 @@ def _filter_manda_items(source, items):
     for it in items:
         t = it["title"] or ""
         nt = _norm_title(t)
+        if uinc and not uinc.search(it.get("url") or ""):
+            continue
+        if uexc and uexc.search(it.get("url") or ""):
+            continue
         if inc and not inc.search(nt):
             continue
         if exc and exc.search(nt):
@@ -841,40 +954,66 @@ def _jsptsearch_items(source):
       method: "jsptsearch"
       jspt_url:  search4 URL 模板(含 {searchWord} 占位, 或直接含 searchWord=xxx)
       jspt_keywords: 关键词列表(如 ["招聘"])
+      jspt_pages: 每个关键词翻几页（默认 1；pageNum 0 基）
     返回 items(title/url/date)。
     search4 结果页 SSR 渲染, 每条主公告为 <a class="..titleFont permitT.." href=.. title=标题>,
     日期在同结果块内 <b>YYYY-MM-DD</b>。解析后入库。
     """
     base = source.get("jspt_url") or source.get("url")
     keywords = source.get("jspt_keywords") or ["招聘"]
+    pages = int(source.get("jspt_pages", 1))
     items, seen = [], set()
+    pat_a = re.compile(
+        r'<a[^>]+href="(https?://[^"]+)"[^>]*class="[^"]*titleFont[^"]*permitT[^"]*"[^>]*title="([^"]+)"', re.S)
     for kw in keywords:
-        url = base.format(searchWord=quote(kw)) if "{searchWord}" in base else base
-        try:
-            html = fetch_http(url, timeout=25)
-        except Exception as e:
-            print(f"[jsptsearch] {source['name']} 关键词[{kw}] 请求失败: {e}")
-            continue
-        pat_a = re.compile(
-            r'<a[^>]+href="(https?://[^"]+)"[^>]*class="[^"]*titleFont[^"]*permitT[^"]*"[^>]*title="([^"]+)"', re.S)
-        matches = list(pat_a.finditer(html))
-        for k, m in enumerate(matches):
-            u, t = m.group(1), m.group(2).strip()
-            if not u or not t:
-                continue
-            key = u.split("#")[0]
-            if key in seen:
-                continue
-            seen.add(key)
-            # 该结果块 = 到下一条标题 a 前，块内取日期 <b>YYYY-MM-DD</b>
-            blk_end = matches[k+1].start() if k+1 < len(matches) else len(html)
-            block = html[m.end():blk_end]
-            dm = re.search(r'<b>\s*(20\d{2}-\d{1,2}-\d{1,2})\s*</b>', block)
-            if not dm:
-                dm = re.search(r'(20\d{2}-\d{1,2}-\d{1,2})', block)
-            date = dm.group(1) if dm else ""
-            items.append({"title": t[:200], "url": u, "date": date})
+        for pg in range(pages):
+            url = base.format(searchWord=quote(kw)) if "{searchWord}" in base else base
+            if pg:
+                # search4 分页靠 pageNum（0 基）。配置里没留占位符时直接改数字，
+                # 这样老配置（URL 写死 pageNum=0）不用改也能翻页。
+                if "{pageNum}" in url:
+                    url = url.format(pageNum=pg)
+                else:
+                    url = re.sub(r"pageNum=\d+", f"pageNum={pg}", url)
+            try:
+                html = fetch_http(url, timeout=25)
+            except Exception as e:
+                print(f"[jsptsearch] {source['name']} 关键词[{kw}] 第 {pg+1} 页请求失败: {e}")
+                break
+            matches = list(pat_a.finditer(html))
+            if not matches:
+                break          # 翻到空页，该关键词不用再翻
+            for k, m in enumerate(matches):
+                u, t = m.group(1), m.group(2).strip()
+                if not u or not t:
+                    continue
+                key = u.split("#")[0]
+                if key in seen:
+                    continue
+                seen.add(key)
+                # 该结果块 = 到下一条标题 a 前，块内取日期 <b>YYYY-MM-DD</b>
+                blk_end = matches[k+1].start() if k+1 < len(matches) else len(html)
+                block = html[m.end():blk_end]
+                dm = re.search(r'<b>\s*(20\d{2}-\d{1,2}-\d{1,2})\s*</b>', block)
+                if not dm:
+                    dm = re.search(r'(20\d{2}-\d{1,2}-\d{1,2})', block)
+                date = dm.group(1) if dm else ""
+                items.append({"title": t[:200], "url": u, "date": date})
     return items
+
+
+def _url_gates(source):
+    """URL 维度的准入闸门（url_include / url_exclude），返回 (inc, exc) 两个已编译正则。
+
+    为什么需要这一层：站内搜索/站群搜索会连带把「政务服务事项」也搜出来。
+    典型（2026-11-11 镇江 search4，「招聘公告」20 条结果）：12 条是
+    *.jszwfw.gov.cn/jszwfw/bscx/itemlist/bszn.do 的办事指南，标题就叫
+    「事业单位公开招聘公告发布」，日期还被填成当天 —— 与真公告在标题上
+    根本分不开，只能按域名/路径挡。用 title_exclude 硬凑关键词会误杀真公告。
+    """
+    uinc = re.compile(source["url_include"]) if source.get("url_include") else None
+    uexc = re.compile(source["url_exclude"]) if source.get("url_exclude") else None
+    return uinc, uexc
 
 
 def _filter_jsptsearch(source, items):
@@ -883,11 +1022,16 @@ def _filter_jsptsearch(source, items):
     """
     inc = re.compile(source["title_include"]) if source.get("title_include") else None
     exc = re.compile(source["title_exclude"]) if source.get("title_exclude") else None
+    uinc, uexc = _url_gates(source)
     seen = set()
     out = []
     for it in items:
         t = it.get("title") or ""
         nt = _norm_title(t)
+        if uinc and not uinc.search(it.get("url") or ""):
+            continue
+        if uexc and uexc.search(it.get("url") or ""):
+            continue
         if inc and not inc.search(nt):
             continue
         if exc and exc.search(nt):
@@ -1497,6 +1641,38 @@ def fetch_jpaas(url, pages=2, page_size=100, timeout=20, ip_family=None):
     return index_html + "\n" + "\n".join(chunks)
 
 
+def _discover_topic_url(source):
+    """按年份自动发现「专题入口」，避免把年度写死在 url 里。
+
+    背景：江苏先锋的省考专题每年换一个路径（2026ndkslygwyzt / 2027ndkslygwyzt…），
+    硬编码的失效方式特别隐蔽——旧年度专题页不会 404，只是停更，于是
+    raw 一直有值、items 一直为 0，看起来像「内容空窗」，实际是新年度公告
+    全部进了另一个目录。等到健康检查报 CRITICAL 时已经漏了几个月。
+
+    做法：配置 discover_url（通常就是站点首页）+ discover_regex（第 1 个分组是年份），
+    每次抓取前重新解析一遍，取年份最大的那个入口。发现失败就返回 None，
+    调用方回退到配置里的 url —— 绝不让「发现」这一步成为新的失败点。
+    """
+    du = source.get("discover_url")
+    rx = source.get("discover_regex")
+    if not du or not rx:
+        return None
+    try:
+        html = fetch_http(du, timeout=int(source.get("http_timeout", 15)), retries=0)
+    except Exception as e:
+        print(f"[discover] {source['name']} 首页抓取失败，沿用配置 url：{str(e)[:60]}")
+        return None
+    best, best_year = None, -1
+    for m in re.finditer(rx, html):
+        try:
+            y = int(m.group(1))
+        except (TypeError, ValueError, IndexError):
+            y = 0
+        if y > best_year:
+            best_year, best = y, m.group(0)
+    return best
+
+
 def fetch(source):
     """抓取入口：支持先抓首页、再自动跟进“公务员/省考专栏”仅一层。"""
     method = source.get("method", "http")
@@ -1530,6 +1706,13 @@ def fetch(source):
     # jpaas：汉王 CMS（泰州等江苏市级站）。同 jpage，也是「栏目页只有壳，
     # 列表靠接口」的站，但接口与分页方式完全不同，故单独一条路径。
     if method == "jpaas":
+        # 年度专题类源（如江苏先锋省考）每年换路径，先自动发现再抓，
+        # 避免跨年后「旧专题还能打开但已停更」这种静默失效。
+        _disc = _discover_topic_url(source)
+        if _disc and _disc != source["url"]:
+            print(f"[jpaas] {source['name']} 年度专题切换：{source['url']} → {_disc}")
+            # 同步改 url：parse_source 用它做相对链接的 urljoin 基准
+            source["url"] = _disc
         try:
             _reach_gate(source["url"], ip_family=ip_family)
             return fetch_jpaas(source["url"], pages=int(source.get("jpaas_pages", 2)),
@@ -2103,7 +2286,15 @@ def cleanup_noise():
                      "%政府采购%", "%单一来源%", "/%",
                      # 2026-09-06 扩充：录用结果公示/招聘会预告/选聘（与 GLOBAL_NOISE 对齐，
                      # 清理加入黑名单前已入库的历史行）
-                     "%拟录用%", "%拟聘用%", "%招聘会%", "%选聘%"]
+                     "%拟录用%", "%拟聘用%", "%招聘会%", "%选聘%",
+                     # 2026-11-11 扩充：消费券/促消费类「平台遴选公告」。
+                     # 这些标题含「遴选」，能过上海源的反向白名单 RECRUIT_KEEP（遴选是招聘词），
+                     # 但内容跟招聘无关——杨浦历史上因此混进 3 条（杨MALL券发放平台遴选、
+                     # 体育消费券发放平台遴选、促消费合作企业遴选）。真实招聘公告不含这些词。
+                     "%消费券%", "%促消费%",
+                     # 「券」+「遴选」组合：消费券/优惠券/杨MALL券 的发放平台遴选，
+                     # 名字千奇百怪但都长这样；真实招聘公告不会同时出现这两个词。
+                     "%券%遴选%"]
     exact_patterns = ["事业单位公开招聘", "公开招聘"]
     n = 0
     for p in like_patterns:
@@ -2261,6 +2452,13 @@ def _work(s, limit_per_source=40):
             # 若先截断再过滤会丢失排位靠后的近期真公告）
             s2 = dict(s)
             raw = _manda_items(s2)
+            items = _filter_manda_items(s2, raw)
+            return s2, items[:limit_per_source], None, len(raw)
+        if s.get("method") == "zwgk_es":
+            # 上海新版政务公开搜索接口（CMS3）：栏目页只有壳、列表靠接口渲染，
+            # 且这类站常带 WAF（无头浏览器 403）。纯 http 打接口，双通道都能跑。
+            s2 = dict(s)
+            raw = _zwgk_es_items(s2)
             items = _filter_manda_items(s2, raw)
             return s2, items[:limit_per_source], None, len(raw)
         if s.get("method") == "jsptsearch":
