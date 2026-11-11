@@ -407,7 +407,8 @@
       "https://hrss.xizang.gov.cn/xwzx/tzgg/index_2.html",
       "https://hrss.xizang.gov.cn/xwzx/tzgg/index_3.html"
     ],
-    "note": "2026-11-11 改 browser → http。原 WARN 是 TLS 握手 [WinError 10054] 远程主机强迫关闭连接，排查结论：该域名 DNS 同时有 AAAA（240e:62c:100:3::4）和 A（220.182.56.98），且 IPv6 排在前面；playwright 走系统解析容易先撞 IPv6，西藏政务网的 IPv6 链路不稳会直接 RST。实测页面本身完全静态可读（21KB），列表和 index_2/index_3 分页都是静态 HTML，改 http 后 raw=171 / items=1，既去掉 playwright 依赖（国内 lite 通道也能跑），也绕开 IPv6——fetch_http 内部强制 IPv4 解析。"
+    "note": "2026-11-11 改 browser → http。原 WARN 是 TLS 握手 [WinError 10054] 远程主机强迫关闭连接，排查结论：该域名 DNS 同时有 AAAA（240e:62c:100:3::4）和 A（220.182.56.98），且 IPv6 排在前面；playwright 走系统解析容易先撞 IPv6，西藏政务网的 IPv6 链路不稳会直接 RST。实测页面本身完全静态可读（21KB），列表和 index_2/index_3 分页都是静态 HTML，改 http 后 raw=171 / items=1，既去掉 playwright 依赖（国内 lite 通道也能跑），也绕开 IPv6——fetch_http 内部强制 IPv4 解析。 另加 browser_fallback=true：实测云端（海外 IP）这一轮没刷新到本源（last_seen 停在国内通道的时间），说明海外直取可能被挡；配了它之后，云端 raw=0 时会用 playwright 再试一次浏览器（海外通道有 playwright，国内 lite 通道没有就自动跳过），两边都拿不到也不会更差——只是多花 5–10 秒。",
+    "browser_fallback": true
   },
   {
     "name": "陕西-省考",

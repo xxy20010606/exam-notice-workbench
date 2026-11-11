@@ -2483,7 +2483,7 @@ def _work(s, limit_per_source=40):
         # 只在 raw==0 时兜底：raw>0 但 items==0 是「读到了但被 include/exclude 全滤掉」，
         # 那是内容空窗或过滤太严，浏览器取同一份列表也救不了，白花 5-10 秒。
         if (not items and not stats.get("raw")
-                and s.get("method") in ("jpage", "jpaas")
+                and (s.get("method") in ("jpage", "jpaas") or s.get("browser_fallback"))
                 and not s.get("no_browser_fallback")):
             try:
                 h2 = _raw_fetch(s["url"], "browser",
