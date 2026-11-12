@@ -1,0 +1,206 @@
+[lite] playwright 可用，browser 源纳入国内抓取
+[jpaas] https://www.jszzb.gov.cn/2027ndkslygwyzt/zkgg/index.html 抓 1 页
+[jpaas] http://www.zjks.com/col/col1229635561/index.html 抓 1 页（共 19 条）
+[jpaas] http://rsj.lishui.gov.cn/col/col1229574716/index.html 抓 1 页
+[jpaas] https://rlsbt.zj.gov.cn/col/col1229743683/index.html 抓 2 页
+[jpaas] https://rlsbj.jiaxing.gov.cn/col/col1229289160/index.html 抓 2 页
+[jpaas] http://hrss.wenzhou.gov.cn/col/col1330496/index.html 抓 2 页（共 2159 条）
+[jpage] http://jshrss.jiangsu.gov.cn/col/col78506/index.html 抓 3 页 / 501 条原始条目
+[分页] 江苏镇江-事业单位 按模板抓取 6 页（5 路并发）
+[jpaas] https://hrss.yangzhou.gov.cn/ztzl/zlzp/index.html 抓 2 页（共 572 条）
+[jpaas] https://rsj.taizhou.gov.cn/xwzx/gsgg/index.html 抓 2 页（共 1714 条）
+[分页] 上海-金山区-事业单位 按模板抓取 12 页（8 路并发）
+[分页] 上海-事业单位招聘 按模板抓取 60 页（8 路并发）
+[jpage] https://jsychrss.yancheng.gov.cn/col/col3431/index.html 抓 2 页 / 401 条原始条目
+[分页] 上海-事业单位统考公告 按模板抓取 8 页（7 路并发）
+[jpaas] http://zsrls.zhoushan.gov.cn/col/col1229335114/index.html 抓 1 页
+[翻页] https://hrss.xz.gov.cn/001/001004/subPage.html 点击翻页 7 页
+[噪声] 三明-事业单位招聘 入库时过滤 2 条 junk
+[噪声] 北京-省考 入库时过滤 2 条 junk
+[噪声] 山西-省考 入库时过滤 26 条 junk
+[噪声] 浙江-省考 入库时过滤 2 条 junk
+[噪声] 安徽-省考 入库时过滤 18 条 junk
+[噪声] 福建-省考 入库时过滤 5 条 junk
+[噪声] 青海-省考 入库时过滤 2 条 junk
+[噪声] 宁夏-省考 入库时过滤 5 条 junk
+[噪声] 新疆兵团-省考 入库时过滤 1 条 junk
+[噪声] 浙江-事业单位招聘 入库时过滤 3 条 junk
+[噪声] 浙江-事业单位(通用网报平台) 入库时过滤 3 条 junk
+[噪声] 浙江温州-事业单位 入库时过滤 3 条 junk
+[噪声] 浙江台州-事业单位 入库时过滤 7 条 junk
+[噪声] 浙江宁波-事业单位 入库时过滤 1 条 junk
+[噪声] 浙江嘉兴-事业单位 入库时过滤 2 条 junk
+[噪声] 浙江丽水-事业单位 入库时过滤 1 条 junk
+[噪声] 江苏-省属事业单位 入库时过滤 1 条 junk
+[噪声] 江苏苏州-事业单位 入库时过滤 2 条 junk
+[噪声] 江苏无锡-事业单位 入库时过滤 2 条 junk
+[噪声] 江苏南通-事业单位 入库时过滤 2 条 junk
+[噪声] 江苏盐城-事业单位 入库时过滤 1 条 junk
+[噪声] 上海-事业单位招聘 入库时过滤 1 条 junk
+[噪声] 上海-浦东区-事业单位 入库时过滤 1 条 junk
+[噪声] 上海-事业单位统考公告 入库时过滤 1 条 junk
+[清理] 删除 7 条历史噪声/重复记录
+{
+  "run_at": "2026-11-12 10:20:46",
+  "dashboard_notices": 1032,
+  "new_count": 19,
+  "cleaned": 7,
+  "date_backfilled": 0,
+  "browser_skipped": 0,
+  "source_errors": 0,
+  "has_change": 1,
+  "new": [
+    {
+      "source": "厦门-事业单位招聘",
+      "category": "事业编",
+      "region": "厦门",
+      "title": "厦门理工学院简化程序公开招聘事业单位专业技术岗位人员公告（2026年11月）",
+      "url": "https://hrss.xm.gov.cn/xxgk/tzgg/202611/t20261112_3025652.htm",
+      "date": "2026-11-12"
+    },
+    {
+      "source": "福建-全省事业单位(统一平台)",
+      "category": "事业编",
+      "region": "福建",
+      "title": "厦门理工学院简化程序公开招聘事业单位专业技术岗位人员公告（2026年11月）",
+      "url": "https://rsc.xmut.edu.cn/info/1018/3201.htm",
+      "date": "2026-11-12"
+    },
+    {
+      "source": "福建-全省事业单位(统一平台)",
+      "category": "事业编",
+      "region": "福建",
+      "title": "福州海关所属事业单位2026年度公开招聘工作人员公告",
+      "url": "http://fuzhou.customs.gov.cn/fuzhou_customs/zfxxgk19/2963574/2965145/7282664/index.html",
+      "date": "2026-08-03"
+    },
+    {
+      "source": "安徽-省考",
+      "category": "省考",
+      "region": "安徽",
+      "title": "安徽省2026年下半年事业单位公开招聘工作人员专题",
+      "url": "http://www.apta.gov.cn/Officer/TopicIndex?examid=431",
+      "date": ""
+    },
+    {
+      "source": "湖南-省考",
+      "category": "省考",
+      "region": "湖南",
+      "title": "湖南省2025年考试录用公务员",
+      "url": "https://www.hxw.gov.cn/topic/267/index.html",
+      "date": "2026-04-21"
+    },
+    {
+      "source": "广西-省考",
+      "category": "省考",
+      "region": "广西",
+      "title": "公务员招录考试",
+      "url": "http://www.gxpta.com.cn/ksxm/gwyzlks/",
+      "date": ""
+    },
+    {
+      "source": "海南-省考",
+      "category": "省考",
+      "region": "海南",
+      "title": "海南省考试录用公务员网上报名管理系统",
+      "url": "https://gwy.hnks.gov.cn/",
+      "date": ""
+    },
+    {
+      "source": "四川-省考",
+      "category": "省考",
+      "region": "四川",
+      "title": "四川省2027年度公开考试录用公务员（参照管理工作人员）专题",
+      "url": "https://www.scpta.com.cn/front/Special/Info/44ad63b224814ead8b066b95b0aa6aff",
+      "date": "2024-07-29"
+    },
+    {
+      "source": "四川-省考",
+      "category": "省考",
+      "region": "四川",
+      "title": "四川省2027年度从优秀村（社区）干部、优秀工人农民、服务基层项目人员、事业编制人员、退役军人中考试录用公务员（参照管理工作人员）职位调整公告",
+      "url": "https://www.scpta.com.cn/front/News/info/79bf6b06650746b79f51119332774e0f?t=56",
+      "date": "2026-11-12"
+    },
+    {
+      "source": "四川-省考",
+      "category": "省考",
+      "region": "四川",
+      "title": "2027年度四川省检察院系统公开考试录用公务员职位调整公告",
+      "url": "https://www.scpta.com.cn/front/News/info/1b368cdcaea64793b7c285218bf47d4d?t=56",
+      "date": "2026-11-12"
+    },
+    {
+      "source": "四川-省考",
+      "category": "省考",
+      "region": "四川",
+      "title": "2027年度四川省监狱系统公开考试录用公务员（人民警察）职位调整公告",
+      "url": "https://www.scpta.com.cn/front/News/info/eac9ef15cbe247e88e89f733e0218ee8?t=56",
+      "date": "2026-11-12"
+    },
+    {
+      "source": "四川-省考",
+      "category": "省考",
+      "region": "四川",
+      "title": "中共成都市委组织部关于成都市2027年度公开考试录用公务员（人民警察）职位调整的公告",
+      "url": "https://www.scpta.com.cn/front/News/info/801dbd3e04e0487ab749818ae8f939ec?t=56",
+      "date": "2026-11-12"
+    },
+    {
+      "source": "四川-省考",
+      "category": "省考",
+      "region": "四川",
+      "title": "中共广安市委组织部广安市公安局关于广安市2027年度公开考试录用公务员（人民警察）职位调整的公告",
+      "url": "https://www.scpta.com.cn/front/News/info/af2c02ad1c98435c90f99e7423816580?t=56",
+      "date": "2026-11-12"
+    },
+    {
+      "source": "四川-省考",
+      "category": "省考",
+      "region": "四川",
+      "title": "中共自贡市委组织部关于自贡市2027年度公开考试录用公务员（参照管理工作人员）职位调整的公告",
+      "url": "https://www.scpta.com.cn/front/News/info/a3e61d00faef44da9abd9a56667576d5?t=56",
+      "date": "2026-11-12"
+    },
+    {
+      "source": "新疆兵团-省考",
+      "category": "省考",
+      "region": "新疆兵团",
+      "title": "公务员招录考试",
+      "url": "http://btpta.xjbt.gov.cn/gwyzl/",
+      "date": ""
+    },
+    {
+      "source": "浙江温州-事业单位",
+      "category": "事业编",
+      "region": "浙江",
+      "title": "2026年下半年温州市直属医疗卫生健康单位面向社会公开招聘优秀毕业生公告",
+      "url": "https://wjw.wenzhou.gov.cn/col/col1229207884/art/2026/art_7b94f0373ab040bbb95342e923e96873.html",
+      "date": "2026-11-11"
+    },
+    {
+      "source": "浙江嘉兴-事业单位",
+      "category": "事业编",
+      "region": "浙江",
+      "title": "嘉兴职业技术学院公开招聘高层次紧缺人才公告",
+      "url": "https://rlsbj.jiaxing.gov.cn/col/col1229289160/art/2026/art_4a8cbf3e4e0645baa1f9f4d9fe180d55.html",
+      "date": "2026-11-11"
+    },
+    {
+      "source": "上海-事业单位招聘",
+      "category": "事业编",
+      "region": "上海",
+      "title": "上海健康医学院2026年公开招聘工作人员公告（第三批）",
+      "url": "https://rsj.sh.gov.cn/tzpgg_17408/20261111/t0035_1444607.html",
+      "date": "2026-11-11"
+    },
+    {
+      "source": "上海-事业单位招聘",
+      "category": "事业编",
+      "region": "上海",
+      "title": "上海市行政管理学校（上海市珠峰中学）2026教师公开招聘简章（第二批）",
+      "url": "https://rsj.sh.gov.cn/tzpgg_17408/20261111/t0035_1444619.html",
+      "date": "2026-11-11"
+    }
+  ]
+}
